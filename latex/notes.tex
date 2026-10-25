@@ -1,0 +1,20 @@
+\documentclass[11pt,oneside]{book}
+\usepackage{coursenotes}
+\setcourse{MFE 230D}{Derivatives: Quantitative Methods}{GennaroAlberto/mfe230d-derivatives}
+\graphicspath{{figures/}}
+\renewcommand{\coursechapter}[2]{\chapter{#2}\label{ch:#1}\input{chapters/#1}}
+% Exercises live in their own book; \exref{<label>} points into it.
+\usepackage{xr}
+\externaldocument[X-]{exercises}
+\newcommand{\exref}[1]{\cref{X-#1}}
+\newcommand{\noteref}[1]{\cref{#1}}
+
+\begin{document}
+\coursetitlepage{Lecture notes}
+\tableofcontents
+\input{preface}
+\input{toc}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}

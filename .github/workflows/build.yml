@@ -1,0 +1,76 @@
+name: Build notes and check code
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the course package
+        run: pip install -e "code[dev]"
+
+      - name: Run the tests
+        run: pytest -q code/tests || [ $? -eq 5 ]   # 5 = no tests collected yet
+
+      - name: Run every notebook
+        run: |
+          shopt -s nullglob
+          nbs=(code/notebooks/*.ipynb)
+          if [ ${#nbs[@]} -gt 0 ]; then
+            jupyter nbconvert --to notebook --execute --output-dir /tmp/executed "${nbs[@]}"
+          fi
+
+      - name: Regenerate the figures
+        run: python code/figures/make_figures.py
+
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends latexmk lmodern \
+            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended
+
+      - name: Build the PDFs
+        run: make pdf
+
+      - name: Assemble the download page
+        run: |
+          mkdir -p _site
+          cp latex/notes.pdf latex/exercises.pdf _site/
+          cp site/index.html _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

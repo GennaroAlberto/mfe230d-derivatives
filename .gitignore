@@ -1,0 +1,25 @@
+# LaTeX build products (PDFs are built by CI and published to GitHub Pages)
+latex/*.pdf
+
+# Solutions are private: never commit them here
+latex/solutions/
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+# Python
+__pycache__/
+*.egg-info/
+.ipynb_checkpoints/
+.pytest_cache/
+.venv/
+
+# Site build
+_site/
+.DS_Store

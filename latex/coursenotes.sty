@@ -1,0 +1,154 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{coursenotes}[2026/10/24 Lecture notes and exercises from one source]
+
+
+% ---------- fonts, layout ----------
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage{microtype}
+\RequirePackage[letterpaper,margin=1.1in,headheight=14pt]{geometry}
+\RequirePackage{amsmath,amssymb,amsthm,mathtools,bm}
+\RequirePackage{xcolor,graphicx,booktabs,enumitem}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{comment}
+\RequirePackage{listings}
+\RequirePackage{fancyhdr}
+\RequirePackage{xspace}
+
+\definecolor{cobalt}{HTML}{2657FF}
+\definecolor{gold}{HTML}{B47B12}
+\definecolor{ink}{HTML}{0F172A}
+\definecolor{paper}{HTML}{F3F5F9}
+
+\RequirePackage[round,authoryear]{natbib}
+\newcommand{\textcite}[1]{\citet{#1}}
+\RequirePackage[colorlinks=true,linkcolor=cobalt,citecolor=cobalt,urlcolor=cobalt]{hyperref}
+\RequirePackage[capitalise,noabbrev]{cleveref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlist{itemsep=0.2em,topsep=0.3em}
+
+% ---------- course metadata, set in each main file ----------
+\newcommand{\coursecode}{}
+\newcommand{\coursetitle}{}
+\newcommand{\repourl}{}
+\newcommand{\colaburl}{}
+\newcommand{\documentkind}{}
+\newcommand{\setcourse}[3]{% {code}{title}{owner/repo}
+  \renewcommand{\coursecode}{#1}\renewcommand{\coursetitle}{#2}%
+  \renewcommand{\repourl}{https://github.com/#3}%
+  \renewcommand{\colaburl}{https://colab.research.google.com/github/#3/blob/main}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{gray}\coursecode\ \textperiodcentered\ \documentkind}
+\fancyhead[R]{\small\color{gray}\nouppercase{\leftmark}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}}
+
+\newcommand{\coursetitlepage}[1]{%
+  \renewcommand{\documentkind}{#1}%
+  \begin{titlepage}
+    \vspace*{0.22\textheight}
+    {\color{cobalt}\rule{0.18\textwidth}{2pt}}\par\vspace{1.2em}
+    {\Large\color{gray}\coursecode}\par\vspace{0.4em}
+    {\Huge\bfseries\color{ink}\coursetitle}\par\vspace{0.8em}
+    {\LARGE #1}\par\vfill
+    {\large Alberto Gennaro}\par\vspace{0.3em}
+    {\color{gray}\href{\repourl}{\nolinkurl{\repourl}}}\par\vspace{0.3em}
+    {\color{gray}Built \today}
+  \end{titlepage}}
+
+% ---------- one table of contents drives every document ----------
+% latex/toc.tex lists \coursechapter{<slug>}{<title>}; each main file decides
+% what a chapter prints (notes, exercises, or the private solutions).
+\newcommand{\coursechapter}[2]{\chapter{#2}\label{ch:#1}}
+
+% ---------- notation ----------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\EQ}{\mathbb{E}^{\mathbb{Q}}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\Fil}{\mathbb{F}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\1}{\mathbf{1}}
+\newcommand{\eqd}{\overset{d}{=}}
+\newcommand{\iid}{i.i.d.\xspace}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\Cov}{Cov}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% ---------- statements ----------
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\tcbset{statement/.style={blanker,breakable,left=11pt,before skip=0.9em,after skip=0.9em}}
+\tcolorboxenvironment{theorem}{statement,borderline west={2pt}{0pt}{cobalt}}
+\tcolorboxenvironment{proposition}{statement,borderline west={2pt}{0pt}{cobalt}}
+\tcolorboxenvironment{lemma}{statement,borderline west={1pt}{0pt}{cobalt!60}}
+\tcolorboxenvironment{corollary}{statement,borderline west={1pt}{0pt}{cobalt!60}}
+\tcolorboxenvironment{definition}{statement,borderline west={2pt}{0pt}{gold}}
+
+% ---------- exercises and solutions ----------
+\newcounter{exercise}[chapter]
+\renewcommand{\theexercise}{\thechapter.\arabic{exercise}}
+\crefname{exercise}{Exercise}{Exercises}
+\newenvironment{exercise}[1][]{%
+  \par\addvspace{1.1em}\refstepcounter{exercise}%
+  \noindent{\bfseries\color{ink}Exercise~\theexercise}%
+  \if\relax\detokenize{#1}\relax\else\ {\itshape(#1)}\fi\quad}{\par}
+% Difficulty marks: \easy, \medium, \hard
+\newcommand{\easy}{\textcolor{gray}{[$\star$]}\ }
+\newcommand{\medium}{\textcolor{gray}{[$\star\star$]}\ }
+\newcommand{\hard}{\textcolor{gray}{[$\star\star\star$]}\ }
+
+% Solutions are NOT kept in this repository (they would spoil the course for
+% students). They live in a private repo and are only used by solutions.tex:
+%   \begin{solution}{<exercise label>} ... \end{solution}
+\newtcolorbox{solution}[1]{enhanced,breakable,colback=paper,colframe=paper,boxrule=0pt,arc=2pt,
+  left=9pt,right=9pt,top=6pt,bottom=6pt,before skip=0.6em,after skip=0.9em,
+  title={Solution to \cref{#1}},fonttitle=\bfseries\small,coltitle=ink,colbacktitle=paper}
+
+% ---------- links to the code ----------
+\newcommand{\coderef}[1]{\href{\repourl/blob/main/#1}{\texttt{\detokenize{#1}}}}
+% \demo{<notebook file>}{<what it shows>}: an interactive notebook, opened in Colab.
+\newcommand{\demo}[2]{\par\noindent\textcolor{cobalt}{$\blacktriangleright$}~%
+  \href{\colaburl/code/notebooks/#1}{Interactive demo}: #2\par}
+\newtcolorbox{incode}[1][]{enhanced,breakable,colback=cobalt!3,colframe=cobalt!35,boxrule=0.4pt,arc=2pt,
+  left=9pt,right=9pt,top=5pt,bottom=5pt,title={In code},fonttitle=\bfseries\small,coltitle=ink,
+  colbacktitle=cobalt!9,before skip=0.9em,after skip=0.9em,#1}
+
+\lstdefinestyle{py}{language=Python,basicstyle=\ttfamily\small,keywordstyle=\color{cobalt}\bfseries,
+  commentstyle=\color{gray}\itshape,stringstyle=\color{gold!80!black},showstringspaces=false,
+  columns=fullflexible,breaklines=true,backgroundcolor=\color{paper},xleftmargin=6pt,framexleftmargin=6pt,
+  frame=none,aboveskip=0.6em,belowskip=0.6em}
+\lstset{style=py}
+
+
+% ---------- chapters still being written ----------
+% \begin{planned} \item ... \end{planned}: the outline of a chapter not yet written.
+\newenvironment{planned}{%
+  \begin{tcolorbox}[enhanced,colback=paper,colframe=paper,boxrule=0pt,arc=2pt,left=9pt,right=9pt,
+    title={In preparation},fonttitle=\bfseries\small,coltitle=ink,colbacktitle=paper]
+  \small This chapter is being written. It will cover:\begin{itemize}[itemsep=0.1em]}%
+  {\end{itemize}\end{tcolorbox}}
+
+% ---------- references at the end of a chapter ----------
+\newcommand{\furtherreading}{\section*{Further reading}\addcontentsline{toc}{section}{Further reading}}
+
+\endinput

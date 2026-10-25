@@ -1,0 +1,44 @@
+\chapter*{About these notes}
+\addcontentsline{toc}{chapter}{About these notes}
+
+These are lecture notes for MFE 230D, \emph{Derivatives: Quantitative Methods}, in the
+Master of Financial Engineering program at UC Berkeley Haas: analytical pricing beyond the
+Black--Scholes formula, Monte Carlo methods and their Greeks, path-dependent and
+multi-asset payoffs, and the numerical methods behind them.
+
+% TODO(Alberto): check the wording of this acknowledgement before publishing.
+They grew out of the discussion sessions I taught for the course, which is taught by
+Dmitry Livdan and builds on material developed by Eric Reiner. The text, the proofs, the
+demos and the wording of the exercises were written for this repository; any mistakes
+are mine.
+
+\paragraph{How to use them.} Each chapter has three parts. The notes, in this document,
+develop the theory with complete proofs wherever the argument teaches something, and
+with precise references where it does not. The exercises are collected in a separate
+document; solutions are not published, so that the course is not spoiled for the next
+class. The interactive demos, marked \textcolor{cobalt}{$\blacktriangleright$}, are Python
+notebooks that open in Google Colab in one click.
+
+\paragraph{Prerequisites.} Stochastic calculus for finance at the level of a first
+course: Brownian motion, It\^o's formula, risk-neutral pricing and the Black--Scholes model.
+The companion notes for IEOR 222 cover all of it. Python with NumPy and SciPy.
+
+\paragraph{Corrections.} Please report errors, typos and unclear passages as issues on
+the \href{\repourl/issues}{GitHub repository}.
+
+\section*{Notation}
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+$(\Omega,\F,\Prob)$ & probability space; $\Prob$ is the real-world (historical) measure\\
+$\Q$, $\EQ$ & a risk-neutral measure and its expectation\\
+$(\F_t)_{t\ge0}$ & filtration: the information available at time $t$\\
+$W$ & a Brownian motion\\
+$\mathcal N(m,v)$, $N(\cdot)$ & normal law with mean $m$ and variance $v$; standard normal CDF\\
+$x^+$, $x\wedge y$ & $\max(x,0)$; $\min(x,y)$\\
+$\1_A$ & indicator of the event $A$\\
+$[X,X]_t$ & quadratic variation of $X$ on $[0,t]$\\
+$r$, $\sigma$, $K$, $T$ & interest rate, volatility, strike, maturity\\
+\bottomrule
+\end{tabular}
+\end{center}

@@ -1,0 +1,18 @@
+\documentclass[11pt,oneside]{book}
+\usepackage{coursenotes}
+\setcourse{MFE 230D}{Derivatives: Quantitative Methods}{GennaroAlberto/mfe230d-derivatives}
+\graphicspath{{figures/}}
+\renewcommand{\coursechapter}[2]{%
+  \chapter{#2}\label{ch:#1}%
+  \IfFileExists{exercises/#1.tex}{\input{exercises/#1}}{\emph{No exercises for this chapter yet.}}}
+% \noteref{<label>} points into the lecture notes (theorems, equations, sections).
+\usepackage{xr}
+\externaldocument[N-]{notes}
+\newcommand{\noteref}[1]{\cref{N-#1}}
+\newcommand{\exref}[1]{\cref{#1}}
+
+\begin{document}
+\coursetitlepage{Exercises}
+\tableofcontents
+\input{toc}
+\end{document}
