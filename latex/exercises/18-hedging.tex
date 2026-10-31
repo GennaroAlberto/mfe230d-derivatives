@@ -1,0 +1,149 @@
+% Exercises for Chapter 18 (Hedging in practice). Statements only: solutions are kept privately.
+% Unless stated otherwise: the standard model, the test case S = K = 100, T = 1, r = 1%, y = 2%,
+% sigma = 20%, a seller who hedges at the dates t_j = jh, h = T/m, with dividends reinvested,
+% and the notation of the chapter (e_m, M_m, H_t, S~_t, I_mu).
+
+\begin{exercise}[Which claims are hedged exactly?]\label{ex:hd-exact-hedge}
+\easy Let $F$ be Lipschitz and $m\ge1$. You may use \noteref{eq:hd-error-integral}, the It\^o
+isometry, that $V$ is infinitely differentiable on $[0,T)\times(0,\infty)$ and continuous up to
+$T$, and that for $0\le s<t$ the conditional law of $S_t$ given $\F_s$ has a positive density on
+$(0,\infty)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $e_m=0$ for every $m$ if $F(s)=a+bs$.
+  \item Conversely, suppose that $e_m=0$ almost surely for one $m\ge1$. Show that
+    $\Gamma=0$ on $[0,T)\times(0,\infty)$, and deduce that $F$ is affine.
+  \item Which of the following does the $m$-date hedge replicate exactly: a forward contract; a
+    long call and a short put with the same strike and maturity; a straddle?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[When the integrability condition fails]\label{ex:hd-integrability}
+\medium The cash-or-nothing call pays $\1_{\{S_T>K\}}$; its gamma is
+$\Gamma_d(t,s)=-e^{-r\tau}N'(d_-)\,d_+/(s^2\sigma^2\tau)$. Work under $\Q$ ($\mu=r$).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\varphi(t)=\E[e^{-2rt}S_t^4\Gamma_d(t,S_t)^2]\ge c\,(T-t)^{-3/2}$ for $t$ close to $T$ and
+    some constant $c>0$, so that the condition \noteref{eq:hd-integrability} fails. \emph{Hint:}
+    restrict the expectation to the event $\{1\le d_+(t,S_t)\le2\}$.
+  \item For $\varepsilon>0$ let $F_\varepsilon(s)=\big((s-K)^+-(s-K-\varepsilon)^+\big)/\varepsilon$, a call spread normalised to
+    pay at most $1$. Show that $F_\varepsilon$ is Lipschitz and satisfies
+    \noteref{eq:hd-integrability}, so that \noteref{prop:hd-discrete-error} applies to it.
+  \item (Computational.) Compute $I_\varepsilon=\int_0^T\E[e^{-2rt}S_t^4\Gamma_\varepsilon(t,S_t)^2]\,\dd t$ for $K=100$ and the
+    widths $\varepsilon=10$, $1$, $0.1$ and $0.01$, where $\Gamma_\varepsilon$ is the gamma of $F_\varepsilon$. How does $I_\varepsilon$ grow as $\varepsilon\to0$, and
+    what does that say about hedging a tight call spread with the asymptotics of
+    \noteref{prop:hd-discrete-error}? \emph{Hint:} the product of two Gaussian kernels
+    $N'(d_+(K_1))N'(d_+(K_2))$ is a constant times a Gaussian kernel centred at the midpoint of
+    their centres, so the closed form \texttt{gamma\_moment} in the module
+    \coderef{code/src/mfe230d/hedging.py} can be reused.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A rule of thumb at the money]\label{ex:hd-kamal-derman}
+\medium Take $r=y=0$ and $S_0=K$, and work under $\Q$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that for the call
+    \[
+      \varphi(t)=\E\big[S_t^4\Gamma(t,S_t)^2\big]=\frac{K^2\exp\big(-\sigma^2T^2/(4(T+t))\big)}{2\pi\sigma^2\sqrt{T^2-t^2}},
+      \qquad0\le t<T .
+    \]
+  \item Let $V_0$ be the price of the call. Deduce that $\sigma^4TI/(2V_0^2)\to\pi/4$ as $\sigma^2T\to0$.
+  \item Conclude, from \noteref{prop:hd-discrete-error}, the traders' rule that for short-dated
+    at-the-money options the standard deviation of the hedging error is about
+    $\sqrt{\pi/(4m)}$ times the premium, or $\sqrt{\pi/(4m)}\,\sigma\mathcal V$ with $\mathcal V$ the vega. Which
+    two limits have been taken, and in which order?
+  \item Evaluate the rule $\sqrt{\pi/4}\,\sigma\mathcal V$ for the test case (where $r,y\ne0$) and compare
+    it with the constant $\sigma^2\sqrt{TI_r/2}$ of the chapter.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Hedging the log contract]\label{ex:hd-variance-swap}
+\easy In the setting of \noteref{sec:hd-wrong-vol} (bounded $\mu_t$ and $0\le\sigma_t\le\bar\sigma$), consider the
+claim $F(s)=-2\log(s/S_0)$, which is not Lipschitz, so that \noteref{prop:hd-wrong-vol} does not
+apply as stated.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that its Black--Scholes price at volatility $\sigma_h$ is
+    $V_h(t,s)=-2e^{-r\tau}\big(\log(s/S_0)+(r-y-\frac12\sigma_h^2)\tau\big)$, and that
+    $s^2\Gamma_h(t,s)=2e^{-r\tau}$.
+  \item Following the proof of \noteref{prop:hd-wrong-vol}, show that the dealer who sells the
+    claim for $V_h(0,S_0)$ and holds $\Delta_h(t,S_t)$ shares ends with
+    \[
+      e^{-rT}\big(X_T-F(S_T)\big)=e^{-rT}\Big(\sigma_h^2T-\int_0^T\sigma_t^2\,\dd t\Big).
+    \]
+    Why is the passage to the limit $T'\uparrow T$ easier here than for a call?
+  \item Interpret the result as a position in realised variance, and contrast it with a call,
+    for which the same realised variance can give very different P\&L.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The mean error under the real-world measure]\label{ex:hd-drift-bias}
+\medium This exercise uses the proof of \noteref{prop:hd-discrete-error}, where
+$\E[e_m]=(\mu-r)\sum_j\E[D_j]$.
+\begin{enumerate}[label=(\alph*)]
+  \item Using the expression for $\E[G_t\tilde S_t\mid\F_{t_j}]$ in that proof, argue heuristically
+    that
+    \[
+      \E[e_m]=-(\mu-r)^2\,\frac h2\int_0^T\E\big[e^{-rt}S_t^2\Gamma(t,S_t)\big]\,\dd t+o(h).
+    \]
+  \item (Computational.) For the test-case call, evaluate the constant with
+    \texttt{gamma\_s2\_moment} of \coderef{code/src/mfe230d/hedging.py} (with $\sigma_h=\sigma_r=\sigma$) for
+    $\mu=10\%$, $20\%$ and $-10\%$, convert to time-$T$ money, and compare with the means of
+    \noteref{tab:hd-hw5}.
+  \item Why is the leading term negative whatever the sign of $\mu-r$? Explain in terms of a
+    hedge ratio that is held fixed while the stock drifts.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Leland's adjustment when the gamma changes sign]\label{ex:hd-nonconvex}
+\medium Let the hedger hold a book whose Black--Scholes gamma $\hat\Gamma$ may take both signs, for
+instance a bull call spread (long the $95$ call, short the $105$ call).
+\begin{enumerate}[label=(\alph*)]
+  \item Explain why, in \noteref{lem:hd-one-period}, the leading cost of one rebalance becomes
+    $\frac12s^2|\hat\Gamma(t,s)|\sigma\sqrt{2h/\pi}$, and why a constant $\hat\sigma>\sigma$ then makes the losses
+    add up instead of cancel wherever $\hat\Gamma<0$.
+  \item Show that balancing the leading cost and the extra time decay at every $(t,s)$, as in
+    Leland's argument, requires the local hedging variance $\sigma^2(1+A\operatorname{sgn}\hat\Gamma)$, with $A$
+    the Leland number, so that the price should solve
+    \[
+      \partial_t\hat V+\tfrac12\sigma^2\big(1+A\operatorname{sgn}\partial_{ss}\hat V\big)s^2\partial_{ss}\hat V+(r-y)s\,\partial_s\hat V-r\hat V=0 .
+    \]
+  \item Why is this equation ill-posed when $A>1$? For $k=2\%$ and $\sigma=20\%$, from how many
+    rebalancing dates per year on is $A>1$? Is that a problem for the call of
+    \noteref{tab:hd-leland}?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[How often to rebalance?]\label{ex:hd-tradeoff}
+\easy A dealer hedges the test-case call at $\sigma$ with round-trip cost $k$ and chooses $m$ to
+minimise $\E[\text{costs}]+a\cdot\mathrm{sd}(\text{error})$, for a price of risk $a>0$. Use the
+leading-order approximations of the chapter, in time-$T$ money: expected costs $\alpha\sqrt m$ with
+$\alpha=e^{rT}k\,\mathcal C/\sqrt T$, $\mathcal C=15.58$, and standard deviation $\beta/\sqrt m$ with $\beta=7.02$.
+\begin{enumerate}[label=(\alph*)]
+  \item Find the optimal $m^*$ and the minimal value. How does $m^*$ scale with $k$ and with
+    $a$?
+  \item Evaluate them for $k=2\%$ and $a=1$.
+  \item (Computational.) Simulate the hedge at the integer nearest to $m^*$ with
+    \texttt{hedge\_experiment} of \coderef{code/src/mfe230d/hedging.py} ($50{,}000$ paths) and compare
+    the mean cost and the standard deviation of the error with the approximations. Explain the
+    differences.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The exact variance of the discrete hedge]\label{ex:hd-exact}
+\hard Work under $\Q$ with the call, $Y=e^{-rT}(S_T-K)^+$ and $M_m$ as in
+\noteref{eq:hd-error}. You may use Girsanov's theorem.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\EQ[e_m^2]=\Var Y+\EQ[M_m^2]-2\EQ[YM_m]$.
+  \item Show that
+    $\EQ[M_m^2]=\sum_je^{-2yt_j}\EQ\big[\delta_j^2\tilde S_{t_j}^2\big]\big(e^{\sigma^2h}-1\big)$.
+  \item Show that $\EQ\big[(\tilde S_{t_{j+1}}/\tilde S_{t_j})\,Y\mid\F_{t_j}\big]=e^{-rt_j}V\big(t_j,S_{t_j}e^{\sigma^2h}\big)$, and
+    deduce
+    \[
+      \EQ[YM_m]=\sum_je^{-(r+y)t_j}\,\EQ\Big[\delta_j\tilde S_{t_j}\big(V(t_j,S_{t_j}e^{\sigma^2h})-V(t_j,S_{t_j})\big)\Big].
+    \]
+  \item (Computational.) Each expectation is an integral against the law of $S_{t_j}$. Implement
+    the formula with a quadrature rule of your choice; compute the standard-error ratio
+    $\mathrm{sd}(e_m)/\mathrm{sd}(Y)$ for $m=1$, $12$ and $52$, simulated as about $0.48$, $0.15$ and $0.075$ after
+    \noteref{prop:cv-nonlinear}; reproduce the column ``exact sd'' of
+    \noteref{tab:hd-hw5}, and find from which $m$ on the leading term of
+    \noteref{prop:hd-discrete-error} is within $1\%$ of the exact standard deviation.
+\end{enumerate}
+\end{exercise}

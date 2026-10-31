@@ -1,0 +1,716 @@
+% Chapter 12: Multilevel Monte Carlo.
+
+\Cref{ch:07-path-simulation} ended with an uncomfortable trade-off. When the solution of a
+stochastic differential equation cannot be sampled exactly, a discretised Monte Carlo
+estimator pays twice: the bias of the scheme calls for small time steps, the statistical
+error for many paths, and with a first-order scheme the cost of a root-mean-square error
+$\varepsilon$ grows like $\varepsilon^{-3}$ instead of the $\varepsilon^{-2}$ of exact
+sampling (\cref{prop:ps-allocation,prop:mc-mse}). Multilevel Monte Carlo closes most of this
+gap, and in favourable cases all of it.
+
+The idea fits in one line. Write the price computed with the finest step as the price
+computed with a very coarse step plus a sum of corrections, each the difference between the
+payoffs computed with two consecutive steps \emph{on the same Brownian path}. The coarse
+price is cheap, so it can be estimated from many paths. A correction is expensive per path,
+but the two paths in it are close, so its variance is small and few paths suffice. Most of
+the work is done where it is cheap.
+
+\Citet{giles-mlmc} introduced the method for path simulation, after the multilevel
+methods of \textcite{heinrich-mlmc} for parametric integration and the two-level
+``statistical Romberg'' estimator of \textcite{kebaier-romberg}. We prove the identity it
+rests on and the best allocation of samples across levels (\cref{sec:ml-identity}), measure
+how fast the corrections shrink under the Euler and Milstein couplings, also for
+discontinuous payoffs (\cref{sec:ml-coupling}), prove Giles' complexity theorem with its
+three regimes and compare it with the allocation of \cref{prop:ps-allocation}
+(\cref{sec:ml-complexity}), describe the adaptive algorithm used in practice
+(\cref{sec:ml-algorithm}), and end with the randomised estimators of
+\textcite{rhee-glynn}, which remove the bias altogether when the corrections shrink fast
+enough (\cref{sec:ml-unbiased}).
+
+Throughout, $X$ solves \eqref{eq:ps-sde} on $[0,T]$ under $\Q$ with the Brownian motion $W$;
+$P$ is a square-integrable discounted payoff, a function of $X_T$ or of the path of $X$;
+$\theta=\E[P]$ is its price; and $P_\ell$ is the payoff computed from a scheme with
+step $h_\ell=T2^{-\ell}$, $\ell\in\N$. The running example is the test case: geometric
+Brownian motion $\dd S=\mu S\,\dd t+\sigma S\,\dd W$ with $\mu=r-y=-1\%$, $\sigma=20\%$,
+$T=1$, and $P=e^{-rT}(S_T-K)^+$ with $S_0=K=100$, so $\theta=7.36429$. Costs are counted in
+time steps: one step of one path costs $1$. A warning on notation: \cref{def:ps-orders}
+called the strong and the weak orders $\gamma$ and $\beta$. From now on, as in the
+literature on multilevel methods, $\alpha$, $\beta$ and $\gamma$ are the rates at which the
+bias, the variance of the corrections and the cost change from one level to the next, and
+the strong order of a scheme is written $\lambda$.
+
+\section{The multilevel identity}\label{sec:ml-identity}
+
+For a finest level $L$, linearity of expectation gives
+\begin{equation}\label{eq:ml-telescoping}
+  \E[P_L]=\E[P_0]+\sum_{\ell=1}^L\E\big[P_\ell-P_{\ell-1}\big].
+\end{equation}
+This is a triviality. It becomes a method when every term on the right is estimated from
+its own independent samples, and every difference is computed from a fine and a coarse
+approximation that are strongly dependent.
+
+\begin{definition}[Coupled corrections]\label{def:ml-coupled}
+Let $P_0,P_1,\dots\in L^2$. A \emph{coupled correction} at level $\ell\ge1$ is a random
+variable $Y_\ell=P^{\mathrm f}_\ell-P^{\mathrm c}_{\ell-1}$, where the \emph{fine} member
+$P^{\mathrm f}_\ell$ and the \emph{coarse} member $P^{\mathrm c}_{\ell-1}$ are square-integrable
+random variables on one probability space with
+\[
+  \E\big[P^{\mathrm f}_\ell\big]=\E[P_\ell],\qquad \E\big[P^{\mathrm c}_{\ell-1}\big]=\E[P_{\ell-1}];
+\]
+usually $P^{\mathrm f}_\ell$ has the law of $P_\ell$ and $P^{\mathrm c}_{\ell-1}$ the law of
+$P_{\ell-1}$. At level $0$, $Y_0=P_0$. We write $V_\ell=\Var(Y_\ell)$ and $\tau_\ell>0$ for
+the expected cost of one sample of $Y_\ell$.
+\end{definition}
+
+Only the means of the two members are constrained; their joint law is ours to choose, and
+the whole art is to choose it so that $V_\ell$ is small.
+
+\begin{proposition}[The multilevel estimator]\label{prop:ml-telescoping}
+Let $Y_0,Y_1,\dots$ be coupled corrections, $L\in\N$ and $n_0,\dots,n_L\ge1$ integers. Let
+$Y^{(i)}_\ell$, $1\le i\le n_\ell$, $0\le\ell\le L$, be independent, with $Y^{(i)}_\ell$
+distributed as $Y_\ell$, and
+\begin{equation}\label{eq:ml-estimator}
+  \hat\theta_L=\sum_{\ell=0}^L\hat Y_\ell,\qquad \hat Y_\ell=\frac1{n_\ell}\sum_{i=1}^{n_\ell}Y^{(i)}_\ell .
+\end{equation}
+\begin{enumerate}[label=(\roman*)]
+  \item $\E[\hat\theta_L]=\E[P_L]$, whatever the joint laws of the fine and coarse members.
+  \item $\Var(\hat\theta_L)=\sum_{\ell=0}^LV_\ell/n_\ell$, and for $\theta=\E[P]$ with
+    $P\in L^1$,
+    $\E\big[(\hat\theta_L-\theta)^2\big]=\big(\E[P_L]-\theta\big)^2+\sum_{\ell=0}^LV_\ell/n_\ell$.
+  \item The expected cost is $\mathcal C=\sum_{\ell=0}^Ln_\ell\tau_\ell$. For all real
+    $n_\ell>0$,
+    \[
+      \Big(\sum_{\ell=0}^L\frac{V_\ell}{n_\ell}\Big)\Big(\sum_{\ell=0}^Ln_\ell\tau_\ell\Big)\ \ge\ S_L^2,
+      \qquad S_L=\sum_{\ell=0}^L\sqrt{V_\ell\tau_\ell},
+    \]
+    and if every $V_\ell>0$, equality holds if and only if $n_\ell$ is proportional to
+    $\sqrt{V_\ell/\tau_\ell}$.
+  \item Let $v>0$. Every choice of the $n_\ell$ with $\Var(\hat\theta_L)\le v$ costs at least
+    $S_L^2/v$, and the integers
+    \begin{equation}\label{eq:ml-nl}
+      n_\ell=\max\Big(1,\Big\lceil\frac{S_L}{v}\sqrt{\frac{V_\ell}{\tau_\ell}}\,\Big\rceil\Big)
+    \end{equation}
+    give $\Var(\hat\theta_L)\le v$ at a cost $\mathcal C\le S_L^2/v+\sum_{\ell=0}^L\tau_\ell$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By \cref{def:ml-coupled}, $\E[Y_\ell]=\E[P_\ell]-\E[P_{\ell-1}]$ for $\ell\ge1$; only the
+two means enter. Each $\hat Y_\ell$ is unbiased for $\E[Y_\ell]$, and the sum telescopes as
+in \eqref{eq:ml-telescoping}.
+
+(ii) The $\hat Y_\ell$ are built from disjoint sets of independent samples, so they are
+independent and their variances add; $\Var(\hat Y_\ell)=V_\ell/n_\ell$ by
+\cref{prop:mc-unbiased}(iii). The mean squared error is the squared bias plus the variance,
+as in \cref{prop:mc-mse}(i).
+
+(iii) Apply the Cauchy--Schwarz inequality to $a_\ell=\sqrt{V_\ell/n_\ell}$ and
+$b_\ell=\sqrt{n_\ell\tau_\ell}$: $(\sum a_\ell^2)(\sum b_\ell^2)\ge(\sum a_\ell b_\ell)^2=S_L^2$,
+with equality if and only if $a=tb$ for some $t\ge0$ (as $b\ne0$). If every $V_\ell>0$, then
+$t>0$, and $\sqrt{V_\ell/n_\ell}=t\sqrt{n_\ell\tau_\ell}$ means $n_\ell=t^{-1}\sqrt{V_\ell/\tau_\ell}$.
+
+(iv) The lower bound is (iii) with $\Var(\hat\theta_L)\le v$. For \eqref{eq:ml-nl},
+$n_\ell\ge v^{-1}S_L\sqrt{V_\ell/\tau_\ell}$ gives $V_\ell/n_\ell\le v\sqrt{V_\ell\tau_\ell}/S_L$
+(trivially if $V_\ell=0$), and summing, $\Var(\hat\theta_L)\le v$. And
+$n_\ell\le v^{-1}S_L\sqrt{V_\ell/\tau_\ell}+1$, so
+$\sum n_\ell\tau_\ell\le v^{-1}S_L\sum\sqrt{V_\ell\tau_\ell}+\sum\tau_\ell$.
+\end{proof}
+
+Plain Monte Carlo on the finest level reaches the variance $v$ at the cost
+$\Var(P_L)\,2^L/v$, one fine path of $2^L$ steps per sample. The multilevel estimator replaces the
+work-normalised variance $\Var(P_L)\,2^L$ (\cref{def:mc-efficiency}) by $S_L^2$, which is much
+smaller when $V_\ell\ll\Var(P_\ell)$ at the expensive levels. The optimal $n_\ell$ spends the
+amount $n_\ell\tau_\ell\propto\sqrt{V_\ell\tau_\ell}$ on level $\ell$; where that amount
+concentrates decides the complexity (\cref{sec:ml-complexity}). Two degenerate cases are worth
+checking. If $V_\ell=0$, then $Y_\ell$ equals its mean almost surely: one sample is exact, the
+continuous optimum $n_\ell=0$ is not admissible because $\E[Y_\ell]$ must still be added, and
+\eqref{eq:ml-nl} takes $n_\ell=1$, which is the reason for the term $\sum\tau_\ell$ in (iv);
+this happens for an equation with constant coefficients, Brownian motion with drift, for which
+the Euler scheme is exact on every grid, so that the fine and coarse values of $X_T$ coincide (with
+additive noise but a state-dependent drift, as for Ornstein--Uhlenbeck, it is not, and $V_\ell>0$). If
+$L=0$, the estimator is plain Monte Carlo with one coarse step.
+
+\begin{remark}[A chain of control variates]\label{rem:ml-control}
+With $L=1$, $\hat\theta_1=\frac1{n_1}\sum_i\big(P^{\mathrm f}_1-P^{\mathrm c}_0\big)^{(i)}+\frac1{n_0}\sum_jP_0^{(j)}$
+is the control-variate estimator \eqref{eq:cv-estimator} for $P_1$, with the control
+$P^{\mathrm c}_0$, the coefficient $1$, and the unknown control mean $\E[P_0]$ replaced by an
+independent estimate from $n_0$ cheap samples. Any coefficient $b$ in place of $1$, used in both
+sums, keeps the estimator unbiased; its variance
+$\big(\Var(P_1)-2b\,\Cov(P^{\mathrm f}_1,P^{\mathrm c}_0)+b^2\Var(P_0)\big)/n_1+b^2\Var(P_0)/n_0$ is
+smallest for $b^*=\Cov(P^{\mathrm f}_1,P^{\mathrm c}_0)/\big(\Var(P_0)(1+n_1/n_0)\big)$, the
+coefficient of \cref{thm:cv-optimal} shrunk to account for the noise in the estimate of the control
+mean. When the levels are close, the correlation of the two members is near $1$, their variances are
+near $\Var(P)$, and $n_1\ll n_0$, so $b^*\approx1$: the simple choice $b=1$ loses little. A multilevel estimator
+is a chain of such controls: each level controls the one above it, and its own mean is
+estimated with the help of the level below. Computing both members from one Brownian path is
+common random numbers (\cref{prop:cv-crn}); with independent paths,
+$V_\ell=\Var(P_\ell)+\Var(P_{\ell-1})$ does not shrink and the method loses
+(\exref{ex:ml-uncoupled}).
+\end{remark}
+
+\section{Coupling fine and coarse paths}\label{sec:ml-coupling}
+
+Let $Y^h$ denote the Euler scheme \eqref{eq:ps-euler} or the Milstein scheme
+\eqref{eq:ps-milstein} with step $h$, driven by the increments of $W$ on its grid. One sample of
+$Y_\ell$, $\ell\ge1$, uses one draw of the $2^\ell$ fine increments
+$\Delta W_1,\dots,\Delta W_{2^\ell}$ of $W$ over steps of length $h_\ell$: the fine member is
+the payoff of $Y^{h_\ell}$ driven by them, the coarse member the payoff of $Y^{h_{\ell-1}}$ driven
+by the sums $\Delta W_{2k-1}+\Delta W_{2k}$, $k\le2^{\ell-1}$, which are the increments of the same
+$W$ over the coarse grid (\texttt{paths.coarsen}). Both members approximate the payoff of the
+same $X$. The sums are independent $\mathcal N(0,h_{\ell-1})$ variables, so the coarse member
+is computed by the level-$(\ell-1)$ scheme from inputs with the right law: it has the law of
+$P_{\ell-1}$, and $Y_\ell$ is a coupled correction. (Drawing the coarse increments first and
+splitting each one with the Brownian bridge of \cref{prop:ps-bridge} gives the same joint law.)
+
+\begin{proposition}[Variance of the corrections: Euler against Milstein]\label{prop:ml-variance-decay}
+Let $Y_\ell$ be built as above from the Euler or the Milstein scheme, and suppose that for some
+$p\ge1$ there are constants $A_p,\lambda>0$ with
+\begin{equation}\label{eq:ml-strong}
+  \big(\E|X_T-Y^h_T|^p\big)^{1/p}\le A_p\,h^\lambda\qquad\text{for all }h=T2^{-\ell},\ \ell\in\N .
+\end{equation}
+\begin{enumerate}[label=(\roman*)]
+  \item (Lipschitz payoffs.) Let $P=f(X_T)$ and $P_\ell=f(Y^{h_\ell}_T)$ with
+    $|f(x)-f(z)|\le\Lambda|x-z|$. If \eqref{eq:ml-strong} holds with $p=2$, then
+    \[
+      V_\ell\le\E[Y_\ell^2]\le\Lambda^2A_2^2\,(1+2^\lambda)^2\,h_\ell^{2\lambda}.
+    \]
+  \item (Digital payoffs.) Let $P=\1_{\{X_T>K\}}$ and $P_\ell=\1_{\{Y^{h_\ell}_T>K\}}$. If $X_T$
+    has a density bounded by $\rho$ on $[K-\delta_0,K+\delta_0]$ for some $\delta_0>0$, then for
+    every $\ell$ with $h_\ell^{\lambda p/(p+1)}\le\delta_0$,
+    \[
+      V_\ell\le\E[Y_\ell^2]=\Q\big(\1_{\{Y^{h_\ell}_T>K\}}\ne\1_{\{Y^{h_{\ell-1}}_T>K\}}\big)
+      \le\big(2\rho+(1+2^{\lambda p})A_p^p\big)\,h_\ell^{\lambda p/(p+1)} .
+    \]
+  \item For the scalar equation \eqref{eq:ps-sde}, the bound \eqref{eq:ml-strong} holds with $p=2$,
+    $\lambda=\frac12$ for the Euler scheme under the hypotheses (A1)--(A3) of \cref{thm:ps-euler},
+    and with $p=2$, $\lambda=1$ for the Milstein scheme under the hypotheses of
+    \cref{thm:ps-milstein}. Consequently, for Lipschitz payoffs $V_\ell=O(h_\ell)$ with Euler and
+    $V_\ell=O(h_\ell^2)$ with Milstein. (For a system driven by several Brownian motions with
+    non-commuting diffusion vector fields, the Milstein scheme without the L\'evy areas has strong
+    order only $\frac12$, and then $\beta=1$ \citep{giles-szpruch}.)
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $|Y_\ell|\le\Lambda|Y^{h_\ell}_T-Y^{h_{\ell-1}}_T|\le\Lambda\big(|Y^{h_\ell}_T-X_T|+|X_T-Y^{h_{\ell-1}}_T|\big)$.
+Both schemes are driven by the same $W$ as $X$, so \eqref{eq:ml-strong} applies to each
+term, and Minkowski's inequality gives
+$\|Y_\ell\|_2\le\Lambda A_2(h_\ell^\lambda+h_{\ell-1}^\lambda)=\Lambda A_2(1+2^\lambda)h_\ell^\lambda$.
+Finally $V_\ell\le\E[Y_\ell^2]$.
+
+(ii) $Y_\ell$ takes values in $\{-1,0,1\}$, so $\E[Y^2_\ell]$ is the probability that the two
+indicators differ. Let $0<\delta\le\delta_0$. If $|X_T-K|>\delta$ and both schemes are within
+$\delta$ of $X_T$, then both lie strictly on the side of $K$ where $X_T$ lies, and the
+indicators agree. Hence, by Markov's inequality and \eqref{eq:ml-strong},
+\[
+  \E[Y^2_\ell]\le\Q(|X_T-K|\le\delta)+\frac{\E|Y^{h_\ell}_T-X_T|^p+\E|Y^{h_{\ell-1}}_T-X_T|^p}{\delta^p}
+  \le2\rho\delta+(1+2^{\lambda p})A_p^p\,\frac{h_\ell^{\lambda p}}{\delta^p}.
+\]
+The choice $\delta=h_\ell^{\lambda p/(p+1)}$ balances the two terms and gives the bound.
+
+(iii) \Citet{kloeden-platen} prove \cref{thm:ps-euler}(i) and \cref{thm:ps-milstein}(i) by
+bounding $\E|X_T-Y^h_T|^2$ (Theorems~10.2.2 and 10.3.5 there; see also the comment after
+the proof of \cref{prop:ps-richardson}), which is \eqref{eq:ml-strong} with $p=2$; then apply (i).
+\end{proof}
+
+So the variance of the corrections decays at the rate $\beta=2\lambda$, twice the strong order:
+$\beta=1$ for Euler, $\beta=2$ for Milstein. This is where the strong order, irrelevant for the
+bias of prices (\cref{sec:ps-schemes}), pays off. The coupling is essential to the proof: the
+two schemes are compared with the same $X_T$.
+
+For digital payoffs the variance decays more slowly, because a small difference between the fine
+and coarse values changes the payoff by a full unit whenever $X_T$ is near the strike. With $p=2$,
+(ii) gives $\beta\ge\frac13$ for Euler and $\beta\ge\frac23$ for Milstein. For an autonomous
+equation with Lipschitz coefficients, such as GBM, the Euler bound \eqref{eq:ml-strong} holds for
+every $p\ge2$
+(\citealp{giles-higham-mao}, equation~(1.8), referring to \citealp{kloeden-platen}), and letting
+$p\to\infty$ in (ii) gives $V_\ell=O(h_\ell^{1/2-\delta})$ for every $\delta>0$; this is the
+argument of \textcite{giles-higham-mao}, Section~3, and \textcite{avikainen} proves the sharp form
+of the inequality behind it (Theorem~3.4 of the preprint arXiv:0712.3635). \Citet{giles-acta},
+Table~5.2, lists $O(h^{1/2}\log h)$ for the Euler digital. One cannot hope for much more with Euler:
+for GBM, the supremum over strikes $K\ge K_0$ of the strong error of the binary payoff is of exact
+order $h^{1/2}$ (Theorem~7.2 of the preprint), whereas corrections with $\E[Y_\ell^2]\le Ch_\ell^\beta$
+uniformly in $K\ge K_0$ for some $\beta>\frac12$ would give
+$\E|P-P_L|=\|P-P_L\|_2^2\le\big(\sum_{\ell>L}\|Y_\ell\|_2\big)^2=O(h_L^\beta)$. For Milstein,
+\textcite{avikainen} proves that the strong error of the binary payoff is $O(h^{1-\delta})$ for every
+$\delta>0$ (scalar equation with Lipschitz coefficients and Lipschitz first derivatives in $x$, and
+$X_T$ with a bounded density; Theorem~3.7 of the preprint). Since
+$\E[Y_\ell^2]\le\E|P_\ell-P|+\E|P_{\ell-1}-P|$ for indicators, $V_\ell=O(h_\ell^{1-\delta})$;
+\textcite{giles-debrabant-rossler} analyse the Milstein corrections in detail.
+
+\begin{example}[Exact level variances for geometric Brownian motion]\label{exa:ml-gbm-exact}
+Take Euler for GBM and the payoff $P=DS_T$, $D=e^{-rT}$, whose level variances can be computed
+exactly. Group the fine steps in pairs. Over one coarse step the fine path is multiplied by
+$f_1f_2$ with $f_i=a+\sigma\Delta W_i$, $a=1+\mu h$, $h=h_\ell$, and the coarse path by
+$F=A+\sigma(\Delta W_1+\Delta W_2)$, $A=1+2\mu h$. The $n=2^{\ell-1}$ coarse steps contribute
+independent factors, so with $u=\E[(f_1f_2)^2]=(a^2+\sigma^2h)^2$,
+$w=\E[f_1f_2F]=a^2A+2a\sigma^2h$ and $v=\E[F^2]=A^2+2\sigma^2h$,
+\[
+  V_\ell=D^2S_0^2\Big[u^n-2w^n+v^n-\big(a^{2n}-A^n\big)^2\Big].
+\]
+Here $u-2w+v=\E[(f_1f_2-F)^2]=\sigma^4h^2+2\mu^2\sigma^2h^3+\mu^4h^4$ and
+$w-v=(A\mu^2+2\mu\sigma^2)h^2$. Writing $u^n-2w^n+v^n=v^n\big[(1+x)^n-2(1+y)^n+1\big]$ with
+$x=(u-v)/v$, $y=(w-v)/v$, both $O(h^2)$, and expanding the powers with $n=T/(2h)$ gives
+$n(x-2y)+O(n^2h^4)=\frac T2\sigma^4h+O(h^2)$, while $(a^{2n}-A^n)^2=O(h^2)$ and
+$v^n\to e^{(2\mu+\sigma^2)T}$. Hence
+\[
+  V_\ell=\tfrac12\,\sigma^4T\,\E[P^2]\,h_\ell+O(h_\ell^2),\qquad \E[P^2]=D^2S_0^2e^{(2\mu+\sigma^2)T}.
+\]
+For the test case $\E[P^2]=10^4$ exactly, so $V_\ell=8h_\ell+O(h_\ell^2)$: $V_1=3.9306$,
+$V_4=0.49890$, $V_7=0.062483$. The rate $\beta=1$ of \cref{prop:ml-variance-decay} is attained,
+not just a bound. For Milstein the same computation gives $V_\ell$ of exact order $h_\ell^2$,
+with a constant that receives a second contribution (\exref{ex:ml-milstein-exact}).
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch12-levels}
+  \caption{Level diagnostics for the test case: Euler and Milstein for GBM, the discounted
+    at-the-money call and digital, levels $\ell=0,\dots,10$ (call) and $0,\dots,7$ (digital);
+    $5\times10^5$ coupled paths per level for $\ell\le7$, on which both payoffs are evaluated,
+    and $4\times10^4$ for $\ell=8,9,10$. Our implementation (NumPy \texttt{default\_rng}, seed
+    $[2027,s,\ell]$ for scheme $s$ and level $\ell$). Left: $\log_2V_\ell$ for $\ell\ge1$, and
+    $\log_2\Var(P_\ell)$ for Milstein (grey). Right: $\log_2$ of the absolute sample mean of
+    $Y_\ell$, $\ell\ge1$; the Milstein digital is omitted, its means being below their
+    standard errors from $\ell=2$ on.}
+  \label{fig:ml-levels}
+\end{figure}
+
+\Cref{fig:ml-levels} shows these rates on the test case. For the call, $V_\ell$ halves at
+each level with Euler (fitted slope $0.99$ for $\ell\ge4$; $V_{10}=4.6\times10^{-3}$) and is
+divided by four with Milstein (slope $1.99$; $V_{10}=2.0\times10^{-7}$), while $\Var(P_\ell)$
+stays near $158$: at level $10$ a correction has a variance $3\times10^4$ (Euler) and almost
+$10^9$ (Milstein) times smaller than the payoff. The means fall like $2^{-\ell}$ for both
+schemes (fitted slope $1.06$ for Milstein, $\ell\ge2$; the Euler means at $\ell\ge8$ are within
+two standard errors of $0$), the weak order $\alpha=1$ of \cref{thm:ps-euler,thm:ps-milstein}. For the
+digital, Euler's $V_\ell$ falls only by $\sqrt2$ per level (fitted slope $0.50$ for $\ell\ge4$), and
+Milstein's by factors between $1.5$ and $2.3$ for $\ell\ge4$ (fitted slope $0.85$, resting on about
+$36$ nonzero corrections out of $5\times10^5$ at $\ell=7$). A digital correction is almost always $0$, and its kurtosis
+$\E[(Y_\ell-\E Y_\ell)^4]/V_\ell^2$ is large: $260$ for Euler and $1.4\times10^4$ for
+Milstein at $\ell=7$, against $7.6$ for the Euler call. This matters for estimating $V_\ell$
+(\cref{rem:ml-kurtosis}).
+
+\demo{12-multilevel.ipynb}{level variances and means for the call, the digital and an Asian
+option, with Euler or Milstein, for any volatility.}
+
+\subsection*{Path-dependent payoffs}
+
+For a payoff that depends on the path, each level needs a rule that turns a discrete path into a
+payoff, and the telescoping requires only that the coarse member at level $\ell$ have the mean of
+the fine member at level $\ell-1$. The simplest choice applies the same rule on every grid.
+
+\emph{Asian options.} For $A=\frac1T\int_0^TS_t\,\dd t$, use the trapezoidal rule on the grid of
+each path. The payoff is Lipschitz in the path values, but the coarse and fine averages also
+differ by the difference of the two quadrature errors, whose variance is of order $h_\ell^2$.
+For the discounted test-case Asian call $(A-K)^+$ (our implementation, seeds $[4,\ell]$,
+$\max(4\times10^5\cdot2^{-\ell},2\times10^4)$ paths), the ratio $V_\ell/V_{\ell+1}$ stays between
+$3.8$ and $4.2$ for $1\le\ell\le7$ with Milstein. With Euler the quadrature term dominates at
+coarse levels (ratios $3.2$ to $3.4$ for $\ell\le3$), and the asymptotic ratio $2$ of the strong
+order $\frac12$ emerges only slowly ($2.3$ and $2.2$ for $\ell=6,7$).
+These are the rates $\beta=1$ and $2$ listed by \textcite{giles-acta}, Section~5.
+
+\emph{Extremes and barriers.} A maximum, a lookback or a barrier inspected only on the grid has a
+bias of order $h^{1/2}$ (\cref{prop:bar-bgk} for GBM, \cref{rem:bar-general} for Euler on general diffusions), so $\alpha=\frac12$, and a knock-out indicator is
+discontinuous, so that with Euler $V_\ell=O(h_\ell^{1/2-\delta})$ for barriers and
+$O(h_\ell^{1-\delta})$ for lookbacks \citep{giles-higham-mao}. The cure is to look between grid
+points with the Brownian bridge: use the probability that the bridge over each step crosses the
+barrier (\cref{prop:bar-bridge-crossing}), or sample the extreme of the bridge. This restores
+$\alpha=1$, and with Milstein it gives $\beta\approx\frac32$ for barriers and $\beta\approx2$ for
+lookbacks \citep{giles-milstein}. There, the coarse member uses the value of the fine path at the
+midpoint of each coarse step, which changes its law but not its mean, so the identity
+\eqref{eq:ml-telescoping} is preserved; this freedom is why \cref{def:ml-coupled} constrains only
+means.
+
+\section{Giles' complexity theorem}\label{sec:ml-complexity}
+
+\begin{theorem}[Giles]\label{thm:ml-complexity}
+Let $P\in L^2$ and let $Y_\ell$ be coupled corrections with variances $V_\ell$ and expected costs
+$\tau_\ell>0$. Suppose that there are constants $\alpha,\beta,\gamma,c_1,c_2,c_3>0$ with
+\[
+  \alpha\ge\tfrac12\min(\beta,\gamma)
+\]
+such that for every $\ell\in\N$
+\[
+  \text{(B)}\ \ \big|\E[P_\ell]-\E[P]\big|\le c_12^{-\alpha\ell},\qquad
+  \text{(V)}\ \ V_\ell\le c_22^{-\beta\ell},\qquad
+  \text{(C)}\ \ \tau_\ell\le c_32^{\gamma\ell}.
+\]
+\begin{enumerate}[label=(\roman*)]
+  \item There is a constant $c_4$, depending only on $\alpha,\beta,\gamma,c_1,c_2,c_3$, such that
+    for every $\varepsilon\in(0,e^{-1})$ the finest level
+    $L=\max\big(0,\big\lceil\alpha^{-1}\log_2(\sqrt2\,c_1/\varepsilon)\big\rceil\big)$ and the
+    sample sizes \eqref{eq:ml-nl} with $v=\varepsilon^2/2$ give
+    $\E[(\hat\theta_L-\theta)^2]\le\varepsilon^2$ at an expected cost
+    \[
+      \mathcal C\le\begin{cases}
+        c_4\,\varepsilon^{-2}, & \beta>\gamma,\\
+        c_4\,\varepsilon^{-2}(\log\varepsilon)^2, & \beta=\gamma,\\
+        c_4\,\varepsilon^{-2-(\gamma-\beta)/\alpha}, & \beta<\gamma.
+      \end{cases}
+    \]
+  \item Conversely, suppose that $|\E[P_\ell]-\E[P]|\ge c_1'2^{-\alpha\ell}$,
+    $V_\ell\ge c_2'2^{-\beta\ell}$ and $\tau_\ell\ge c_3'2^{\gamma\ell}$ for every $\ell$, with
+    constants $c_i'>0$. Then there are $c_4'>0$ and $\varepsilon_0>0$ such that, for
+    $\varepsilon<\varepsilon_0$, every estimator \eqref{eq:ml-estimator} (any $L$, any
+    $n_\ell\ge1$) with mean squared error at most $\varepsilon^2$ costs at least
+    $c_4'\varepsilon^{-2}$, $c_4'\varepsilon^{-2}(\log\varepsilon)^2$ or
+    $c_4'\varepsilon^{-2-(\gamma-\beta)/\alpha}$ in the three cases.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) \emph{Bias.} If $L=0$ then $\sqrt2c_1\le\varepsilon$; otherwise
+$L\ge\alpha^{-1}\log_2(\sqrt2c_1/\varepsilon)$. In both cases (B) gives
+$|\E[P_L]-\theta|\le c_12^{-\alpha L}\le\varepsilon/\sqrt2$.
+
+\emph{Variance and cost.} By \cref{prop:ml-telescoping}(iv) with $v=\varepsilon^2/2$, the
+variance is at most $\varepsilon^2/2$, so the mean squared error is at most $\varepsilon^2$ by
+\cref{prop:ml-telescoping}(ii), and
+\begin{equation}\label{eq:ml-cost-bound}
+  \mathcal C\le2\varepsilon^{-2}S_L^2+\sum_{\ell=0}^L\tau_\ell,\qquad
+  S_L\le\sqrt{c_2c_3}\,\sum_{\ell=0}^L2^{(\gamma-\beta)\ell/2}
+\end{equation}
+by (V) and (C). Two consequences of the choice of $L$ and of $\varepsilon<e^{-1}<1$ will be used.
+First, $L\le1+\alpha^{-1}\log_2^+(\sqrt2c_1/\varepsilon)$, so with $c_5=\max(1,\sqrt2c_1)^{1/\alpha}$,
+\[
+  2^L\le2c_5\,\varepsilon^{-1/\alpha}.
+\]
+Second, $\log(1/\varepsilon)>1$, so $L+1\le2+\alpha^{-1}\log_2c_5^\alpha+\alpha^{-1}\log_2(1/\varepsilon)\le c_6\log(1/\varepsilon)$
+for a constant $c_6$. The last sum in \eqref{eq:ml-cost-bound}, which comes from the integer
+ceilings, is at most $c_32^{\gamma L}/(1-2^{-\gamma})\le c_7\varepsilon^{-\gamma/\alpha}$.
+
+\emph{Case $\beta>\gamma$.} The geometric series gives $S_L\le\sqrt{c_2c_3}/(1-2^{-(\beta-\gamma)/2})$,
+so $2\varepsilon^{-2}S_L^2\le c\,\varepsilon^{-2}$. Here $\min(\beta,\gamma)=\gamma$, so
+$\gamma/\alpha\le2$ and $\varepsilon^{-\gamma/\alpha}\le\varepsilon^{-2}$.
+
+\emph{Case $\beta=\gamma$.} Every term of $S_L$ equals $\sqrt{c_2c_3}$, so
+$S_L\le\sqrt{c_2c_3}\,(L+1)\le\sqrt{c_2c_3}\,c_6\log(1/\varepsilon)$ and
+$2\varepsilon^{-2}S_L^2\le c\,\varepsilon^{-2}(\log\varepsilon)^2$. Again $\gamma/\alpha\le2$, and
+$\varepsilon^{-2}\le\varepsilon^{-2}(\log\varepsilon)^2$.
+
+\emph{Case $\beta<\gamma$.} Now the series is dominated by its last term:
+$S_L\le\sqrt{c_2c_3}\,2^{(\gamma-\beta)L/2}/(1-2^{-(\gamma-\beta)/2})$, and with
+$2^L\le2c_5\varepsilon^{-1/\alpha}$, $2\varepsilon^{-2}S_L^2\le c\,\varepsilon^{-2-(\gamma-\beta)/\alpha}$.
+Here $\min(\beta,\gamma)=\beta\le2\alpha$, which is the same as
+$\gamma/\alpha\le2+(\gamma-\beta)/\alpha$, so the ceiling term is of no larger order.
+
+(ii) The mean squared error is at least the squared bias $(\E[P_L]-\theta)^2\ge c_1'^24^{-\alpha L}$,
+so $2^{-\alpha L}\le\varepsilon/c_1'$, that is $L\ge\alpha^{-1}\log_2(c_1'/\varepsilon)$. It is
+also at least the variance, so $\Var(\hat\theta_L)\le\varepsilon^2$, and by
+\cref{prop:ml-telescoping}(iv) $\mathcal C\ge\varepsilon^{-2}S_L^2$ with
+$S_L\ge\sqrt{c_2'c_3'}\sum_{\ell\le L}2^{(\gamma-\beta)\ell/2}$. If $\beta>\gamma$, keep the
+term $\ell=0$: $\mathcal C\ge c_2'c_3'\varepsilon^{-2}$. If $\beta=\gamma$,
+$S_L\ge\sqrt{c_2'c_3'}(L+1)\ge\sqrt{c_2'c_3'}\,\alpha^{-1}\log_2(c_1'/\varepsilon)$, which is at
+least a constant times $\log(1/\varepsilon)$ for small $\varepsilon$. If $\beta<\gamma$, keep the
+term $\ell=L$: $S_L^2\ge c_2'c_3'2^{(\gamma-\beta)L}\ge c_2'c_3'(c_1'/\varepsilon)^{(\gamma-\beta)/\alpha}$.
+\end{proof}
+
+This is Theorem~3.1 of \textcite{giles-mlmc}, stated there with $\gamma=1$, $\alpha\ge\frac12$ and
+a general refinement factor $M$ ($h_\ell=TM^{-\ell}$, which only changes the constants); the
+present form is Theorem~2.1 of \textcite{cliffe-giles-scheichl-teckentrup}, proved in their
+Appendix~A, and \textcite{giles-acta}, Section~2.1 (Theorem~1 in the author's version). Part (ii) shows that the three rates are not artefacts of the
+proof: for a hierarchy whose bias, variances and costs behave exactly like powers of $2$, no
+choice of $L$ and $n_\ell$ does better. Where the work goes explains the three regimes. With
+$n_\ell\tau_\ell\propto\sqrt{V_\ell\tau_\ell}\propto2^{(\gamma-\beta)\ell/2}$, the work
+concentrates on the coarsest levels if $\beta>\gamma$, so the cost is that of an unbiased
+estimator with bounded cost per sample; it is spread evenly over the $L+1\approx\alpha^{-1}\log_2(1/\varepsilon)$
+levels if $\beta=\gamma$, hence the squared logarithm; and it concentrates on the finest levels if
+$\beta<\gamma$.
+
+\begin{remark}[The condition $\alpha\ge\frac12\min(\beta,\gamma)$]\label{rem:ml-alpha}
+It is used only to bound the term $\sum_\ell\tau_\ell$ in \eqref{eq:ml-cost-bound}: every level up
+to $L$ must be sampled at least once, and the bias fixes how many levels there are. It cannot be
+dropped. Under the lower bounds of (ii), any estimator with mean squared error $\varepsilon^2$
+costs at least $\sum_{\ell\le L}\tau_\ell\ge c_3'2^{\gamma L}\ge c_3'(c_1'/\varepsilon)^{\gamma/\alpha}$,
+and if $\alpha<\frac12\min(\beta,\gamma)$ this exceeds the bound in (i) by a power of
+$1/\varepsilon$. For the Euler and Milstein couplings with smooth or Lipschitz payoffs,
+$\alpha=1$ and $\gamma=1$, and the condition holds. For a lookback monitored on the grid with
+Euler, $\alpha=\frac12$ and $\beta=1-\delta$ (\cref{sec:ml-coupling}), and it holds only just.
+\end{remark}
+
+For plain Monte Carlo with a bias $c\,h^\alpha$ and a cost $h^{-\gamma}$ per path,
+\cref{prop:mc-mse}(iii) gives a cost of order $\varepsilon^{-2-\gamma/\alpha}$. The table uses the
+rates $\beta$ of \cref{sec:ml-coupling}, $\gamma=1$, and for $\alpha$ the weak orders of
+\cref{thm:ps-euler,thm:ps-milstein} (for the digital, those of the expansion of \citealp{bally-talay}
+recalled in \cref{rem:ps-failures}, also observed in \cref{fig:ml-levels}); the rate for the
+Milstein digital is Avikainen's, recalled after \cref{prop:ml-variance-decay} (a sample of $Y_\ell$ costs $2^\ell+2^{\ell-1}=3\cdot2^{\ell-1}$
+steps):
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+payoff and scheme & $\alpha$ & $\beta$ & multilevel & plain Monte Carlo\\
+\midrule
+Lipschitz, Euler & $1$ & $1$ & $\varepsilon^{-2}(\log\varepsilon)^2$ & $\varepsilon^{-3}$\\
+Lipschitz, Milstein & $1$ & $2$ & $\varepsilon^{-2}$ & $\varepsilon^{-3}$\\
+digital, Euler & $1$ & $\frac12$ & $\varepsilon^{-5/2}$ & $\varepsilon^{-3}$\\
+digital, Milstein & $1$ & $1-\delta$ & $\varepsilon^{-2-\delta}$ & $\varepsilon^{-3}$\\
+barrier on the grid, Euler & $\frac12$ & $\frac12-\delta$ & $\varepsilon^{-3-2\delta}$ & $\varepsilon^{-4}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+For the digital the slower decay of $V_\ell$ moves Euler from the borderline regime $\beta=\gamma$
+into the regime $\beta<\gamma$: the cost of the finest levels dominates, and halving $\varepsilon$
+multiplies the cost by $2^{5/2}\approx5.7$ instead of about $4$. Milstein restores $\beta\approx\gamma$,
+and smoothing the payoff by a conditional expectation over the last step pushes $\beta$ above
+$\gamma$ (\exref{ex:ml-smoothing}; \citealp{giles-acta}, Section~5).
+
+\subsection*{Against the optimal allocation of Chapter 7}
+
+\Cref{prop:ps-allocation} chose the best single step for a given budget. \Cref{prop:ml-telescoping}
+chooses the best spread of the same budget over a hierarchy of steps. On the laboratory of
+\cref{fig:ps-allocation} (GBM with $\mu=-1\%$, $\sigma=20\%$, the smooth payoff
+$f(x)=5\log(1+e^{(x-100)/5})$, cost in steps), the multilevel root-mean-square error for a budget
+$\mathcal C$ is $\min_L\big(b_L^2+S_L^2/\mathcal C\big)^{1/2}$ (continuous sample sizes, as in
+\cref{prop:ml-telescoping}(iii)), with the exact biases $b_L$
+(\texttt{paths.gbm\_scheme\_weak\_error}) and the level variances estimated with
+$\max(4\times10^5\cdot2^{-\ell},2\times10^4)$ paths (our implementation, seeds $[3,\ell]$ for
+Euler and $[4,\ell]$ for Milstein; finest levels $L=4,8$ for Euler and $6,10$ for Milstein). For a
+fair comparison, the single-level columns use the same exact biases: the error is
+$\min_m\big(b_m^2+v\,m/\mathcal C\big)^{1/2}$ over integer numbers of steps $m$, with $v=154$ (best
+$m=7,34$ for Euler and $5,19$ for Milstein; the model of \cref{prop:ps-allocation} with $c=0.17$
+gives $0.041$ and $0.0088$ for Euler):
+\begin{center}
+\begin{tabular}{lcccccc}
+\toprule
+budget (steps) & exact & Euler & Milstein & MLMC, Euler & MLMC, Milstein\\
+\midrule
+$10^6$ & $0.0124$ & $0.0400$ & $0.0318$ & $0.0227$ & $0.0136$\\
+$10^8$ & $0.00124$ & $0.00885$ & $0.00659$ & $0.00307$ & $0.00137$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Forty independent replications of each multilevel estimator at $10^6$ steps have root-mean-square
+errors $0.026$ (Euler) and $0.012$ (Milstein) (\cref{fig:ml-complexity}, right). At equal budget,
+the multilevel estimators cut the error of the best single-level estimator with the same scheme by
+factors of $1.8$ and $2.9$ (Euler) and $2.3$ and $4.8$ (Milstein) at $10^6$ and $10^8$ steps, and
+the error of multilevel Milstein is only about $10\%$ above that of exact simulation: in terms of
+cost, it pays a factor of about $1.2$ for not knowing the law of $S_T$.
+
+\section{The adaptive algorithm}\label{sec:ml-algorithm}
+
+In practice $V_\ell$ and the bias are unknown, and the number of levels is decided on the fly.
+The bias test rests on the following observation.
+
+\begin{lemma}[Estimating the remaining bias]\label{lem:ml-bias}
+If $\E[P_\ell]-\E[P]=c\,2^{-\alpha\ell}(1+\eta_\ell)$ with $c\ne0$, $\alpha>0$ and $\eta_\ell\to0$,
+then
+\[
+  \E[P_L]-\E[P]=-\frac{\E[Y_L]}{2^\alpha-1}\,\big(1+o(1)\big)\qquad(L\to\infty).
+\]
+\end{lemma}
+
+\begin{proof}
+$\E[Y_L]=c2^{-\alpha L}\big(1+\eta_L-2^\alpha(1+\eta_{L-1})\big)=-c2^{-\alpha L}(2^\alpha-1)(1+o(1))$,
+and $\E[P_L]-\E[P]=c2^{-\alpha L}(1+o(1))$; divide.
+\end{proof}
+
+\medskip\noindent\textbf{Algorithm} (\citealp{giles-mlmc}, Section~5; \citealp{giles-acta}, Section~3.1).
+Given $\varepsilon$, rates $\alpha$ and $\beta$ (known from the theory, or fitted to the level
+means and variances), and an initial sample size $n_{\mathrm{init}}$:
+\begin{enumerate}[label=\arabic*.]
+  \item Set $L=2$ and draw $n_{\mathrm{init}}$ samples on levels $0,1,2$.
+  \item Estimate $V_\ell$ by the sample variance of the samples drawn so far on each level, and set
+    $n_\ell$ by \eqref{eq:ml-nl} with $v=\varepsilon^2/2$; draw the missing samples. Repeat until no
+    level needs more than $1\%$ additional samples.
+  \item Estimate the remaining bias by $\max_{j=0,1,2}\,2^{-j\alpha}|\hat Y_{L-j}|/(2^\alpha-1)$
+    (levels $L-j\ge1$). If it is at most $\varepsilon/\sqrt2$, stop and return
+    $\hat\theta_L$ with the standard error $(\sum_\ell\hat V_\ell/n_\ell)^{1/2}$. Otherwise set
+    $L\leftarrow L+1$, initialise $\hat V_{L}=\hat V_{L-1}2^{-\beta}$, and go to step~2.
+\end{enumerate}
+Step~3 applies \cref{lem:ml-bias} to the sample means, extrapolating from the two levels below
+$L$ as well, so that a correction whose mean happens to be close to zero does not stop the
+algorithm too early. The algorithm is a heuristic, and \textcite{giles-acta} says so: the lemma is
+asymptotic, the regime it assumes may not have been reached, and the sample means are noisy, so
+nothing guarantees a mean squared error below $\varepsilon^2$. Its standard error ignores the
+bias, which the stopping rule only estimates. Our implementation (\texttt{multilevel.mlmc}) also
+prevents $\hat V_\ell$ from falling below half of $\hat V_{\ell-1}2^{-\beta}$ for $\ell\ge2$.
+
+\begin{remark}[Kurtosis and the variance estimates]\label{rem:ml-kurtosis}
+The sample variance of $n$ \iid\ copies of $Y$ has a relative standard deviation of about
+$\sqrt{(\kappa-1)/n}$, where $\kappa$ is the kurtosis of $Y$: twice the relative error of the sample
+standard deviation computed in \cref{exa:mc-se-accuracy}. For a
+digital correction, $Y_\ell$ is nonzero with a small probability $q_\ell$ and $\kappa\approx1/q_\ell$,
+so the variance estimate is reliable only when $n_\ell q_\ell$, the number of nonzero corrections
+seen, is large. With $10^3$ initial samples and $\kappa=1.4\times10^4$ (\cref{fig:ml-levels}),
+the estimate of $V_\ell$ is often exactly $0$: the floor in the implementation, or an initial sample
+size of order $\kappa$, is needed. A smoothed payoff has a much smaller kurtosis.
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch12-complexity}
+  \caption{Left: the adaptive algorithm on the test-case call ($\alpha=1$, $\beta=1$ for Euler and
+    $2$ for Milstein, $n_{\mathrm{init}}=1000$, seed $11$; one run per accuracy): $\varepsilon^2$
+    times the cost in steps, for $\varepsilon=0.05$, $0.02$, $0.01$, $0.005$. Triangles: plain Monte
+    Carlo on the finest level $L$ chosen by the same run, with $\lceil2\Var(P_L)/\varepsilon^2\rceil$
+    paths of $2^L$ steps ($\Var(P_L)$ from \cref{fig:ml-levels}). Right: Chapter~7's laboratory
+    (\cref{fig:ps-allocation}): root-mean-square error against the budget for exact simulation, Euler
+    with the optimal allocation of \cref{prop:ps-allocation} ($c=0.17$, $v=154$), and the best
+    multilevel estimators (lines: model of \cref{sec:ml-complexity}; dots: $40$ replications at
+    $10^4$, $10^5$ and $10^6$ steps).}
+  \label{fig:ml-complexity}
+\end{figure}
+
+On the test-case call (\cref{fig:ml-complexity}, left; our implementation, seed $11$), the
+algorithm stops at $L=3,4,5,6$ with Euler and $L=3,4,5,5$ with Milstein for
+$\varepsilon=0.05,0.02,0.01,0.005$. With Milstein, $\varepsilon^2$ times the cost stays at
+$371$--$375$ steps: the regime $\beta>\gamma$, where the cost is that of an unbiased estimator. With
+Euler it grows from $675$ to $1370$, the slow logarithmic growth of the regime $\beta=\gamma$. At
+$\varepsilon=0.005$ the Euler run uses $(n_0,\dots,n_6)=(23497780, 1547621, 827227, 434917, 226194,
+114576, 57780)$ samples, returns $7.3703$ with standard error $0.0035$, and costs
+$5.5\times10^7$ steps; plain Monte Carlo on level $6$ would cost $15$ times more, and the gap
+grows like $1/(\varepsilon(\log\varepsilon)^2)$. For Milstein the gap is $27$. For the digital with
+Euler ($\beta=\frac12$, $n_{\mathrm{init}}=2000$), averaged over eight runs (seeds $11$ to $18$),
+$\varepsilon^2\times$cost is $10.8$, $17.4$ and $32.5$ at $\varepsilon=0.004$, $0.002$, $0.001$,
+with root-mean-square errors $0.0033$, $0.0022$, $0.0010$. Unlike for the call it grows, as in the
+regime $\beta<\gamma$ of \cref{thm:ml-complexity}, where it grows like $\varepsilon^{-1/2}$; at these
+accuracies the growth is irregular (single runs vary by a factor of $2$), because the finest level
+chosen by the algorithm jumps from one run to another.
+
+\demo{12-multilevel.ipynb}{run the adaptive algorithm on the call or an Asian option for any accuracy and scheme, see how
+it spreads the samples over the levels, and compare its cost with plain Monte Carlo.}
+
+\begin{incode}
+\coderef{code/src/mfe230d/multilevel.py}: \texttt{GBMLevels(payoff, scheme)} returns, for a level
+$\ell$, coupled fine and coarse payoffs computed on shared Brownian increments; \texttt{SDELevels}
+does the same for any scalar equation through \texttt{paths.euler} and \texttt{paths.milstein}.
+\texttt{level\_statistics} produces the diagnostics of \cref{fig:ml-levels}, \texttt{mlmc} is the
+adaptive algorithm, \texttt{optimal\_samples} implements \eqref{eq:ml-nl}, \texttt{gbm\_level\_exact}
+the exact moments of \cref{exa:ml-gbm-exact}, and \texttt{single\_term} and \texttt{coupled\_sum} the
+estimators of \cref{sec:ml-unbiased}.
+\end{incode}
+
+\section{Unbiased randomised estimators}\label{sec:ml-unbiased}
+
+When $\beta>\gamma$, the multilevel cost $\varepsilon^{-2}$ is that of an unbiased estimator with
+bounded cost per sample. \Citet{mcleish-debiasing} and \textcite{rhee-glynn} showed that such an
+estimator exists when, in addition, the bias vanishes fast enough ($2\alpha>\gamma$): draw the level
+at random, so that every level, however fine, has a chance to be sampled, and reweight. There is
+then no finest level and no bias.
+
+\begin{proposition}[Single-term randomised estimator]\label{prop:ml-unbiased}
+Let $Y_0,Y_1,\dots$ be coupled corrections with $\E[P_\ell]\to\E[P]$, let $m_j=\E[Y_j^2]$, and
+let $J$ be an $\N$-valued random variable, independent of the corrections, with
+$p_j=\Q(J=j)>0$ for every $j$. Draw $J$, then one sample of $Y_J$, and set $Z=Y_J/p_J$.
+\begin{enumerate}[label=(\roman*)]
+  \item $\E[Z^2]=\sum_{j\ge0}m_j/p_j$ (finite or not), and the expected cost of one sample is
+    $\E[\tau_J]=\sum_jp_j\tau_j$.
+  \item If $\sum_jm_j/p_j<\infty$, then $Z$ is integrable, $\E[Z]=\E[P]$, and
+    $\Var(Z)=\sum_jm_j/p_j-\E[P]^2$.
+  \item (Geometric randomisation.) Let $p_j=(1-2^{-r})2^{-rj}$ with $r>0$, and suppose that
+    $m_j\le c\,2^{-\beta'j}$ and $\tau_j\le c\,2^{\gamma j}$. Then $\Var(Z)<\infty$ if $r<\beta'$, and
+    $\E[\tau_J]<\infty$ if $r>\gamma$. If instead $m_j\ge c'2^{-\beta'j}$ and $\tau_j\ge c'2^{\gamma j}$
+    with $c'>0$, then $\Var(Z)=\infty$ for $r\ge\beta'$ and $\E[\tau_J]=\infty$ for $r\le\gamma$.
+    Under (B) and (V) of \cref{thm:ml-complexity}, one can take $\beta'=\min(\beta,2\alpha)$.
+  \item (No free lunch.) For every distribution $(p_j)$ with all $p_j>0$,
+    \[
+      \E[Z^2]\,\E[\tau_J]\ \ge\ \Big(\sum_{j\ge0}\sqrt{m_j\tau_j}\Big)^2 .
+    \]
+    In particular, if $m_j\ge c'2^{-\beta'j}$ and $\tau_j\ge c'2^{\gamma j}$ with $\beta'\le\gamma$, then
+    no randomisation gives both a finite variance and a finite expected cost.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Conditioning on $J$ and using its independence of the corrections, by Tonelli's theorem
+$\E[Z^2]=\sum_jp_j\E[Y_j^2]/p_j^2=\sum_jm_j/p_j$; the cost is $\tau_j$ on $\{J=j\}$.
+
+(ii) By the Cauchy--Schwarz inequality,
+\[
+  \E|Z|=\sum_j\E|Y_j|\le\sum_j\sqrt{m_j/p_j}\,\sqrt{p_j}\le\Big(\sum_j\frac{m_j}{p_j}\Big)^{1/2}\Big(\sum_jp_j\Big)^{1/2}<\infty .
+\]
+So $Z$ is integrable and, by Fubini's theorem and \cref{prop:ml-telescoping}(i),
+$\E[Z]=\sum_j\E[Y_j]=\lim_L\sum_{j\le L}\E[Y_j]=\lim_L\E[P_L]=\E[P]$. The variance follows from (i).
+
+(iii) $m_j/p_j\le c\,2^{(r-\beta')j}/(1-2^{-r})$ and $p_j\tau_j\le c\,2^{(\gamma-r)j}$ give
+convergent geometric series when $r<\beta'$, respectively $r>\gamma$. With the lower bounds, the
+terms are bounded below by $c'2^{(r-\beta')j}/(1-2^{-r})$ and $c'(1-2^{-r})2^{(\gamma-r)j}$, which
+do not tend to $0$ when $r\ge\beta'$, respectively $r\le\gamma$; then $\E[Z^2]=\infty$, and
+$\Var(Z)=\infty$ because $\E[P]$ is finite. Finally,
+$m_j=V_j+\E[Y_j]^2$ and $|\E[Y_j]|\le|\E[P_j]-\E[P]|+|\E[P_{j-1}]-\E[P]|\le c_1(1+2^\alpha)2^{-\alpha j}$,
+so $m_j\le c_22^{-\beta j}+c_1^2(1+2^\alpha)^24^{-\alpha j}\le c\,2^{-\min(\beta,2\alpha)j}$.
+
+(iv) The Cauchy--Schwarz inequality with $a_j=\sqrt{m_j/p_j}$ and $b_j=\sqrt{p_j\tau_j}$, as in
+\cref{prop:ml-telescoping}(iii). If $\beta'\le\gamma$, then $\sqrt{m_j\tau_j}\ge c'2^{(\gamma-\beta')j/2}\ge c'$,
+the series diverges, and one of the two factors on the left is infinite.
+\end{proof}
+
+So a finite variance and a finite expected cost are compatible exactly when the second moments
+$m_j=V_j+\E[Y_j]^2$ shrink faster than the costs grow: if $m_j\asymp2^{-\beta'j}$ and
+$\tau_j\asymp2^{\gamma j}$, by (iii) and (iv) some randomisation works if and only if $\beta'>\gamma$,
+and then every geometric one with $r\in(\gamma,\beta')$ does. Under (B) and (V),
+$\beta'=\min(\beta,2\alpha)$, and the condition $\min(\beta,2\alpha)>\gamma$ is stronger than the
+$\beta>\gamma$ of \cref{thm:ml-complexity}: with a bias $c\,2^{-\gamma\ell/2}$, variances
+$2^{-\beta\ell}$, $\beta>\gamma$, and costs $2^{\gamma\ell}$, multilevel Monte Carlo costs
+$\varepsilon^{-2}$, but $m_j\ge\E[Y_j]^2\asymp2^{-\gamma j}$ and (iv) rules out every randomisation.
+When the condition holds, the estimator averages \iid\ samples with random costs,
+and by the central limit theorem with random costs (\cref{rem:mc-budget}) its error for a budget
+$\mathcal C$ is of order $(\Var(Z)\E[\tau_J]/\mathcal C)^{1/2}$: the square-root rate of exact
+simulation, with no bias to estimate and a valid confidence interval
+(\cref{thm:mc-clt}). Milstein with a Lipschitz payoff qualifies ($\beta=2$, $\alpha=\gamma=1$);
+Euler, with $\beta=\gamma=1$, does not, and \textcite{rhee-glynn}, Section~4, analyse what can still be done
+then. Equality in (iv) holds for $p_j\propto\sqrt{m_j/\tau_j}$ (\exref{ex:ml-randomisation} treats
+geometric laws); \textcite{rhee-glynn}, Theorems~3 and~4, find the randomisations that minimise the
+work--variance product $\Var(Z)\E[\tau_J]$.
+
+\begin{remark}[The coupled-sum estimator]\label{rem:ml-coupled-sum}
+Rhee and Glynn's main estimator uses one path for all the levels up to the random one:
+$\bar Z=\sum_{j=0}^JY_j/\Q(J\ge j)$, where $Y_j=P_j-P_{j-1}$ are all computed from one Brownian
+path with $2^J$ steps, coarsened level by level, and $J$ is independent of the path. If $P_j\to P$ in
+$L^2$ and
+$\sum_{j\ge1}\E[(P_{j-1}-P)^2]/\Q(J\ge j)<\infty$, then $\bar Z$ is square integrable and unbiased
+for $\E[P]$, and its second moment is given explicitly \citep[Theorem~1]{rhee-glynn}. Level $0$
+is always included, since $\Q(J\ge0)=1$, so a cheap and noisy level~$0$ is not inflated by a
+factor $1/p_0$ as in the single-term estimator. The expected cost is $\sum_j2^j\Q(J\ge j)$ steps.
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.68\textwidth]{ch12-unbiased}
+  \caption{Randomised estimators for the test-case call with Milstein, $\Q(J=j)\propto2^{-rj}$:
+    variance times mean cost per sample, in steps. Line: single-term model of
+    \cref{prop:ml-unbiased}(i), with $m_j$ estimated from \cref{fig:ml-levels} for $j\le10$ and
+    continued geometrically with $\beta=2$, $\gamma=1$. Dots: simulations with $4\times10^5$
+    samples per value of $r$ (seeds $[5,100r]$ and $[6,100r]$). Shaded: the window
+    $\gamma<r<\beta$ of \cref{prop:ml-unbiased}(iii). Horizontal lines: $\varepsilon^2$ times the cost of
+    the adaptive multilevel runs of \cref{fig:ml-complexity} (mean over $\varepsilon$), and the
+    variance $158.0$ of exact simulation at one step per sample.}
+  \label{fig:ml-unbiased}
+\end{figure}
+
+\Cref{fig:ml-unbiased} shows the window on the test case. At $r=1.5$ (our implementation, seed
+$[5,150]$, $4\times10^5$ samples), the single-term estimator returns $7.4075$ with standard error
+$0.0267$, at an average cost of $3.01$ steps per sample (the expected cost is $2.987$); the
+coupled-sum estimator (seed $[6,150]$) returns $7.3238$ with standard error $0.0199$ at an average
+cost of $3.71$ steps (expected cost $1/(1-2^{-1/2})=3.414$; see the first caveat below). The
+fourteen estimates in the figure lie between $-2.4$ and $+1.7$
+standard errors of $7.36429$. As $r$ decreases to $\gamma=1$, the cost of the rare fine levels
+dominates and the product blows up; at the other end the variance diverges only at $r=\beta=2$, and
+so slowly that the curve barely turns up, because $m_j$ falls by four per level from
+$m_1\approx0.047$ while $m_0/p_0$, about $300$, dominates. Near $r=1.75$--$1.9$ the coupled sum
+costs $340$--$390$ steps per unit of variance, against $373$ for $\varepsilon^2$ times the cost of
+adaptive multilevel Monte Carlo, which spends half of $\varepsilon^2$ on the bias. Two caveats: for
+$r\le2$ the cost per sample has infinite variance ($\E[\tau_J^2]=\sum_jp_j\tau_j^2$ diverges), so
+the realised cost of a run fluctuates a lot, although the central limit theorem with random costs
+needs only $\E[\tau_J]<\infty$; and the sample variance of $Z$ converges slowly when $\E[Z^4]=\infty$,
+which for the single-term estimator happens when $r\ge\frac43$, since
+$\E[Z^4]=\sum_j\E[Y_j^4]/p_j^3$ and $\E[Y_j^4]$ is here of the order of $m_j^2\approx4^{-2j}$.
+
+\demo{12-multilevel.ipynb}{randomised estimators for the call with Euler or Milstein: running means,
+confidence intervals and running costs for any rate $r$.}
+
+\furtherreading
+\textcite{giles-acta} is the standard survey: the complexity theorem and its variants
+(Sections~2.1--2.4, including randomised and multi-index methods), the algorithm (Section~3.1), and
+the analysis of path-dependent payoffs with Euler and Milstein (Section~5), with references.
+\textcite{giles-mlmc} is the original paper, \textcite{giles-milstein} the Milstein version with the
+Brownian-bridge treatment of lookbacks, barriers and digitals, and \textcite{giles-higham-mao} and
+\textcite{avikainen} the analysis of nonsmooth payoffs with Euler. \textcite{kebaier-romberg} studied
+the two-level estimator and its central limit theorem (\exref{ex:ml-kebaier}), and
+\textcite{ben-alaya-kebaier} proved a central limit theorem for the multilevel Euler estimator. In
+several dimensions, where Milstein needs Lévy areas, the antithetic coupling of
+\textcite{giles-szpruch} recovers $\beta=2$ without them for smooth payoffs (about $\frac32$ for a
+call). \textcite{rhee-glynn} and
+\textcite{mcleish-debiasing} are the sources for \cref{sec:ml-unbiased}. \textcite{glasserman-mc},
+which predates multilevel methods, covers the ingredients: discretisation schemes and their orders
+(Sections~6.1--6.2) and the allocation of effort (Section~1.1.3).

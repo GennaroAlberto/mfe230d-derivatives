@@ -1,0 +1,729 @@
+% Chapter 13: Monte Carlo Greeks.
+
+A price is one number; a hedge needs its derivatives. The delta and the gamma decide the
+hedge and how often to rebalance it (\cref{ch:18-hedging}), the vega and the rhos measure
+the exposure to volatility and rates, and a risk system recomputes all of them every day
+for every position. When the price comes from a simulation, so must the Greeks. The course
+compares three ways to get them: \emph{bumping} an input and pricing again, differentiating
+the simulated payoff path by path (the course's \emph{analytical differencing}, called the
+\emph{pathwise} method in the literature), and differentiating the probability density of
+the simulated state (the \emph{likelihood-ratio} method). The gamma needs mixtures of the
+last two, and books with many inputs need the \emph{adjoint} method, which computes every
+first-order Greek of a path at a small multiple of the cost of its price.
+
+The three approaches trade bias, variance and regularity in different ways. Bumping is
+biased, and done naively its variance explodes as the bump shrinks. The pathwise method is
+unbiased with a small variance, but it needs a payoff that is Lipschitz in the parameter.
+The likelihood-ratio method needs only a smooth density, but its variance is usually larger,
+and it grows with the number of time steps and as $\sigma\sqrt T\to0$. The code is
+\coderef{code/src/mfe230d/greeks.py}.
+
+Throughout, a Greek is the derivative $\alpha'(\theta)$ of $\alpha(\theta)=\E[Y(\theta)]$,
+where $Y(\theta)$ is a discounted payoff and $\theta$ one input. The running example is the
+test case $S=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, with
+\[
+  S_T=S\,G,\qquad G=\exp\big(\nu T+\sigma\sqrt T\,Z\big),\qquad \nu=r-y-\tfrac{\sigma^2}2,\qquad Z\sim\mathcal N(0,1)
+\]
+under $\Q$, call price $7.36429$, and Black--Scholes Greeks (\texttt{bs.greeks},
+\cref{prop:bsf-greeks}) $\Delta=e^{-yT}N(d_+)=0.509643$, $\Gamma=0.0195277$, vega
+$\mathcal V=39.0554$, theta $\partial_tV=-3.32226$ per year, $\rho_r=43.6000$ and
+$\rho_y=-50.9643$. The cash-or-nothing digital call pays $\1_{\{S_T>K\}}$; its price is
+$e^{-rT}N(d_-)=0.436000$ and its delta $e^{-rT}N'(d_-)/(S\sigma\sqrt T)=0.0195277$, equal to
+the gamma of the call because $S\,\Gamma_{\mathrm{call}}=K\,\Delta_{\mathrm{dig}}$ (from
+$Se^{-yT}N'(d_+)=Ke^{-rT}N'(d_-)$).
+
+\section{Finite differences}\label{sec:gr-fd}
+
+Bumping is the natural first approach: it treats the pricer as a black box and works for any
+model. The course bumps the spot by a relative amount, $S_\pm=S(1\pm\varepsilon)$, and the
+other inputs by absolute amounts (one basis point for $r$ and $y$, one volatility point for
+$\sigma$). With $C_0$ and $C_\pm$ the Monte Carlo prices at $S$ and $S_\pm$, the forward,
+backward and central deltas and the central gamma are
+\begin{equation}\label{eq:gr-course-fd}
+  \Delta_+=\frac{C_+-C_0}{\varepsilon S},\qquad \Delta_-=\frac{C_0-C_-}{\varepsilon S},\qquad
+  \Delta_c=\frac{C_+-C_-}{2\varepsilon S},\qquad \Gamma_c=\frac{C_++C_--2C_0}{(\varepsilon S)^2}.
+\end{equation}
+Two choices matter: the size $h=\varepsilon S$ of the bump, and whether the three prices use
+the same random numbers (\emph{common random numbers}, CRN; \cref{prop:cv-crn}) or
+independent ones. The next proposition, for a generic input $\theta$, quantifies both.
+
+\begin{proposition}[Finite differences: bias, variance and the optimal bump]\label{prop:gr-finite-difference}
+Let $I$ be an open interval and, for $\theta\in I$, let $Y(\theta)=g(\theta,U)$ with $U$ a
+random vector and $\E[Y(\theta)^2]<\infty$; write $\alpha(\theta)=\E[Y(\theta)]$ and
+$\sigma^2(\theta)=\Var(Y(\theta))$. Fix $\theta$ and $h>0$ with $[\theta-h,\theta+h]\subset I$,
+and let $\hat\Delta^F_{n}$, $\hat\Delta^C_{n}$ and $\hat\Gamma_{n}$ be the averages over $n$
+independent replications of the forward difference $(Y(\theta+h)-Y(\theta))/h$, the central
+difference $(Y(\theta+h)-Y(\theta-h))/(2h)$ and the second difference
+$(Y(\theta+h)-2Y(\theta)+Y(\theta-h))/h^2$.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Bias}, whatever the sampling.) If $\alpha$ is $C^2$ near $\theta$, then
+    $\E\hat\Delta^F_n-\alpha'(\theta)=\frac12\alpha''(\theta)h+o(h)$. If $\alpha$ is $C^3$, then
+    $\E\hat\Delta^C_n-\alpha'(\theta)=\frac16\alpha'''(\theta)h^2+o(h^2)$. If $\alpha$ is $C^4$, then
+    $\E\hat\Gamma_n-\alpha''(\theta)=\frac1{12}\alpha^{(4)}(\theta)h^2+o(h^2)$.
+  \item (\emph{Independent sampling}: each evaluation within a replication uses its own
+    independent copy of $U$.) Then
+    \begin{gather*}
+      \Var\hat\Delta^F_n=\frac{\sigma^2(\theta+h)+\sigma^2(\theta)}{nh^2},\qquad
+      \Var\hat\Delta^C_n=\frac{\sigma^2(\theta+h)+\sigma^2(\theta-h)}{4nh^2},\\
+      \Var\hat\Gamma_n=\frac{\sigma^2(\theta+h)+4\sigma^2(\theta)+\sigma^2(\theta-h)}{nh^4}.
+    \end{gather*}
+    If $\sigma^2$ is continuous and positive at $\theta$, these are of exact order
+    $1/(nh^2)$, $1/(nh^2)$ and $1/(nh^4)$.
+  \item (\emph{Common random numbers}: one $U$ per replication.) Then
+    $\Var\hat\Delta^C_n=\Var\big(Y(\theta+h)-Y(\theta-h)\big)/(4nh^2)$, and similarly for the
+    others.
+    \begin{enumerate}[label=(\alph*)]
+      \item If there are $\delta>0$ and a random variable $\kappa$ with $\E\kappa^2<\infty$
+        and $|Y(\theta_1)-Y(\theta_2)|\le\kappa|\theta_1-\theta_2|$ almost surely for all
+        $\theta_1,\theta_2\in(\theta-\delta,\theta+\delta)$ (a \emph{Lipschitz} payoff),
+        then $\Var\hat\Delta^F_n$ and $\Var\hat\Delta^C_n$ are at most $\E\kappa^2/n$ for every
+        $h<\delta$.
+      \item If $\E\big[(Y(\theta_1)-Y(\theta_2))^2\big]\le c|\theta_1-\theta_2|$ for
+        $\theta_1,\theta_2$ near $\theta$ (a payoff with a jump, \cref{exa:gr-digital}), then
+        $\Var\hat\Delta^F_n\le c/(nh)$ and $\Var\hat\Delta^C_n\le c/(2nh)$.
+      \item If $|Y(\theta+h)-2Y(\theta)+Y(\theta-h)|\le h\kappa\1_{A_h}$ for a random $\kappa\ge0$
+        and events $A_h$ with $\E[\kappa^2\1_{A_h}]\le ch$ (a payoff with a kink,
+        \cref{rem:gr-kernel}), then $\Var\hat\Gamma_n\le c/(nh)$.
+    \end{enumerate}
+  \item (\emph{Optimal bump}.) Suppose that, as $h\downarrow0$, the bias is
+    $bh^\beta(1+o(1))$ and $n$ times the variance is $vh^{-\gamma}(1+o(1))$, with constants
+    $b\ne0$, $v>0$, $\beta>0$, $\gamma>0$ that do not depend on $n$. Let
+    $c^*=\big(\gamma v/(2\beta b^2)\big)^{1/(2\beta+\gamma)}$. For every sequence
+    $h_n\to0$,
+    \[
+      \liminf_{n\to\infty}\,n^{2\beta/(2\beta+\gamma)}\,\E\big[(\hat\Delta_n-\alpha'(\theta))^2\big]
+      \ \ge\ \Big(1+\frac{2\beta}{\gamma}\Big)b^2(c^*)^{2\beta},
+    \]
+    with equality (and a limit) for $h_n=c^*n^{-1/(2\beta+\gamma)}$; here $\hat\Delta_n$ is
+    the estimator built with the bump $h_n$, and $\alpha'(\theta)$ is replaced by
+    $\alpha''(\theta)$ for $\hat\Gamma_n$. In case (iii)(a), the mean squared error is at
+    most $b^2h^{2\beta}(1+o(1))+\E\kappa^2/n$, which is $O(1/n)$ for every $h_n=O(n^{-1/(2\beta)})$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By Taylor's theorem with the Lagrange remainder,
+$\alpha(\theta+h)=\alpha(\theta)+\alpha'(\theta)h+\frac12\alpha''(\xi)h^2$ with $\xi$ between
+$\theta$ and $\theta+h$, and $\alpha''(\xi)\to\alpha''(\theta)$ by continuity. For the central
+difference, expand $\alpha(\theta\pm h)$ to third order: the even terms cancel and
+$\alpha(\theta+h)-\alpha(\theta-h)=2\alpha'(\theta)h+\frac16(\alpha'''(\xi_+)+\alpha'''(\xi_-))h^3$.
+For the second difference, expand to fourth order: the odd terms cancel and
+$\alpha(\theta+h)+\alpha(\theta-h)-2\alpha(\theta)=\alpha''(\theta)h^2+\frac1{24}(\alpha^{(4)}(\xi_+)+\alpha^{(4)}(\xi_-))h^4$.
+In every case the expectation of the estimator is the same difference of $\alpha$, by linearity,
+whatever the dependence between the evaluations.
+
+(ii) The replications are independent and, within one, the evaluations are independent, so
+the variances add: $\Var(aY_1+bY_2+cY_3)=a^2\sigma_1^2+b^2\sigma_2^2+c^2\sigma_3^2$, and averaging
+over $n$ replications divides by $n$.
+
+(iii) The first claim is the variance of an average of i.i.d.\ terms. (a) With
+$|Y(\theta+h)-Y(\theta-h)|\le2h\kappa$, the variance of one central quotient is at most its
+second moment, $\le\E\kappa^2$; the forward quotient is the same. (b) Likewise, the variance
+of one quotient is at most $ch/h^2$ (forward) or $2ch/(4h^2)$ (central). (c) The second moment
+of one second difference is at most $h^2\E[\kappa^2\1_{A_h}]/h^4\le c/h$.
+
+(iv) The mean squared error is the squared bias plus the variance
+(\cref{prop:mc-mse}(i)). Write $h_n=c_nn^{-1/(2\beta+\gamma)}$. Then
+$n^{2\beta/(2\beta+\gamma)}h_n^{2\beta}=c_n^{2\beta}$ and
+$n^{2\beta/(2\beta+\gamma)}h_n^{-\gamma}/n=c_n^{-\gamma}$, so
+\[
+  n^{2\beta/(2\beta+\gamma)}\,\mathrm{MSE}=b^2c_n^{2\beta}(1+o(1))+vc_n^{-\gamma}(1+o(1))
+  \ \ge\ (1-\eta)\,\phi(c_n)\ \ge\ (1-\eta)\,\phi(c^*)
+\]
+for every $\eta\in(0,1)$ and $n$ large, where $\phi(c)=b^2c^{2\beta}+vc^{-\gamma}$. As in the
+proof of \cref{prop:mc-mse}(iii), $\phi$ decreases on $(0,c^*]$ and increases on $[c^*,\infty)$, so $c^*$
+is its global minimiser, and $vc^{*-\gamma}=\frac{2\beta}{\gamma}b^2c^{*2\beta}$ gives
+$\phi(c^*)=(1+2\beta/\gamma)b^2c^{*2\beta}$. With $c_n=c^*$ the two $o(1)$ terms vanish in the
+limit. The last claim combines the bias with the bound of (iii)(a).
+\end{proof}
+
+The proposition gives the familiar table of rates
+\citep[Sections~7.1.1--7.1.2]{glasserman-mc}, due to \textcite{glynn-1989} and
+\textcite{lecuyer-perron}:
+\begin{center}
+\small
+\begin{tabular}{@{}lccccc@{}}
+  \toprule
+  & $\beta$ & $\gamma$ & best bump & best MSE & RMSE \\
+  \midrule
+  forward, independent & $1$ & $2$ & $n^{-1/4}$ & $n^{-1/2}$ & $n^{-1/4}$ \\
+  central, independent & $2$ & $2$ & $n^{-1/6}$ & $n^{-2/3}$ & $n^{-1/3}$ \\
+  forward, CRN, payoff with a jump & $1$ & $1$ & $n^{-1/3}$ & $n^{-2/3}$ & $n^{-1/3}$ \\
+  central, CRN, payoff with a jump & $2$ & $1$ & $n^{-1/5}$ & $n^{-4/5}$ & $n^{-2/5}$ \\
+  central or forward, CRN, Lipschitz payoff & $1$ or $2$ & --- & small enough & $n^{-1}$ & $n^{-1/2}$ \\
+  \midrule
+  second difference, independent & $2$ & $4$ & $n^{-1/8}$ & $n^{-1/2}$ & $n^{-1/4}$ \\
+  second difference, CRN, payoff with a kink & $2$ & $1$ & $n^{-1/5}$ & $n^{-4/5}$ & $n^{-2/5}$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+In the table, only common random numbers with a Lipschitz payoff reach the Monte Carlo rate
+$n^{-1/2}$; higher-order differences come closer without reaching it (\exref{ex:gr-extrapolation}).
+\textcite{lecuyer-perron} prove the rate $n^{-1/2}$ under the conditions that also make the
+pathwise method of \cref{sec:gr-pathwise} valid. The last line is
+\cref{rem:gr-kernel}. Everything assumes $b\ne0$. If $b=0$ the bias is of higher order and
+the rates improve; if $b$ is merely small, the asymptotic rates set in only for very large $n$
+(\cref{fig:gr-bump}(c)).
+
+\begin{example}[The delta of a digital]\label{exa:gr-digital}
+Let $Y(S)=e^{-rT}\1_{\{SG>K\}}$ with common draws. Then
+$Y(S+h)-Y(S-h)=e^{-rT}\1_{\{K/(S+h)<G\le K/(S-h)\}}$, so
+\[
+  \E\big[(Y(S+h)-Y(S-h))^2\big]=e^{-2rT}\big(N(z_{-h})-N(z_{+h})\big),\qquad
+  z_{\pm h}=\frac{\log(K/(S\pm h))-\nu T}{\sigma\sqrt T}.
+\]
+By the mean value theorem,
+\[
+  N(z_{-h})-N(z_{+h})=N'(\xi_h)(z_{-h}-z_{+h}),\qquad
+  z_{-h}-z_{+h}=\frac{1}{\sigma\sqrt T}\log\frac{S+h}{S-h}=\frac{2h}{S\sigma\sqrt T}\big(1+o(1)\big),
+\]
+with $\xi_h\to-d_-$. So the second moment is $2he^{-rT}\Delta_{\mathrm{dig}}(1+o(1))$: case (iii)(b)
+with $\gamma=1$ and $v=e^{-rT}\Delta_{\mathrm{dig}}/2$. The bias of the central difference is
+$\frac16\alpha'''(S)h^2$, with $\alpha'''(S)=-4.82\times10^{-5}$ for the test case, and (iv)
+gives $h^*=2.06$ at $n=10^6$, a $2\%$ bump; minimising the exact mean squared error (bias from
+the closed form, variance by quadrature, \texttt{greeks.optimal\_bump}) gives $h^*=2.07$ and a
+root mean squared error of $7.39\times10^{-5}$, $0.38\%$ of the delta. Without common random
+numbers the best is $1.35\times10^{-4}$, and the likelihood-ratio estimator of
+\cref{sec:gr-lr} has standard error $0.0290/\sqrt n=2.90\times10^{-5}$ with no bias at all: at
+equal accuracy it needs $6.5$ times fewer draws than the best bump.
+\end{example}
+
+\begin{remark}[The bumped gamma is a kernel estimator]\label{rem:gr-kernel}
+For the call with common draws, $(x+h)^+-2x^++(x-h)^+=(h-|x|)^+$ gives, sample by sample,
+\[
+  \frac{Y(S+h)-2Y(S)+Y(S-h)}{h^2}=e^{-rT}G\,k_h\big(S-K/G\big),\qquad k_h(u)=\frac{(h-|u|)^+}{h^2},
+\]
+and $\Delta_c$ is $e^{-rT}G$ times the ramp $\int_{-\infty}^{S-K/G}\1_{\{|u|<h\}}\,\dd u/(2h)$. Each draw has a
+\emph{critical spot} $K/G$, the initial price at which it finishes at the money. The bumped
+gamma $\hat\Gamma_n=\frac1n\sum_ie^{-rT}G_ik_h(S-K/G_i)$ is a kernel estimator, with the
+triangular kernel $k_h$ of width $2h$ and integral $1$, of the density of the critical spots
+weighted by $e^{-rT}G$, which is the gamma. Since the tent is at most $h$, each second
+difference is at most $he^{-rT}G\1_{A_h}$ with $A_h=\{|S-K/G|<h\}$, and
+$\E[e^{-2rT}G^2\1_{A_h}]=O(h)$ because $K/G$ has a bounded density near $S$ and $G\le2K/S$ on
+$A_h$ for $h<S/2$: \cref{prop:gr-finite-difference}(iii)(c) bounds the variance by a multiple of
+$1/(nh)$, and the bias is $O(h^2)$, the last line of the table. The course's region-by-region analysis is this
+decomposition: regions II and III, where $K/(1+\varepsilon)<S_T<K/(1-\varepsilon)$, are the two
+sides of the tent, and outside them a draw contributes nothing to $\Gamma_c$. The number of
+draws in the tent is binomial, with mean $n\,\Q(|S-K/G|<h)$: $4.0$ for the course's $n=1024$
+and $\varepsilon=0.001$, $40$ for $\varepsilon=0.01$ and $388$ for $\varepsilon=0.1$. With four
+draws the estimate is a handful of tents and zero in between, the ``butterflies'' of
+\cref{fig:gr-course}(b). The deltas are sums of ramps, which become steps as $h\to0$: the
+``$1/n$ quantization'' of the course.
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch13-bump}
+  \caption{Finite differences for the test case, exact curves (bias from the closed forms,
+    variance by quadrature). (a) Root mean squared error of the call delta against the relative
+    bump, $n=10^4$; dots: $200$ independent runs each (our implementation, \texttt{default\_rng},
+    seeds $100$--$103$). With CRN the error is flat at the pathwise standard error $0.0058$.
+    (b) Error relative to the exact value for the central digital delta and the second-difference
+    call gamma, $n=10^4$; with CRN the two curves almost coincide (their exact values are equal
+    and both variances are of order $1/(nh)$). (c) Error at the optimal bump against $n$ for the
+    digital delta; reference slopes $-1/4$, $-1/3$, $-2/5$. The forward curves approach their
+    slopes slowly because the digital's $\alpha''=-4.9\times10^{-5}$ is small at the test case.}
+  \label{fig:gr-bump}
+\end{figure}
+
+\Cref{fig:gr-bump}(a) shows the two regimes for the call delta. With independent draws the
+error grows like $1/\varepsilon$ for small bumps, and the best forward difference ($\varepsilon=4.4\%$)
+has error $0.061$. With common random numbers the central difference has error $0.0058$ for
+every bump up to $3\%$, ten times smaller, which is worth a hundred times more paths; the
+forward difference stays there up to $0.1\%$, after which its bias of order $h$ takes over. A
+bump of $10^{-4}$ is as good as a bump of $10^{-2}$: with a Lipschitz payoff and common draws,
+small bumps cost nothing. Rounding
+does not interfere at these sizes, since in double precision a difference quotient loses about
+$10^{-16}|Y|/h$, far below the statistical error. \Cref{fig:gr-course} reproduces the course's
+experiment: $n=1024$ draws, reused for every $S_0$. The forward and backward deltas bracket the
+central one, $\Delta_+-\Delta_-=\varepsilon S\,\Gamma_c\ge0$ sample by sample because the payoff is
+convex, and the gammas are biased for $\varepsilon=0.1$ and useless for $\varepsilon=0.001$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.94\textwidth]{ch13-course}
+  \caption{The course's shoot-out on the test-case call, $n=1024$ draws reused for every $S_0$
+    (our implementation, \texttt{default\_rng}, seed $1024$). (a) Bumped deltas
+    \eqref{eq:gr-course-fd}, $\varepsilon=0.01$. (b) Bumped gammas $\Gamma_c$ for
+    $\varepsilon=0.1$, $0.01$ and $0.001$ (dots; values above $0.075$ are cut).
+    (c) Pathwise and likelihood-ratio deltas, \eqref{eq:gr-pw-bs} and \eqref{eq:gr-lr-bs}.
+    (d) The PW-LR and LR-LR gammas of \cref{prop:gr-hybrid-gamma}. Black: Black--Scholes.}
+  \label{fig:gr-course}
+\end{figure}
+
+\demo{13-mc-greeks.ipynb}{move the bump, the number of draws and the payoff, and watch the
+two regimes of the error.}
+
+\section{Pathwise derivatives}\label{sec:gr-pathwise}
+
+Let the bump go to zero with common random numbers. If $\theta\mapsto Y(\theta)$ is
+differentiable along each path, the difference quotients converge to the derivative
+$Y'(\theta)$ of the payoff along the path, and the question is whether
+$\E[Y'(\theta)]=\alpha'(\theta)$: whether the derivative and the expectation can be
+interchanged. Almost sure differentiability is not enough (\cref{rem:gr-digital}); what is
+needed is a dominating Lipschitz bound.
+
+\begin{theorem}[Pathwise derivatives]\label{thm:gr-pathwise}
+Let $I$ be an open interval, $\theta_0\in I$, and $(Y(\theta))_{\theta\in I}$ random variables
+with $\E|Y(\theta_0)|<\infty$. Assume
+\begin{enumerate}[label=(PW\arabic*)]
+  \item for almost every $\omega$, the map $\theta\mapsto Y(\theta,\omega)$ is differentiable
+    at $\theta_0$, with derivative $Y'(\theta_0)$;
+  \item there are $\delta>0$ and a random variable $\kappa$ with $\E\kappa<\infty$ such that,
+    almost surely, $|Y(\theta_1)-Y(\theta_2)|\le\kappa|\theta_1-\theta_2|$ for all
+    $\theta_1,\theta_2\in(\theta_0-\delta,\theta_0+\delta)$.
+\end{enumerate}
+Then $Y(\theta)$ is integrable for $|\theta-\theta_0|<\delta$, $\alpha$ is differentiable at
+$\theta_0$, and $\alpha'(\theta_0)=\E[Y'(\theta_0)]$. If moreover $\E\kappa^2<\infty$, then
+$\Var Y'(\theta_0)\le\E\kappa^2$ and the common-random-number difference quotients converge to
+$Y'(\theta_0)$ in $L^2$ as $h\to0$.
+
+\noindent\emph{Sufficient conditions} \citep[Section~7.2.2, conditions (A1)--(A4)]{glasserman-mc}.
+Let $Y(\theta)=f(X(\theta))$ with $X(\theta)$ a random vector in $\R^m$ and $f:\R^m\to\R$
+Borel. Then (PW1) and (PW2) hold if: (a) $X(\theta)$ is almost surely differentiable at
+$\theta_0$; (b) $\Prob\big(X(\theta_0)\in D_f\big)=1$, where $D_f$ is the set of points at which
+$f$ is differentiable; (c) $f$ is Lipschitz, $|f(x)-f(x')|\le L_f\sum_i|x_i-x'_i|$; (d) there
+are random variables $\kappa_i$ with $\E\kappa_i<\infty$ and
+$|X_i(\theta_1)-X_i(\theta_2)|\le\kappa_i|\theta_1-\theta_2|$ on a neighbourhood of $\theta_0$.
+Then $\kappa=L_f\sum_i\kappa_i$ and $Y'(\theta_0)=\nabla f(X(\theta_0))\cdot X'(\theta_0)$. In
+particular (PW2) holds, by the mean value theorem, whenever $\theta\mapsto Y(\theta)$ is almost
+surely continuously differentiable on the neighbourhood with
+$\E\sup_{|\theta-\theta_0|<\delta}|Y'(\theta)|<\infty$.
+\end{theorem}
+
+\begin{proof}
+For $|\theta-\theta_0|<\delta$, $|Y(\theta)|\le|Y(\theta_0)|+\kappa\delta$ is integrable. Let
+$h_k\to0$ with $0<|h_k|<\delta$. By (PW1) the quotients
+$Q_k=(Y(\theta_0+h_k)-Y(\theta_0))/h_k$ converge to $Y'(\theta_0)$ almost surely, and by (PW2)
+$|Q_k|\le\kappa$, integrable. By dominated convergence,
+$(\alpha(\theta_0+h_k)-\alpha(\theta_0))/h_k=\E Q_k\to\E Y'(\theta_0)$; the sequence being
+arbitrary, $\alpha'(\theta_0)=\E Y'(\theta_0)$. Also $|Y'(\theta_0)|=\lim|Q_k|\le\kappa$ almost
+surely, so $\Var Y'(\theta_0)\le\E\kappa^2$; and $(Q_k-Y'(\theta_0))^2\le4\kappa^2$, so
+$\E(Q_k-Y'(\theta_0))^2\to0$ by dominated convergence again; the central quotients are the
+average of a forward and a backward one.
+
+For the sufficient conditions: on the almost sure event where (a) and (b) hold, $f$ is
+differentiable at $X(\theta_0)$ and $X$ at $\theta_0$, and the chain rule gives (PW1) with the
+stated derivative. On the event where (d) holds,
+$|f(X(\theta_1))-f(X(\theta_2))|\le L_f\sum_i|X_i(\theta_1)-X_i(\theta_2)|\le L_f\sum_i\kappa_i|\theta_1-\theta_2|$.
+Finally, if $\theta\mapsto Y(\theta)$ is $C^1$ on the interval, the mean value theorem gives
+$|Y(\theta_1)-Y(\theta_2)|\le\sup|Y'|\,|\theta_1-\theta_2|$.
+\end{proof}
+
+Common random numbers and the pathwise method are two views of one thing: under (PW2) with
+$\E\kappa^2<\infty$, the bumped quotients with common draws converge in $L^2$ to the pathwise
+estimator as $h\to0$, and differ from it in mean by the bias of order $h$ or $h^2$. This is why
+the error in \cref{fig:gr-bump}(a) is flat.
+
+\paragraph{Black--Scholes.} Differentiating $S_T=S\exp(\nu T+\sigma\sqrt TZ)$ gives
+$\partial_SS_T=G$, $\partial_\sigma S_T=S_T(\sqrt TZ-\sigma T)$, $\partial_rS_T=TS_T$,
+$\partial_yS_T=-TS_T$ and $\partial_TS_T=S_T(\nu+\sigma Z/(2\sqrt T))$. For the call,
+$f'(s)=\1_{\{s>K\}}$ off the strike, and the pathwise estimators (the course's analytical
+differencing) are
+\begin{equation}\label{eq:gr-pw-bs}
+\begin{aligned}
+  \Delta^{\mathrm{pw}}&=e^{-rT}\1_{\{S_T>K\}}G, &\quad
+  \mathcal V^{\mathrm{pw}}&=e^{-rT}\1_{\{S_T>K\}}S_T\big(\sqrt TZ-\sigma T\big),\\
+  \rho_r^{\mathrm{pw}}&=TKe^{-rT}\1_{\{S_T>K\}}, &\quad
+  \rho_y^{\mathrm{pw}}&=-Te^{-rT}\1_{\{S_T>K\}}S_T=-TS\,\Delta^{\mathrm{pw}},\\
+  \partial_K^{\mathrm{pw}}&=-e^{-rT}\1_{\{S_T>K\}}, &\quad
+  \Theta^{\mathrm{pw}}&=re^{-rT}(S_T-K)^+-e^{-rT}\1_{\{S_T>K\}}S_T\Big(\nu+\frac{\sigma Z}{2\sqrt T}\Big),
+\end{aligned}
+\end{equation}
+where $\rho_r^{\mathrm{pw}}$ combines the discount factor, $-Te^{-rT}(S_T-K)^+$, with the drift,
+$Te^{-rT}\1_{\{S_T>K\}}S_T$, and $\Theta^{\mathrm{pw}}$ estimates $\partial_tV=-\partial_TV$. The
+sufficient conditions hold for every input when $S,\sigma,T>0$: $f$ is $1$-Lipschitz,
+$\Q(S_T=K)=0$ because $S_T$ has a density, and for the input in a small neighbourhood (with
+$T$ bounded away from $0$) each derivative of $S_T$ is bounded by an integrable variable of the
+form $c_1e^{c_2|Z|}(1+|Z|)$.
+So all six are unbiased, as \cref{tab:gr-lab} confirms; the put is the same with
+$f'(s)=-\1_{\{s<K\}}$. Two of them are the course's ``pathwise proportionality'':
+$\rho_y^{\mathrm{pw}}=-TS\Delta^{\mathrm{pw}}$ and $\rho_r^{\mathrm{pw}}=-TK\partial_K^{\mathrm{pw}}$
+hold draw by draw, because the discounted payoff
+$\big(Se^{-yT}e^{-\sigma^2T/2+\sigma\sqrt TZ}-Ke^{-rT}\big)^+$ depends on $S$ and $y$ only through
+$Se^{-yT}$, and on $K$ and $r$ only through $Ke^{-rT}$ (\exref{ex:gr-homogeneity}). The bumped
+$\rho_y$ and $\Delta$ of the course move together for the same reason.
+
+The edges deserve a look. At $S=0$ write $\Delta^{\mathrm{pw}}=e^{-rT}\1_{\{SG>K\}}G$, which is
+$0$ for $K>0$, the limit of $e^{-yT}N(d_+)$. For $K=0$ the payoff is the share,
+$\Delta^{\mathrm{pw}}=e^{-rT}G$ has mean $e^{-yT}$ and variance $e^{-2yT}(e^{\sigma^2T}-1)$, small
+when $\sigma^2T$ is. As $\sigma\sqrt T\to0$ the hypothesis $\Q(S_T=K)=0$ survives for every
+$\sigma>0$, but at $\sigma=0$ with $K$ equal to the forward it fails, and indeed the price
+$(Se^{-yT}-Ke^{-rT})^+$ has a kink there. As $T\downarrow0$ the theta estimator contains
+$\sigma Z/(2\sqrt T)$. At and in the money its variance grows like $1/T$ ($T\Var\Theta^{\mathrm{pw}}$
+tends to $\frac14S^2\sigma^2\Var(Z^+)=34.1$ at $S=100$ and to $\frac14S^2\sigma^2=121$ at $S=110$), while
+out of the money it tends to $0$ ($37.6$, $0.019$ at $T=1$, $0.01$ for $S=90$); the theta itself grows
+like $1/\sqrt T$ at the money and stays bounded away from it.
+
+\begin{remark}[Why digitals fail, and three remedies]\label{rem:gr-digital}
+For the digital, $Y(S)=e^{-rT}\1_{\{SG>K\}}$ is differentiable at $S$ with derivative $0$ for
+almost every draw, so the pathwise estimator is identically zero, while the delta is
+$0.0195$. Condition (PW2) is what fails. For a draw with critical spot $K/G$ at distance
+$u=|S-K/G|<\delta$ from $S$, the quotient $(Y(S')-Y(S))/(S'-S)$ equals $e^{-rT}/|S'-S|$ for
+$S'$ just across $K/G$, so any admissible $\kappa$ must exceed $e^{-rT}/u$; and $u$ has a
+density bounded below near $0$, so $\E[1/u;u<\delta]=\infty$. Indeed no integrable $\kappa$ can
+exist, since otherwise the theorem would give the delta $0$. The same happens for barrier
+options, whose payoff jumps when the path touches the barrier, and for the pathwise derivative
+of the call's pathwise delta, which jumps at the strike (\cref{sec:gr-gamma}). Three remedies:
+\begin{enumerate}[label=(\alph*)]
+  \item \emph{Smoothing}: replace the payoff by a Lipschitz approximation, such as the call
+    spread $\big((S_T-K+\eta)^+-(S_T-K)^+\big)/\eta$, and accept a bias of order $\eta$;
+    the variance of its pathwise delta grows like $1/\eta$, the trade-off of
+    \cref{prop:gr-finite-difference}(iv) again.
+  \item \emph{Likelihood ratios}, which differentiate the density instead of the payoff
+    (\cref{sec:gr-lr}).
+  \item \emph{Conditional expectation}: replace $Y$ by $\E[Y\mid\mathcal G]$ for a
+    $\sigma$-algebra $\mathcal G$ such that the conditional payoff is a smooth function of the
+    input; this keeps the mean, lowers the variance (\cref{thm:st-conditional}) and makes the
+    pathwise method valid. For a payoff on a simulated path, conditioning on everything but the
+    last step replaces the indicator of the last step by a Black--Scholes digital price
+    (\exref{ex:gr-smoothing}).
+\end{enumerate}
+\end{remark}
+
+\paragraph{Along a path.} For an Asian call on the arithmetic average
+$A=\frac1m\sum_jS_{t_j}$ of $m$ equally spaced fixings, $t_j=jT/m$, simulated exactly with
+\texttt{paths.gbm\_paths} (\cref{prop:ps-gbm-exact}) from $S_{t_j}=S\exp(\nu t_j+\sigma W_{t_j})$,
+\begin{equation}\label{eq:gr-asian-pw}
+  \Delta^{\mathrm{pw}}=e^{-rT}\1_{\{A>K\}}\frac AS,\qquad
+  \mathcal V^{\mathrm{pw}}=e^{-rT}\1_{\{A>K\}}\frac1m\sum_{j=1}^mS_{t_j}\big(W_{t_j}-\sigma t_j\big).
+\end{equation}
+The sufficient conditions hold as for the call ($A$ has a density). For the geometric average
+$A^{\mathrm g}$ the same formulas, with $\partial_\sigma A^{\mathrm g}=A^{\mathrm g}\cdot\frac1m\sum_j(W_{t_j}-\sigma t_j)$, can be checked
+against the closed form (\cref{prop:as-geometric}): with $m=12$ the exact delta and vega are
+$0.486882$ and $22.4010$, and $4\times10^5$ paths give $0.4866(9)$ and $22.42(6)$ (our
+implementation, seed $3$; standard errors in units of the last digit). The arithmetic Asian
+gives $0.4951(9)$ and $24.07(7)$ from the same paths.
+
+When the path is produced by a discretisation scheme, the pathwise derivative is propagated
+along with it. For the Euler scheme $X_{k+1}=X_k+a(X_k)h+b(X_k)\Delta W_k$ of
+\cref{thm:ps-euler}, the derivative $D_k=\partial X_k/\partial x_0$ obeys
+\begin{equation}\label{eq:gr-tangent}
+  D_{k+1}=D_k\big(1+a'(X_k)h+b'(X_k)\Delta W_k\big),\qquad D_0=1,
+\end{equation}
+and $\partial_{x_0}f(X_N)=f'(X_N)D_N$. If $|a'|,|b'|\le L$ and $f$ is Lipschitz, each step is
+Lipschitz in its input with constant $1+Lh+L|\Delta W_k|$, so (PW2) holds with
+$\kappa=L_f\prod_k(1+Lh+L|\Delta W_k|)$, whose mean is the product of the means of independent
+factors. If $b$ does not vanish, $X_N$ has a density (given $X_{N-1}$ it is Gaussian), so (PW1)
+holds for every $f$ that is differentiable except at finitely many points, such as calls, puts
+and their combinations. For geometric Brownian motion,
+$D_N=X_N/x_0$ exactly. This is \emph{forward mode}: one derivative per input, computed
+alongside the path. \Cref{sec:gr-aad} runs it backwards.
+
+\section{The likelihood ratio method}\label{sec:gr-lr}
+
+The pathwise method moves the payoff and keeps the law. The likelihood-ratio method keeps the
+payoff and moves the law. Let $X$ have density $g_\theta$ on $\R^k$, let the payoff $f$ not
+depend on $\theta$, and write $\alpha(\theta)=\E_\theta[f(X)]=\int f\,g_\theta\,\dd x$.
+
+\begin{theorem}[Likelihood ratio method]\label{thm:gr-likelihood-ratio}
+Let $\theta_0\in I$, an open interval, $f:\R^k\to\R$ Borel, and assume:
+\begin{enumerate}[label=(LR\arabic*)]
+  \item there is $\delta>0$ such that, for every $x$, $\theta\mapsto g_\theta(x)$ is
+    differentiable on $U=(\theta_0-\delta,\theta_0+\delta)$, with derivative
+    $\dot g_\theta(x)$;
+  \item there is a Borel $H\ge0$ with $|\dot g_\theta(x)|\le H(x)$ for all $\theta\in U$ and $x$, and
+    $\int_{\R^k}|f(x)|H(x)\,\dd x<\infty$.
+\end{enumerate}
+If $\E_{\theta_0}|f(X)|<\infty$, then $\alpha$ is differentiable at $\theta_0$ and
+\[
+  \alpha'(\theta_0)=\E_{\theta_0}\big[f(X)\,\ell_{\theta_0}(X)\big],\qquad
+  \ell_\theta(x)=\frac{\dot g_\theta(x)}{g_\theta(x)}\ \text{ on }\{g_\theta>0\},\quad\ell_\theta=0\ \text{elsewhere}.
+\]
+The \emph{score} $\ell_{\theta_0}$ does not involve $f$, so one simulation under $g_{\theta_0}$
+gives every Greek of every payoff; the estimator $f(X)\ell_{\theta_0}(X)$ has finite variance
+if and only if $\E_{\theta_0}[f(X)^2\ell_{\theta_0}(X)^2]<\infty$.
+\end{theorem}
+
+\begin{proof}
+For $0<|h|<\delta$ and every $x$, the mean value theorem gives
+$|g_{\theta_0+h}(x)-g_{\theta_0}(x)|/|h|\le H(x)$, so the integrands
+$f(x)\big(g_{\theta_0+h}(x)-g_{\theta_0}(x)\big)/h$ are dominated by the integrable $|f|H$ and
+converge to $f(x)\dot g_{\theta_0}(x)$. By dominated convergence,
+$\alpha'(\theta_0)=\int f\dot g_{\theta_0}\,\dd x$. Where $g_{\theta_0}(x)=0$, the nonnegative
+function $\theta\mapsto g_\theta(x)$ has a minimum at $\theta_0$, so $\dot g_{\theta_0}(x)=0$;
+elsewhere $\dot g_{\theta_0}=\ell_{\theta_0}g_{\theta_0}$. Hence
+$\int f\dot g_{\theta_0}\,\dd x=\int f\ell_{\theta_0}g_{\theta_0}\,\dd x$.
+\end{proof}
+
+Condition (LR2) is a domination condition. It makes the difference quotients
+\[
+  f(X)\Big(\frac{g_{\theta_0+h}(X)}{g_{\theta_0}(X)}-1\Big)\Big/h,\qquad 0<|h|<\delta,
+\]
+uniformly integrable under $g_{\theta_0}$. When the support $\{g_\theta>0\}$ does not depend on
+$\theta$, these quotients have mean $(\alpha(\theta_0+h)-\alpha(\theta_0))/h$, and uniform
+integrability together with almost sure convergence is all that the interchange needs
+\citep[Section~4.6]{durrett}. A moving support is not in itself an obstacle: a location family
+$\psi(x-\theta)$ with $\psi$ a smooth, compactly supported density satisfies (LR1)--(LR2). The
+uniform law on $[0,\theta]$, on the other hand, violates (LR1): its density is not differentiable
+in $\theta$ at $x=\theta$.
+
+The likelihood ratio method is importance sampling read the other way round
+(\cref{ch:09-importance-sampling}). If $g_{\theta_0}>0$ wherever $g_\theta>0$, then
+$\alpha(\theta)=\E_{\theta_0}\big[f(X)g_\theta(X)/g_{\theta_0}(X)\big]$ by
+\cref{prop:is-likelihood-ratio}, with sampling law $g_{\theta_0}$ and target $g_\theta$; the
+score is the derivative of that weight at $\theta=\theta_0$.
+
+\paragraph{Black--Scholes.} The log-price $\log S_T$ has the density of
+$\mathcal N(\log S+\nu T,\sigma^2T)$. Differentiating its logarithm in each input and writing
+the result in terms of $Z=(\log S_T-\log S-\nu T)/(\sigma\sqrt T)$, the estimators are, with
+$Y=e^{-rT}f(S_T)$ for any payoff $f$,
+\begin{equation}\label{eq:gr-lr-bs}
+\begin{aligned}
+  \Delta^{\mathrm{lr}}&=Y\frac{Z}{S\sigma\sqrt T}, &\quad
+  \Gamma^{\mathrm{lr}}&=Y\frac{Z^2-1-\sigma\sqrt TZ}{S^2\sigma^2T}, &\quad
+  \mathcal V^{\mathrm{lr}}&=Y\Big(\frac{Z^2-1}{\sigma}-\sqrt TZ\Big),\\
+  \rho_y^{\mathrm{lr}}&=-Y\frac{\sqrt TZ}{\sigma}=-TS\Delta^{\mathrm{lr}}, &\quad
+  \rho_r^{\mathrm{lr}}&=-TY+Y\frac{\sqrt TZ}{\sigma}, &\quad
+  \Theta^{\mathrm{lr}}&=rY-Y\Big(\frac{\nu Z}{\sigma\sqrt T}+\frac{Z^2-1}{2T}\Big).
+\end{aligned}
+\end{equation}
+The gamma uses $\partial_S^2g/g$, computed in \cref{sec:gr-gamma}; $\rho_r^{\mathrm{lr}}$ adds the
+discount factor's $-TY$ to the score of the drift. For the digital,
+$\Delta^{\mathrm{lr}}=e^{-rT}\1_{\{S_T>K\}}Z/(S\sigma\sqrt T)$ is unbiased with per-sample
+standard deviation $0.0290$ (\cref{exa:gr-digital}). The domination (LR2) holds for every
+payoff of polynomial growth in $s$ and $1/s$: for the mean, for instance,
+$\sup_{|m'-m|<\delta}|\partial_mq(x-m')|\le C(1+|x-m|)e^{-((|x-m|-\delta)^+)^2/(2\sigma^2T)}$ for
+the Gaussian density $q$.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lccccrr@{}}
+    \toprule
+    & Black--Scholes & pathwise & likelihood ratio & bump, CRN & \multicolumn{2}{c}{sd per sample}\\
+    & & & & & pathwise & LR \\
+    \midrule
+    $\Delta$ & $0.509643$ & $0.5108(18)$ & $0.5093(41)$ & $0.5108(18)$ & $0.582$ & $1.287$ \\
+    $\Gamma$ & $0.0195277$ & $0.01954(11)^\ast$ & $0.01941(39)$ & $0.01977(36)$ & $0.0363^\ast$ & $0.1234$ \\
+    $\mathcal V$ & $39.0554$ & $39.08(23)$ & $38.82(79)$ & $39.08(23)$ & $72.67$ & $246.70$ \\
+    $\rho_r$ & $43.6000$ & $43.71(16)$ & $43.55(37)$ & $43.71(16)$ & $49.15$ & $117.08$ \\
+    $\rho_y$ & $-50.9643$ & $-51.08(18)$ & $-50.93(41)$ & $-51.08(18)$ & $58.22$ & $128.71$ \\
+    $\partial_tV$ & $-3.32226$ & $-3.324(21)$ & $-3.299(75)$ & $-3.324(21)$ & $6.73$ & $23.45$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{The six Greeks of the test-case call from the same $n=10^5$ draws (our
+    implementation, \texttt{default\_rng}, seed $13$, \texttt{greeks.greeks\_table}); standard
+    errors in units of the last digit. Bumps with common random numbers: $1\%$ of $S$ (second
+    difference for $\Gamma$), of $\sigma$ and of $T$, and one basis point for $r$ and $y$.
+    The per-sample standard deviations are exact (quadrature). $^\ast$For the gamma, the
+    PW-LR estimator of \cref{prop:gr-hybrid-gamma}; its LR-PW estimator gives $0.019557(92)$,
+    with standard deviation $0.0290$.}
+  \label{tab:gr-lab}
+\end{table}
+
+\Cref{tab:gr-lab} compares the three methods on the test case. Every estimate is within two
+standard errors of the closed form. The bumps with common random numbers reproduce the pathwise
+estimates and their errors, as \cref{thm:gr-pathwise} predicts. The likelihood-ratio
+estimators have standard deviations $2.2$ to $3.5$ times larger, that is $5$ to $12$ times more
+paths for the same accuracy; the course's observation that the likelihood-ratio $\rho_y$ has
+errors ``more than twice'' the pathwise ones is the ratio $128.71/58.22=2.21$; the exact ratio
+grows with the spot, from $1.86$ at $S_0=90$ to $2.81$ at $S_0=110$, and exceeds $2$ for
+$S_0\gtrsim95$. In
+\cref{fig:gr-course}(c) the pathwise delta has the $1/n$ steps of \cref{rem:gr-kernel}, while
+the likelihood-ratio delta is smooth in $S_0$, since each draw contributes the smooth
+$e^{-rT}(SG-K)^+Z/(S\sigma\sqrt T)$, but further from the truth.
+
+\begin{remark}[The weight degenerates as $\sigma\sqrt T\to0$]\label{rem:gr-lr-degenerate}
+The delta weight $Z/(S\sigma\sqrt T)$ has standard deviation $1/(S\sigma\sqrt T)$. Let $f$ be
+continuous at the forward $F=Se^{(r-y)T}$, with $|f(s)|\le C(1+s^p)$. Then, as $\sigma\downarrow0$
+with $S,T,r,y$ fixed,
+\[
+  \sigma^2T\,\Var\big(\Delta^{\mathrm{lr}}\big)\longrightarrow e^{-2rT}f(F)^2/S^2 .
+\]
+Indeed $\sigma^2T\Var(\Delta^{\mathrm{lr}})=e^{-2rT}\E[f(S_T)^2Z^2]/S^2-\big(\sigma\sqrt T\,\Delta\big)^2$;
+as $\sigma\downarrow0$, $S_T\to F$ for every $Z$, and for $\sigma\le1$ the integrand is
+dominated by $C'(1+e^{2p\sqrt T|Z|})Z^2$, with $C'$ depending on $S,T,r,y,p$, so the first term converges to
+$e^{-2rT}f(F)^2/S^2$ by dominated convergence; the same argument gives
+$\sigma\sqrt T\Delta=e^{-rT}\E[f(S_T)Z]/S\to e^{-rT}f(F)\E[Z]/S=0$. So whenever $f(F)\ne0$ the
+standard deviation grows like $1/(\sigma\sqrt T)$, while the pathwise delta of a payoff with
+Lipschitz constant $L_f$ has variance at most $e^{-2rT}L_f^2\E[G^2]$, bounded. For the share
+($K=0$) the two exact variances are $e^{-2yT}\big(e^{\sigma^2T}(1+4\sigma^2T)/(\sigma^2T)-1\big)=28.04$
+and $e^{-2yT}(e^{\sigma^2T}-1)=0.0392$ at the test case, a ratio of $715$. The same happens as
+$T\downarrow0$, and the gamma weight is worse, of order $1/(\sigma^2T)$. At the forward,
+$f(F)=0$ for the call and the limit is finite (\exref{ex:gr-small-vol}).
+\end{remark}
+
+\paragraph{Along a path.} For a payoff of the whole path, the law of the path is a product
+of Gaussian steps: with $\Delta t=T/m$ and $\log(S_{t_j}/S_{t_{j-1}})=\nu\Delta t+\sigma\sqrt{\Delta t}Z_j$,
+the input $S$ enters only the first step and $\sigma$ enters every step, so the scores are
+\begin{equation}\label{eq:gr-asian-lr}
+  \Delta^{\mathrm{lr}}=Y\frac{Z_1}{S\sigma\sqrt{t_1}},\qquad
+  \mathcal V^{\mathrm{lr}}=Y\sum_{j=1}^m\Big(\frac{Z_j^2-1}{\sigma}-\sqrt{\Delta t}\,Z_j\Big),
+\end{equation}
+valid for any payoff of the fixings, digital or barrier included. Both degrade as the grid is
+refined (\cref{fig:gr-asian}(a)). The vega weight is a sum of $m$ independent terms of variance
+$2/\sigma^2+\Delta t$, so its variance grows linearly in $m$; in continuous time the laws of the
+paths for two volatilities are mutually singular, because the quadratic variation of
+$\log S$ reveals $\sigma$, and there is no likelihood-ratio vega at all. The delta weight has
+standard deviation $1/(S\sigma\sqrt{t_1})$, which grows as the first fixing approaches $0$. This
+weight is Girsanov's (\cref{thm:is-girsanov}): moving $\log S$ by $\epsilon$ moves every fixing,
+and the cheapest drift that achieves this by time $t_1$ is the constant $\epsilon/(\sigma t_1)$ on
+$[0,t_1]$ (by Cauchy--Schwarz it has the smallest $\int\theta^2$ among drifts with
+$\int_0^{t_1}\theta=\epsilon/\sigma$, hence the smallest second moment of the weight),
+and its weight differentiates to $W_{t_1}/(S\sigma t_1)=Z_1/(S\sigma\sqrt{t_1})$. For
+$m=1$ the Asian is the call, and the likelihood-ratio standard deviations are $2.2$ (delta) and
+$3.4$ (vega) times the pathwise ones (\cref{tab:gr-lab}); for the arithmetic Asian with $m=128$
+they are $8.9$ and $17$ times ($10^5$ paths, seed $2026$).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.94\textwidth]{ch13-asian}
+  \caption{Asian call on the test case. (a) Per-sample standard deviations of the pathwise
+    \eqref{eq:gr-asian-pw} and likelihood-ratio \eqref{eq:gr-asian-lr} deltas and vegas
+    against the number of fixings, divided by the pathwise value at $m=1$ ($10^5$ paths per $m$,
+    seed $2026$). (b) Bucketed vegas $\partial P/\partial\sigma_j$ for $m=12$ from one adjoint
+    sweep (bars, with $95\%$ intervals) and from $24$ central bumps of $10^{-4}$ with common
+    random numbers (dots), same $10^5$ paths (seed $2027$); the total is the parallel vega.}
+  \label{fig:gr-asian}
+\end{figure}
+
+\section{The gamma}\label{sec:gr-gamma}
+
+A second derivative is harder. For the call, the pathwise delta
+$e^{-rT}\1_{\{SG>K\}}G$ jumps when the critical spot $K/G$ crosses $S$, so its own pathwise
+derivative is $0$ almost everywhere: the ``pathwise gamma'' is identically zero
+(\cref{rem:gr-digital}), and the second difference with common draws is a kernel estimator with
+variance of order $1/(nh)$ (\cref{rem:gr-kernel}). The likelihood-ratio gamma of
+\eqref{eq:gr-lr-bs} is unbiased but noisy. The course's way out is to differentiate twice by
+different methods: once pathwise, where the payoff is smooth enough, and once by likelihood
+ratio, where it is not.
+
+\begin{proposition}[Mixed estimators of the gamma]\label{prop:gr-hybrid-gamma}
+Let $S,\sigma,T>0$, $S_T=SG$ as above, and let $f:(0,\infty)\to\R$ be continuous, and
+continuously differentiable except at finitely many points, with $|f(s)|+|sf'(s)|\le C(s^p+s^{-p})$
+wherever $f'(s)$ exists, for some constants $C,p$.
+Then $V(S)=e^{-rT}\E f(S_T)$ is twice differentiable, and its gamma $\Gamma=V''(S)$ is the
+expectation of each of
+\[
+\begin{aligned}
+  &\text{(LR-LR)}\quad e^{-rT}f(S_T)\,\frac{Z^2-1-\sigma\sqrt TZ}{S^2\sigma^2T},\\
+  &\text{(PW-LR)}\quad e^{-rT}f'(S_T)S_T\,\frac{Z-\sigma\sqrt T}{S^2\sigma\sqrt T},\\
+  &\text{(LR-PW)}\quad e^{-rT}\big(f'(S_T)S_T-f(S_T)\big)\frac{Z}{S^2\sigma\sqrt T},
+\end{aligned}
+\]
+all with finite variance. PW-LR applies the likelihood ratio to the pathwise delta, LR-PW
+differentiates the likelihood-ratio delta pathwise. The LR-LR estimator needs only $f$ Borel
+with $|f(s)|\le C(s^p+s^{-p})$, digitals included; the other two are biased for the digital.
+\end{proposition}
+
+\begin{proof}
+Let $u=\log S$, $X=\nu T+\sigma\sqrt TZ$, so that $S_T=e^{u+X}$, and $q$ the density of $X$.
+For a Borel $k$ with $|k(s)|\le C(s^p+s^{-p})$ let $\phi_k(u)=\E[k(e^{u+X})]=\int k(e^x)q(x-u)\,\dd x$.
+The family $u\mapsto q(x-u)$ satisfies (LR1) and (LR2), and so does $u\mapsto\partial_uq(x-u)$ in
+place of $q(x-u)$, since $\partial_u^jq(x-u)$ is a polynomial in $x-u$ times $q(x-u)$ and $k(e^x)$
+grows at most like $e^{p|x|}$. By \cref{thm:gr-likelihood-ratio}, and the same dominated
+convergence argument for the second derivative,
+\[
+  \phi_k'(u)=\frac{\E[k(S_T)Z]}{\sigma\sqrt T},\qquad \phi_k''(u)=\frac{\E[k(S_T)(Z^2-1)]}{\sigma^2T},
+\]
+because $\partial_u\log q(x-u)=(x-u-\nu T)/(\sigma^2T)=Z/(\sigma\sqrt T)$ and
+$\partial_u^2q/q=(Z^2-1)/(\sigma^2T)$. Next, $f$ is continuous and piecewise $C^1$, so
+$f(e^{u'+X})-f(e^{u+X})=\int_u^{u'}f'(e^{v+X})e^{v+X}\,\dd v$, and
+$|f(e^{u'+X})-f(e^{u+X})|\le|u'-u|\,\kappa$ for $|u'-u|<1$, with
+$\kappa=\sup_{|v-u|<1}C(e^{p(v+X)}+e^{-p(v+X)})$ integrable, also after multiplication by $|Z|$;
+and $f$ is differentiable at $S_T$ almost surely, since $S_T$ has a density and $f$ fails to be
+differentiable at finitely many points only. By \cref{thm:gr-pathwise},
+$\phi_f'(u)=\E[f'(S_T)S_T]$ and $\frac{\dd}{\dd u}\E[f(S_T)Z]=\E[f'(S_T)S_TZ]$.
+
+Since $\partial_S=S^{-1}\partial_u$, $\Gamma=e^{-rT}S^{-2}(\phi_f''-\phi_f')(u)$. Writing
+$\phi_f''-\phi_f'$ with both derivatives by likelihood ratio gives LR-LR. Writing
+$\phi_f'=\phi_k$ with $k(s)=sf'(s)$ (pathwise) and then
+$\phi_f''=\phi_k'=\E[k(S_T)Z]/(\sigma\sqrt T)$ (likelihood ratio, which needs only the growth
+of $k$) gives PW-LR. Writing $\phi_f'=\E[f(S_T)Z]/(\sigma\sqrt T)$ (likelihood ratio) and
+differentiating it pathwise gives $\phi_f''=\E[f'(S_T)S_TZ]/(\sigma\sqrt T)$, hence LR-PW. Each
+estimator is a polynomial in $Z$ times a function of $S_T$ of polynomial growth in $S_T$ and
+$1/S_T$, so it has finite variance. For the digital, $f$ is not continuous and $f'=0$ off $K$:
+PW-LR is then identically $0$ and LR-PW has mean $-\Delta/S$.
+\end{proof}
+
+For the test-case call the per-sample standard deviations are $0.1234$ (LR-LR), $0.0363$
+(PW-LR) and $0.0290$ (LR-PW): the mixed estimators need $12$ and $18$ times fewer paths than
+the pure likelihood ratio. The second difference with common draws and a $1\%$ bump has standard
+deviation $0.112$ and a bias of $0.02\%$: comparable to LR-LR, at three evaluations per draw. For the call,
+$f'(s)s-f(s)=K\1_{\{s>K\}}$, and LR-PW is $K/S$ times the likelihood-ratio delta of the digital:
+the gamma of a call is the delta of a digital in disguise. \Cref{fig:gr-course}(d) is the
+course's picture: with $1024$ draws the mixed gamma is already smooth in $S_0$, and LR-LR
+converges as well, more slowly. Both mixed estimators inherit the likelihood-ratio weight, so
+they degenerate like $1/(\sigma\sqrt T)$, not like the $1/(\sigma^2T)$ of LR-LR.
+
+\demo{13-mc-greeks.ipynb}{pathwise, likelihood-ratio and mixed Greeks against the spot, for
+any number of draws.}
+
+\section{Many Greeks at once: adjoints}\label{sec:gr-aad}
+
+A book may depend on hundreds of inputs: a volatility per maturity, a forward rate per period.
+Bumping costs one or two repricings per input, and so does the pathwise method in forward mode
+\eqref{eq:gr-tangent}, one derivative at a time. The \emph{adjoint}, or reverse, mode computes
+the derivative of one output with respect to all the inputs in one backward sweep.
+
+\begin{remark}[Adjoint algorithmic differentiation]\label{rem:gr-aad}
+Write the computation of a path's discounted payoff $P$ from the inputs $x_1,\dots,x_p$ as a
+sequence of elementary operations $v_k=\varphi_k(v_j:j\prec k)$, each using earlier values.
+Forward mode propagates tangents $\dot v_k=\sum_{j\prec k}\partial_j\varphi_k\,\dot v_j$ from a
+seed $\dot x$, one input direction per sweep. Reverse mode propagates adjoints
+$\bar v_j=\partial P/\partial v_j$ backwards, $\bar v_j=\sum_{k\succ j}\bar v_k\,\partial_j\varphi_k$,
+from $\bar P=1$; at the end, $\bar x_i=\partial P/\partial x_i$ for every $i$. Each elementary
+operation is visited once in each sweep, and its local partial derivatives cost a bounded
+multiple of the operation itself. In the operation-count model of
+\citet[Section~4.6]{griewank-walther}, the price and its whole gradient together cost at most
+four times the price alone, whatever $p$. \textcite{giles-glasserman-adjoints} quote this bound and use the adjoint to compute the
+deltas and vegas of the LIBOR market model, with an advantage over forward mode that grows in
+proportion to the number of forward rates; \textcite{capriotti-aad} develops the method for
+pricing code in general. Three caveats. (a) The backward sweep needs the intermediate values of the forward
+sweep, stored (the ``tape'') or recomputed; in Monte Carlo this is one path at a time, so the
+memory is proportional to the number of time steps. (b) Applied path by path, the adjoint
+computes \emph{exactly} the pathwise estimator, to rounding: it inherits the hypotheses of
+\cref{thm:gr-pathwise}, so digitals and barriers must be smoothed first, and a gamma needs a
+second-order method such as those of \cref{prop:gr-hybrid-gamma}. (c) The bound is on
+operations; actual running times also depend on memory traffic and on the implementation.
+\end{remark}
+
+For the Asian call with a volatility $\sigma_j$ on each period $(t_{j-1},t_j]$, the forward sweep
+is $X_0=\log S$, $X_j=X_{j-1}+(r-y-\sigma_j^2/2)\Delta t+\sigma_j\sqrt{\Delta t}Z_j$,
+$S_{t_j}=e^{X_j}$, $A=\frac1m\sum_jS_{t_j}$, $P=e^{-rT}(A-K)^+$. Differentiating each line
+backwards gives $\bar A=e^{-rT}\1_{\{A>K\}}$ and, for $j=m,\dots,1$,
+\[
+  \bar X_j=\bar A\,\frac{S_{t_j}}m+\bar X_{j+1}\quad(\bar X_{m+1}=0),\qquad
+  \frac{\partial P}{\partial\sigma_j}=\bar X_j\big(\sqrt{\Delta t}Z_j-\sigma_j\Delta t\big),
+\]
+then $\Delta=\bar X_1/S$, $\rho_y=-\Delta t\sum_j\bar X_j$ and
+$\rho_r=-TP+\Delta t\sum_j\bar X_j$: all $m+3$ sensitivities for one forward and one backward
+pass, against $2(m+3)$ repricings for central bumps. With a flat volatility the bucketed vegas
+add up to the pathwise vega \eqref{eq:gr-asian-pw}. In our implementation the adjoint agrees
+with the $m+3$ forward-mode sweeps to $10^{-12}$ on every path and with central bumps of
+$10^{-4}$ to $10^{-3}$, and \cref{fig:gr-asian}(b) shows the twelve bucketed vegas: the early periods
+matter most, because a volatility early in the year moves every later fixing.
+
+\begin{incode}
+\begin{lstlisting}
+x = np.full(n, np.log(S))                       # forward sweep, storing the tape X
+for j in range(m):
+    x = x + (r - y - sig[j]**2 / 2) * dt + sig[j] * sq * Z[:, j]
+    X[:, j] = x
+Sj = np.exp(X); A = Sj.mean(axis=1); P = disc * np.maximum(A - K, 0.0)
+Abar, acc = disc * (A > K), 0.0                 # reverse sweep
+for j in reversed(range(m)):
+    acc = acc + Abar * Sj[:, j] / m
+    Xbar[:, j] = acc
+vega = Xbar * (sq * Z - sig * dt); delta = Xbar[:, 0] / S
+\end{lstlisting}
+\texttt{asian\_adjoint} in \coderef{code/src/mfe230d/greeks.py}; \texttt{asian\_tangent} is the
+forward mode, one input direction per sweep. No automatic-differentiation library is used:
+the backward sweep is the chain rule written by hand.
+\end{incode}
+
+\demo{13-mc-greeks.ipynb}{Asian Greeks against the number of fixings, and bucketed vegas by
+adjoint and by bumping, with timings.}
+
+\furtherreading
+\Cref{fig:gr-course} and \cref{tab:gr-lab} reproduce the course's bumping study and its
+analytical-differencing, likelihood-ratio and mixed estimators. \textcite{glasserman-mc},
+Chapter~7, is the reference for everything here: finite differences in Section~7.1, the
+pathwise method in Section~7.2, likelihood ratios and the gamma in Section~7.3.
+\textcite{broadie-glasserman-greeks} introduced the pathwise and likelihood-ratio estimators
+to option pricing, and \citet[Chapter~VII]{asmussen-glynn} treat derivative estimation in
+simulation in general. The Malliavin-calculus weights of \textcite{fournie-malliavin} generalise
+the likelihood ratio to models without explicit densities. Adjoints are due to
+\textcite{giles-glasserman-adjoints} in this context; \textcite{capriotti-aad} and
+\textcite{griewank-walther} cover algorithmic differentiation in depth.

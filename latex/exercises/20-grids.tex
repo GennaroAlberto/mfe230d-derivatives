@@ -1,0 +1,142 @@
+% Exercises for Chapter 20 (Trees and finite differences). Statements only: solutions are kept privately.
+% Notation as in the notes: nu = r - y - sigma^2/2, time to maturity tau, log price x, the CRR tree with
+% factors u = e^{sigma sqrt(dt)}, d = 1/u and probability q, the theta-scheme with lambda = sigma^2 k / (2 h^2).
+% The test case is S_0 = K = 100, T = 1, r = 1%, y = 2%, sigma = 20%.
+
+\begin{exercise}[When is a tree a model?]\label{ex:fd-validity}
+\easy You may use \noteref{prop:fd-binomial}(i).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that the Jarrow--Rudd tree, $u,d=e^{\nu\Delta t\pm\sigma\sqrt{\Delta t}}$, has $q\in(0,1)$ if and only if
+    $\sigma\sqrt{\Delta t}<2$, whatever $r-y$, and that $q=\frac12+\frac1{24}\sigma^3\Delta t^{3/2}+O(\Delta t^2)$. Compare with
+    the CRR condition when $\sigma\to0$ with $r\ne y$ fixed.
+  \item Take the CRR tree with $n=1$, $T=1$, $S_0=K=100$, $r=5\%$, $y=0$, $\sigma=1\%$. Compute $q$ and the
+    ``price'' \noteref{eq:fd-tree} of the put. Exhibit an arbitrage in the one-period model with these $u$
+    and $d$.
+  \item Show that two CRR steps of length $\Delta t/2$ make one step of a trinomial tree with moves $\pm h$
+    and $0$. Find $h$ and the stretch $\kappa$ of \noteref{eq:fd-kr}, and show that the three probabilities
+    agree with \noteref{eq:fd-kr} up to $O(\Delta t)$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The binomial formula and the Leisen--Reimer tree]\label{ex:fd-leisen-reimer}
+\medium Let a tree as in \noteref{def:fd-tree} have $q\in(0,1)$, and let $a$ be the smallest number of up
+moves with $S_0u^ad^{n-a}>K$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that the European call in the tree is worth
+    \[
+      S_0e^{-yT}\Psi(a;n,q')-Ke^{-rT}\Psi(a;n,q),\qquad q'=que^{-(r-y)\Delta t},
+    \]
+    where $\Psi(a;n,p)$ is the probability that a binomial variable with parameters $n$ and $p$ is at
+    least $a$. Interpret $q'$ as the probability of an up move under a change of measure.
+  \item For the Leisen--Reimer tree of \noteref{prop:fd-binomial}(iv)(b), show that
+    $qu+(1-q)d=e^{(r-y)\Delta t}$, that $q$ is the risk-neutral probability, and that $q'=h_n^{-1}(d_+)$.
+  \item (Computational.) On the test case with $K=110$, compute the Leisen--Reimer call for $n=25$,
+    $51$, $101$, $201$, $401$, estimate the order of convergence, and check that $K$ lies between the two
+    middle terminal nodes. How many CRR steps give the accuracy of the Leisen--Reimer tree with $n=25$, and what
+    does that mean for the cost of an American option priced by backward induction?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Digitals on a tree]\label{ex:fd-digital}
+\medium This is a computational exercise. Let $D_n$ be the CRR price of the digital call paying
+$\1\{S_T>K\}$, and $D=e^{-rT}N(d_-)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Repeat the heuristic of \noteref{rem:fd-oscillation} for $F(x)=f(x)\1\{x>\log K\}$, with
+    $\alpha_n\in(0,1]$ the offset, in units of $H=2\delta$, of the first terminal node strictly above $\log K$.
+    Show that it suggests $\sqrt n\,(D_n-D)\approx-2e^{-rT}N'(d_-)(\alpha_n-\frac12)$.
+  \item On the test case with $K=110$, compute $\sqrt n(D_n-D)$ for $n=1000,\dots,1200$ and compare
+    with (a).
+  \item What happens when $K$ is a node? Explain why the computed price then depends on how the
+    payoff is evaluated at that node, and which value is natural.
+  \item Compute $n(D^{\mathrm{BBS}}_n-D)$ for the BBS tree of \noteref{prop:fd-binomial}(iv)(a), with
+    $K=100$ and $K=110$, for a few $n$ between $100$ and $1600$. What has the smoothing achieved?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Small volatility and upwinding]\label{ex:fd-upwind}
+\medium Consider \noteref{eq:fd-pde} with $\nu>0$ and small $\sigma$, on a grid of mesh $h$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that central differences give $p_-<0$ as soon as $h\nu>\sigma^2$, so that
+    \noteref{thm:fd-schemes}(iv) does not apply for any time step. What does the condition mean
+    in terms of the distance $\nu k$ that the drift moves the log price in one step, compared with
+    the spread $\sigma\sqrt k$?
+  \item The \emph{upwind} scheme replaces $\nu\,\partial_xu$ by $\nu(U_{j+1}-U_j)/h$. Show that its implicit
+    version is positive for all $k$ and $h$. Why is the forward difference the right one for $\nu>0$?
+  \item Show that the upwind operator is consistent of order one only, and that it is consistent
+    of order two with the equation in which $\sigma^2$ is replaced by $\sigma^2+\nu h$.
+  \item Take $S_0=100$, $T=1$, $r=5\%$, $y=0$, $\sigma=1\%$ and $h=0.01$. Find the largest $h$ for which
+    central differences are positive, the minimal number of CRR steps, and the effective
+    volatility of (c). Price the calls with $K=100$ and $K=105$ with the implicit upwind scheme and
+    compare with the Black--Scholes prices at $\sigma$ and at the effective volatility.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Positivity of the $\theta$-scheme]\label{ex:fd-theta-positivity}
+\medium Consider the $\theta$-scheme for $\partial_\tau u=\frac12\sigma^2\partial_{xx}u$ on $h\Z$, with $\lambda=\sigma^2k/(2h^2)$ and
+$\theta\in(0,1)$. You may use the integral and the Neumann-series argument in the proof of
+\noteref{thm:fd-schemes}(iv).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $C=\theta^{-1}I-\theta^{-1}(1-\theta)B$, and deduce that $G$ is positive if and only if
+    $(B^{-1})_{00}\ge1-\theta$.
+  \item Show that this holds if and only if $\lambda\le\frac{2-\theta}{4(1-\theta)^2}$. Check $\theta=\frac12$ and the limits
+    $\theta\to0$ and $\theta\to1$.
+  \item Compare, for $\theta=0.5$, $0.6$, $0.75$, $0.9$, this condition with the sufficient condition of
+    \noteref{thm:fd-schemes}(iv) and with the stability condition of \noteref{thm:fd-schemes}(i).
+  \item On a finite grid with zero boundary values, $B_J$ is the restriction of $B$ to the nodes
+    $1,\dots,J-1$. Show that $B_J^{-1}\le(B^{-1})_{\{1,\dots,J-1\}}$ entry by entry, and conclude that positivity on
+    the finite grid can only require a smaller $\lambda$.
+  \item Let $\theta=\frac12$ and consider the half-line $\{1,2,\dots\}$ with a zero value at node $0$. Writing
+    $(B^{-1})_{jl}=\beta_{j-l}$ on $h\Z$, show by the method of images that the inverse on the half-line has
+    entries $\beta_{j-l}-\beta_{j+l}$. Given that $\beta_m=\rho^{|m|}/\sqrt{1+2\lambda}$ with
+    $\rho=(\sqrt{1+2\lambda}-1)/(\sqrt{1+2\lambda}+1)$, show that $G$ is positive on the half-line if and only if
+    $\lambda\le4-2\sqrt2$, and that the node next to the boundary is the one that binds.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[How far is far enough?]\label{ex:fd-boundary-width}
+\easy This is a computational exercise. Price the test-case call on the grid
+$\log S_0\pm m\sigma\sqrt T$ with the crude boundary values $0$ at both ends.
+\begin{enumerate}[label=(\alph*)]
+  \item Use \noteref{prop:fd-boundary} with its Gaussian bound to find the smallest $m$ among
+    $6,6.25,6.5,6.75$ for which the truncation error at $S_0$ is guaranteed below $10^{-6}$. (Compute $\varepsilon$
+    as the largest call price at the two ends over $t\le T$.)
+  \item Compute the actual truncation error at $S_0$ for these $m$, as in
+    \noteref{fig:fd-american}(b), with $h=0.003$ and $400$ Crank--Nicolson steps with Rannacher's
+    start, and compare it with the bound computed with the exact exit probability. Why is the
+    bound not sharp?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The penalty method]\label{ex:fd-penalty}
+\hard Let $B$ be as in \noteref{prop:fd-american}: $B_{jl}\le0$ for $j\ne l$, every row sum at least $1$. Let
+$z^*$ solve \noteref{eq:fd-lcp}, and let $z_\rho$, for $\rho>0$, solve $Bz=q+\rho(g-z)^+$ (you may assume that
+it exists).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $z_\rho\le z^*$. \emph{Hint:} look at a positive maximum of $z_\rho-z^*$.
+  \item Let $\varepsilon_\rho=\max_j(g_j-z_{\rho,j})^+$. Show that $z_\rho+\varepsilon_\rho\mathbf 1$ is a supersolution, so that $z^*\le z_\rho+\varepsilon_\rho\mathbf 1$.
+  \item Show that $\varepsilon_\rho\le\|(Bg-q)^+\|_\infty/\rho$, and that the penalized equation has at most one
+    solution.
+  \item (Computational.) For the first implicit half-step of the test-case put ($J=800$, $N=400$,
+    Rannacher's start), compute $\|(Bg-q)^+\|_\infty$ and compare $\max_j(z^*_j-z_{\rho,j})$ with the bound for
+    $\rho=10^2,10^4,10^6$. Where is $(Bg-q)^+$ largest, and why?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[An American straddle]\label{ex:fd-straddle}
+\hard This is a computational exercise. Consider the American option paying $|S-K|$ on exercise,
+with $S_0=K=100$, $T=1$, $r=3\%$, $y=6\%$, $\sigma=25\%$, on the Crank--Nicolson grid with $J=800$,
+$N=400$ and Rannacher's start.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute its price with PSOR and with the penalty method, and the European price. Find
+    the exercise region at $t=0$ and explain why it has two parts.
+  \item Run Brennan--Schwartz with the exercise region assumed at the bottom, and then at the top.
+    Report the prices and the largest residuals of \noteref{eq:fd-lcp}. Point to the step of the
+    proof of \noteref{prop:fd-american}(iii) that fails.
+  \item Suppose that the exercise set of one time step is $\{j\le j_1\}\cup\{j\ge j_2\}$ with $j_1<j_2$, and
+    that $j_2$ is known. Show that Brennan--Schwartz with the exercise region at the bottom, applied
+    to the rows $j<j_2$ with the values $z_j=g_j$, $j\ge j_2$, moved to the right side, returns $z^*$ on
+    those rows.
+  \item Turn (c) into an algorithm that alternates the two one-sided versions, each with the
+    other's exercise region frozen, and test it on this option.
+\end{enumerate}
+\end{exercise}

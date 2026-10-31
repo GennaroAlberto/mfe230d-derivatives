@@ -1,0 +1,146 @@
+% Exercises for Chapter 4 (Static replication and the Kolmogorov equations). Statements only: solutions are kept privately.
+Throughout, the market is that of \noteref{sec:sr-carr-madan}: a pricing measure $\Q$, the bond paying $1$ at $T$
+costs $e^{-rT}$, the prepaid forward costs $S_0e^{-yT}$, $F=S_0e^{(r-y)T}$, and $C$, $P$, $D$ are call, put and
+digital-call prices for maturity $T$. ``The standard model'' is that of \noteref{def:sm-model}. You may use the
+results of the notes, quoting them, and the closed forms and the implied-volatility solver of
+\texttt{bs.py}. In computational parts report your numbers to the precision asked; if you use random
+numbers, use NumPy's \texttt{default\_rng} and report the seed.
+
+\begin{exercise}[A note with a digital]\label{ex:sr-note}
+\easy A five-year note on an index pays, per $100$ of notional and with $R=S_T/S_0$,
+\[
+  \Pi(R)=\begin{cases}100R,&R<0.6,\\ 100,&0.6\le R<0.9,\\ 100+400\,(R-0.9),&0.9\le R<1,\\ 140,&R\ge1.\end{cases}
+\]
+\begin{enumerate}[label=(\alph*)]
+  \item Sketch $\Pi$ and write it as a portfolio of shares, calls and one digital, with strikes in units of
+    $S_0$.
+  \item In the standard model with $S_0=100$, $T=5$, $r=3\%$, $y=3.5\%$ and $\sigma=22\%$, price each
+    component and the note, to four decimals. The issuer sells the note at $100$: what is its margin?
+  \item Does it matter whether the digital pays at $R=0.6$ exactly? Would it matter if $S_T$ had an atom at
+    $0.6\,S_0$?
+  \item A dealer who cannot trade digitals holds instead $40$ call spreads, long the call struck at $59$ and
+    short the call struck at $60$. Show that this position pays at least the digital's payoff in every state,
+    and compute its extra cost.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The log put]\label{ex:sr-log-put}
+\medium The \emph{log put} with strike $K>0$ pays $K\big[\log(K/S_T)\big]^+$.
+\begin{enumerate}[label=(\alph*)]
+  \item Using \noteref{thm:sr-carr-madan} with $\kappa=K$, show that it is replicated by one put struck at $K$ and
+    a strip of puts with strikes $k<K$ and density $K/k^2$, and write its price in terms of put prices.
+  \item Show that, in any model with a pricing measure and $\Q(S_T=0)=0$, the log put has a finite price if
+    and only if $\int_0^KP(k)\,k^{-2}\,\dd k<\infty$. Give a law of $S_T$ with mean $F$, without atoms, for which
+    this integral is infinite. Which feature of the law matters?
+  \item In the standard model, show that the log put costs
+    $e^{-rT}K\sigma\sqrt T\,\big[N'(d_-)-d_-N(-d_-)\big]$, and find the price of the \emph{log call}, which pays
+    $K[\log(S_T/K)]^+$, by a parity argument.
+  \item For the test case ($S_0=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$), compute the log put from (c), and
+    the put and the strip of (a) separately by numerical integration, to five decimals.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Two power payoffs from the course]\label{ex:sr-power-payoffs}
+\medium Work in the standard model and use \noteref{prop:sr-power}.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $2\big(S_T-\sqrt{KS_T}\big)^+=2S_T\1_{\{S_T>K\}}-2\sqrt K\,S_T^{1/2}\1_{\{S_T>K\}}$, and deduce that it costs
+    \[
+      2\Big[S_0e^{-yT}N(d_+)-\sqrt{KS_0}\,e^{-(\frac12(r+y)+\frac18\sigma^2)T}N(x_0)\Big],\qquad
+      x_0=\frac{\log(S_0/K)+(r-y)T}{\sigma\sqrt T}.
+    \]
+    Evaluate it in the test case to five decimals.
+  \item The \emph{asymptotic call} pays $(K/S_T)(S_T-K)^+$. Price it as a leveraged payoff with $p=-1$: show
+    that the inputs are $r'_{-1}=2r-y-\sigma^2$ and $y'_{-1}=r$, and evaluate the price for $S_0=K=100$, $T=1$,
+    $r=0.75\%$, $y=2\%$, $\sigma=20\%$ to four decimals.
+  \item Replicate the asymptotic call with calls only, and check (b) by integrating over the strip numerically.
+  \item Both payoffs have right derivative $1$ at $K$, like the call struck at $K$. Without computing, which of
+    the two is worth more than the call struck at $K$ with the same inputs (those of (a), respectively (b)),
+    and which less? Check with the numbers.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Homogeneity without scale invariance]\label{ex:sr-homogeneity}
+\medium In the normal (Bachelier) model the forward moves as $\dd F_t=\sigma_N\,\dd W_t$ under $\Q$, with $F_0=S_0e^{(r-y)T}$
+and a normal volatility $\sigma_N>0$ measured in money. The call costs
+\[
+  C=e^{-rT}\big[(F_0-K)N(d)+\sigma_N\sqrt T\,N'(d)\big],\qquad d=\frac{F_0-K}{\sigma_N\sqrt T}.
+\]
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $C(\lambda S_0,\lambda K,\lambda\sigma_N)=\lambda C(S_0,K,\sigma_N)$ for $\lambda>0$, and deduce
+    $S_0\partial_{S_0}C+K\partial_KC+\sigma_N\partial_{\sigma_N}C=C$.
+  \item Let $r=y=0$. Show that $C(S_0+c,K+c)=C(S_0,K)$ for every real $c$, deduce $\partial_{S_0}C+\partial_KC=0$ and
+    $\partial_{S_0S_0}C=-\partial_{S_0K}C=\partial_{KK}C$, and compare with \noteref{prop:sr-euler}(iv). What replaces the
+    factor $(S/K)^2$ between the spot gamma and the risk-neutral density?
+  \item With $r=y=0$, $S_0=K=100$, $T=1$ and $\sigma_N=20$, compute $C$ and $S_0\partial_{S_0}C+K\partial_KC$. How badly does
+    Euler's identity in $(S_0,K)$ fail?
+  \item In the constant-elasticity model $\dd S_t=\sigma S_t^\beta\,\dd W_t$ ($r=y=0$, $0<\beta<1$, absorbed at $0$), show
+    that $\lambda S$ follows the same model with $\sigma$ replaced by $\lambda^{1-\beta}\sigma$, and deduce
+    $S_0\partial_{S_0}C+K\partial_KC+(1-\beta)\sigma\partial_\sigma C=C$, assuming the price is differentiable. You may
+    assume that the stochastic differential equation has a unique solution in law.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Stationary laws from the forward equation]\label{ex:sr-stationary}
+\medium Let $\dd X_t=b(X_t)\,\dd t+a(X_t)\,\dd W_t$ on an open interval $I$, with $b$ continuously differentiable,
+$a^2$ twice continuously differentiable and $a>0$ on $I$, and no discounting. A \emph{stationary density} is a
+probability density $p$ on $I$ that does not change under the forward equation of
+\noteref{thm:sr-kolmogorov}(iii).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that a twice differentiable stationary density satisfies
+    $\frac12(a^2p)'-bp=-\phi$ for a constant $\phi$, the \emph{probability flux}. Solve this equation when $\phi=0$.
+  \item For the Ornstein--Uhlenbeck process $\dd X=\kappa(\theta-X)\,\dd t+\gamma\,\dd W$ on $I=\R$ ($\kappa,\gamma>0$), find the
+    stationary law, and show that no stationary density has $\phi\neq0$.
+  \item For the square-root process $\dd V=\kappa(\theta-V)\,\dd t+\gamma\sqrt V\,\dd W$ on $I=(0,\infty)$
+    ($\kappa,\theta,\gamma>0$), the variance of the Heston model, find the stationary density with zero flux. Show
+    that it is a gamma density, give its mean and variance, and show that it is bounded near $0$ if and only if
+    $2\kappa\theta\ge\gamma^2$ (Feller's condition).
+  \item Which hypothesis of \noteref{thm:sr-kolmogorov} fails in (c)? Explain in a few lines why the zero-flux
+    condition is the natural boundary condition at $0$ here.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Dupire's equation]\label{ex:sr-dupire}
+\medium Part (c) is the hardest. In a local-volatility model, $\dd S_t=(r-y)S_t\,\dd t+\sigma(t,S_t)S_t\,\dd W_t$ under $\Q$, with $r,y$ constant.
+Let $G(T,K)$ be the discounted density of $S_T$ at $K>0$ (the Arrow--Debreu price density, for a fixed spot
+$S_0$), and $C(T,K)=\int_K^\infty(\xi-K)\,G(T,\xi)\,\dd\xi$ the call price. Assume that $G$ is $C^{1,2}$ on
+$(0,\infty)^2$ and satisfies the forward equation
+\[
+  \partial_TG=\tfrac12\partial_{KK}\big(\sigma^2K^2G\big)-\partial_K\big((r-y)KG\big)-rG,
+\]
+which is the forward equation of \noteref{thm:sr-kolmogorov} written in the price variable, and that $G$ and its derivatives decay fast enough
+at $0$ and $\infty$ for every boundary term below to vanish and for differentiation under the integral sign.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\partial_KC=-\int_K^\infty G\,\dd\xi$ and $\partial_{KK}C=G$.
+  \item By integrating the forward equation against $(\xi-K)^+$, show \emph{Dupire's equation}
+    \[
+      \partial_TC=\tfrac12\sigma(T,K)^2K^2\,\partial_{KK}C-(r-y)K\,\partial_KC-yC .
+    \]
+  \item Deduce a formula for $\sigma(T,K)^2$ in terms of $C$ and its derivatives. Which no-arbitrage relations
+    of \noteref{ch:03-strike-arbitrage} make the right side well defined and nonnegative?
+  \item Check that the Black--Scholes price with constant $\sigma$ satisfies Dupire's equation. You may use the
+    Greeks of \noteref{prop:bsf-greeks}.
+  \item Compare the role of $(T,K)$ in Dupire's equation with the role of $(t,S)$ in the pricing equation
+    (\noteref{eq:sm-bs-pde}). Which one would you solve to price a single option for many spots, and which to price
+    many strikes for the current spot?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A static hedge for a barrier option]\label{ex:sr-barrier}
+\hard In the standard model with $r=y$, a down-and-in call with barrier $H$ and strike $K$, $0<H\le K$ and
+$H<S_0$, pays $(S_T-K)^+$ at $T$ if $\min_{t\le T}S_t\le H$, and nothing otherwise.
+\begin{enumerate}[label=(\alph*)]
+  \item Use \noteref{cor:sr-pcs} to show that at any time $t<T$ at which $S_t=H$, the call struck at $K$ and $K/H$
+    puts struck at $H^2/K$, both with maturity $T$, have the same price.
+  \item Consider the strategy: at time $0$ buy $K/H$ puts struck at $H^2/K$; if the stock reaches $H$ before $T$,
+    sell them and buy one call struck at $K$. Show that it costs nothing after time $0$ and pays exactly the
+    down-and-in call. Deduce the price of the down-and-in call, and explain why this is an arbitrage argument
+    that needs no knowledge of the law of the hitting time.
+  \item With $S_0=100$, $K=100$, $H=90$, $T=1$, $r=y=2\%$ and $\sigma=20\%$, compute the price to five decimals.
+    Check it by Monte Carlo: simulate $\log S$ on $500$ steps and detect crossings of the barrier between the
+    grid dates with the Brownian-bridge probability $\exp\big(-2(x_k-\log H)(x_{k+1}-\log H)/(\sigma^2h)\big)$ for
+    consecutive log-prices $x_k,x_{k+1}$ above $\log H$ and step $h$.
+  \item Now let $r=5\%$ and $y=0$, with the other inputs of (c). Compute the cost of the exchange in (b) if the
+    barrier is hit with $0.25$, $0.5$ and $1$ year left. Is the put portfolio a super- or a sub-hedge? Explain
+    the sign.
+\end{enumerate}
+\end{exercise}

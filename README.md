@@ -17,35 +17,41 @@ Generated from [`latex/toc.tex`](latex/toc.tex). Chapters marked *in preparation
 
 | | Chapter | Notes | Exercises | Demos |
 |---|---|---|---|---|
-| 1 | The standard model, revisited | in preparation | – | – |
-| 2 | The Black–Scholes formula three ways | in preparation | – | – |
-| 3 | Arbitrage in the strike and the smile | in preparation | – | – |
-| 4 | Static replication | in preparation | – | – |
+| 1 | The standard model, revisited | ✓ | ✓ | [01-standard-model.ipynb](code/notebooks/01-standard-model.ipynb) |
+| 2 | The Black–Scholes formula three ways | ✓ | ✓ | [02-black-scholes.ipynb](code/notebooks/02-black-scholes.ipynb) |
+| 3 | Arbitrage in the strike and the smile | ✓ | ✓ | [03-strike-arbitrage.ipynb](code/notebooks/03-strike-arbitrage.ipynb) |
+| 4 | Static replication and the Kolmogorov equations | ✓ | ✓ | [04-static-replication.ipynb](code/notebooks/04-static-replication.ipynb) |
 
-**Monte Carlo**
+**Monte Carlo methods**
 
 | | Chapter | Notes | Exercises | Demos |
 |---|---|---|---|---|
-| 5 | Random numbers | in preparation | – | – |
-| 6 | Monte Carlo pricing and its error | in preparation | – | – |
-| 7 | Variance reduction | in preparation | – | – |
-| 8 | Monte Carlo Greeks | in preparation | – | – |
+| 5 | Random numbers | ✓ | ✓ | [05-random-numbers.ipynb](code/notebooks/05-random-numbers.ipynb) |
+| 6 | Monte Carlo pricing and its error | ✓ | ✓ | [06-monte-carlo.ipynb](code/notebooks/06-monte-carlo.ipynb) |
+| 7 | Simulating paths | ✓ | ✓ | [07-path-simulation.ipynb](code/notebooks/07-path-simulation.ipynb) |
+| 8 | Antithetic variates, moment matching and control variates | ✓ | ✓ | [08-antithetic-control.ipynb](code/notebooks/08-antithetic-control.ipynb) |
+| 9 | Importance sampling | ✓ | ✓ | [09-importance-sampling.ipynb](code/notebooks/09-importance-sampling.ipynb) |
+| 10 | Stratified sampling and conditional Monte Carlo | ✓ | ✓ | [10-stratification.ipynb](code/notebooks/10-stratification.ipynb) |
+| 11 | Quasi-Monte Carlo | ✓ | ✓ | [11-quasi-monte-carlo.ipynb](code/notebooks/11-quasi-monte-carlo.ipynb) |
+| 12 | Multilevel Monte Carlo | ✓ | ✓ | [12-multilevel.ipynb](code/notebooks/12-multilevel.ipynb) |
+| 13 | Monte Carlo Greeks | ✓ | ✓ | [13-mc-greeks.ipynb](code/notebooks/13-mc-greeks.ipynb) |
+| 14 | American options by simulation | ✓ | ✓ | [14-american-mc.ipynb](code/notebooks/14-american-mc.ipynb) |
 
 **Path-dependent and multi-asset payoffs**
 
 | | Chapter | Notes | Exercises | Demos |
 |---|---|---|---|---|
-| 9 | Asian options | in preparation | – | – |
-| 10 | Barriers, lookbacks and the Brownian bridge | in preparation | – | – |
-| 11 | FX and multi-asset options | in preparation | – | – |
+| 15 | Asian options | ✓ | ✓ | [15-asian.ipynb](code/notebooks/15-asian.ipynb) |
+| 16 | Barriers, lookbacks and the Brownian bridge | ✓ | ✓ | [16-barriers.ipynb](code/notebooks/16-barriers.ipynb) |
+| 17 | FX and multi-asset options | ✓ | ✓ | [17-multi-asset.ipynb](code/notebooks/17-multi-asset.ipynb) |
 
 **Beyond Black–Scholes**
 
 | | Chapter | Notes | Exercises | Demos |
 |---|---|---|---|---|
-| 12 | Hedging in practice | in preparation | – | – |
-| 13 | Stochastic volatility | in preparation | – | – |
-| 14 | Trees and finite differences | in preparation | – | – |
+| 18 | Hedging in practice | ✓ | ✓ | [18-hedging.ipynb](code/notebooks/18-hedging.ipynb) |
+| 19 | Stochastic volatility | ✓ | ✓ | [19-stochastic-vol.ipynb](code/notebooks/19-stochastic-vol.ipynb) |
+| 20 | Trees and finite differences | ✓ | ✓ | [20-grids.ipynb](code/notebooks/20-grids.ipynb) |
 
 ## Layout
 

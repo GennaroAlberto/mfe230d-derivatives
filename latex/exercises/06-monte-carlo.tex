@@ -1,0 +1,167 @@
+% Exercises for Chapter 6 (Monte Carlo pricing and its error). Statements only: solutions
+% are kept privately. Unless stated otherwise, the test case is S_0 = K = 100, T = 1,
+% r = 1%, y = 2%, sigma = 20%, and S_T = S_0 exp(nu T + sigma sqrt(T) Z) under Q with
+% nu = r - y - sigma^2/2 and Z standard normal.
+
+\begin{exercise}[The exact variance of a call payoff]\label{ex:mc-call-variance}
+\easy In the Black--Scholes model with yield, let $F=S_0e^{(r-y)T}$ and
+$d_\pm=\big(\log(S_0/K)+(r-y\pm\frac12\sigma^2)T\big)/(\sigma\sqrt T)$. You may use the call
+price $C=e^{-rT}\big(FN(d_+)-KN(d_-)\big)$ and the Gaussian identity
+$\E[e^{aZ}\1_{\{Z>b\}}]=e^{a^2/2}N(a-b)$ for $Z\sim\mathcal N(0,1)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\EQ\big[S_T^2\1_{\{S_T>K\}}\big]=F^2e^{\sigma^2T}N(d_++\sigma\sqrt T)$.
+  \item Deduce a closed form for the variance $\sigma_C^2$ of the discounted payoff
+    $e^{-rT}(S_T-K)^+$, and for the variance of $S_T$.
+  \item Evaluate both standard deviations for the test case, and for the parameters of the
+    course's problem sets: $S_0=K=3900$, $T=1$, $r=3\%$, $y=1.3\%$, $\sigma=25\%$.
+  \item A run with $n=10^4$ paths on the test case returns $\hat C=7.52$ with $\hat s_n=12.9$.
+    At the $5\%$ level, is it consistent with the exact price? How many paths would make a
+    discrepancy of $0.16$ significant at that level?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[When no scenario pays]\label{ex:mc-zero-hits}
+\easy Let $X=\1_A$ with $p=\Prob(A)\in(0,1)$, for example the payoff of a digital option,
+and let $\hat X_n$, $\hat s_n$ and $I_n$ be as in \noteref{def:mc-estimator}.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute $\Prob(\hat X_n=0)$. What are $\hat s_n$ and $I_n$ on this event? Evaluate
+    the probability for $p=1\%$ and $n=100$, and the probability that $I_n$ contains $p$
+    on this event.
+  \item Suppose a run has no hits. Show that the set of $p$ for which observing no hit has
+    probability at least $5\%$ is $[0,p^*]$ with $p^*=1-0.05^{1/n}$, and that
+    $p^*\approx3/n$ for large $n$. Interpret $[0,3/n]$ as a confidence interval.
+  \item A run of $n=1000$ paths has $3$ hits. Compute the interval $I_n$, and the exact
+    interval $[p_-,p_+]$, where $p_-$ solves $\Prob_{p}(\text{at least }3\text{ hits})=2.5\%$
+    and $p_+$ solves $\Prob_{p}(\text{at most }3\text{ hits})=2.5\%$ (numerically). Then compute
+    exactly, by summing binomial probabilities, the coverage of $I_n$ and of the exact
+    interval when $p=0.003$ and $n=1000$. Comment.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The price of batching]\label{ex:mc-batch-noise}
+\medium Let $X_1,\dots,X_n$ be independent $\mathcal N(\mu,\sigma^2)$, $n=mk$, and let
+$\hat V_m$ be the batch variance estimator of \noteref{prop:mc-batch} with $m$ batches of
+size $k$. You may use that the sample variance $S^2$ of $\ell$ independent
+$\mathcal N(\mu',v)$ variables satisfies $(\ell-1)S^2/v\sim\chi^2_{\ell-1}$, and that
+$\E[\sqrt W]=\sqrt2\,\Gamma(j/2+\frac12)/\Gamma(j/2)$ for $W\sim\chi^2_j$.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute the relative standard deviation $\sqrt{\Var(\hat V_m)}/\E[\hat V_m]$ and
+    compare it with that of the plain estimator $\hat s_n^2/n$.
+  \item Show that the expected half-width of the batch interval
+    $\bar Y\pm t_{m-1,\delta}\sqrt{\hat V_m}$ is $t_{m-1,\delta}\,c_m\,\sigma/\sqrt n$ with
+    $c_m=\sqrt{2/(m-1)}\,\Gamma(m/2)/\Gamma((m-1)/2)$.
+  \item For $\delta=5\%$, tabulate the ratio of this expected half-width to $1.96\,\sigma/\sqrt n$
+    for $m=2$, $5$, $10$, $32$, $1024$. What would you recommend?
+  \item If $m=2^{10}$ batches give a batch standard error equal to the plain one up to noise,
+    what does that tell you, and what does it not tell you?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Dependent samples]\label{ex:mc-dependent}
+\medium This exercise is partly computational. Let $|\phi|<1$ and let
+$X_0\sim\mathcal N(\mu,\sigma^2)$, $X_i=\mu+\phi(X_{i-1}-\mu)+\sigma\sqrt{1-\phi^2}\,\varepsilon_i$ for
+$i\ge1$, with $\varepsilon_i$ independent standard normals independent of $X_0$. Such
+correlated samples arise, for instance, from Markov chain samplers.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that every $X_i$ is $\mathcal N(\mu,\sigma^2)$ and that
+    $\Cov(X_i,X_j)=\sigma^2\phi^{|i-j|}$.
+  \item With $\hat X_n=\frac1n\sum_{i=1}^nX_i$, show that
+    $n\Var(\hat X_n)\to\sigma^2\frac{1+\phi}{1-\phi}$, while $\E[\hat s_n^2]\to\sigma^2$. By what
+    factor does the plain standard error misstate the error for $\phi=0.9$?
+  \item Let the batch means $Y_j$ be built from consecutive blocks of $k$ samples. Show that
+    the correlation of $Y_j$ and $Y_{j+1}$ tends to $0$ as $k\to\infty$.
+  \item Simulate $n=2^{20}$ samples with $\mu=0$, $\sigma=1$, $\phi=0.9$. Report the plain
+    and the batch ($m=2^{10}$) standard errors next to the asymptotic standard deviation
+    from (b), and estimate from $1000$ independent runs the coverage of the two nominal
+    $95\%$ intervals for $\mu$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The implied volatility of a simulated price]\label{ex:mc-implied-vol}
+\medium This exercise is partly computational. A desk prices the test-case call by Monte
+Carlo and quotes the result as a Black--Scholes implied volatility $\hat\sigma_n=g(\hat C_n)$,
+where $g$ is the inverse of $\sigma\mapsto C(\sigma)$. You may use that
+$\partial C/\partial\sigma=\mathcal V$ (vega) and
+$\partial^2C/\partial\sigma^2=\mathcal V\,d_+d_-/\sigma$, and that $\sigma_C=12.570$.
+\begin{enumerate}[label=(\alph*)]
+  \item Use \noteref{prop:mc-delta} to find the asymptotic standard deviation of
+    $\hat\sigma_n$. How many paths are needed for a $95\%$ half-width of $0.1$ volatility
+    point?
+  \item Compute $g''(C)$. Applying the formula of \noteref{prop:mc-delta}(ii) formally,
+    what is the leading bias of $\hat\sigma_n$, and how does it compare with the standard
+    deviation at $n=10^4$? (Part (ii) does not apply as stated: why not?)
+  \item Check (a) by simulation: $1000$ independent runs of $n=10^4$ paths.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Heavy tails]\label{ex:mc-pareto}
+\hard This exercise is partly computational. Let $X$ have $\Prob(X>x)=x^{-\alpha}$ for
+$x\ge1$, with $1<\alpha<2$, and let $M_n=\max_{i\le n}X_i$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $U^{-1/\alpha}$ has this law for $U$ uniform on $(0,1)$, compute
+    $\mu=\E[X]$, and show that $\E[X^2]=\infty$ while $\E[X^q]<\infty$ for $q<\alpha$.
+  \item Show that $M_n/n^{1/\alpha}$ converges in distribution and identify the limit.
+  \item Show that $\E[M_n]/n\to0$ but $\E[M_n]/\sqrt n\to\infty$. Explain why this suggests
+    an error of order $n^{1/\alpha-1}$ rather than $n^{-1/2}$ for $\hat X_n$.
+  \item By simulation, estimate the median of $|\hat X_n-\mu|$ for $n=2^6,2^8,\dots,2^{16}$
+    and $\alpha=1.2$ and $1.8$ (use at least $1000$ runs for each $n$), fit the slope on a
+    log-log scale, and compare with (c).
+  \item Estimate the coverage of the nominal $95\%$ interval at $n=2^{12}$ for $\alpha=1.2$,
+    $1.8$ and $2.5$. Comment on the case $\alpha=2.5$, for which $\E[X^2]<\infty$ but
+    $\E|X|^3=\infty$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A price relative to the forward]\label{ex:mc-ratio}
+\medium This exercise is partly computational. Since $\EQ[S_T]=F$ is known, one may
+estimate the call price by the ratio estimator
+$\hat C^{R}_n=e^{-rT}F\,\bar Y_n/\bar X_n$, with $X=S_T$ and $Y=(S_T-K)^+$. You may use the
+results of \exref{ex:mc-call-variance}, and you may assume that the bias expansion of
+\noteref{prop:mc-delta}(iii) holds for this lognormal $X$ (see the remark that follows it).
+\begin{enumerate}[label=(\alph*)]
+  \item Compute $\Cov(X,Y)$ in closed form, and the correlation of $X$ and $Y$ for the test
+    case.
+  \item Compute the asymptotic variance of $\hat C^R_n$ and compare it with that of the
+    plain estimator. Why is the reduction so much smaller than $1-\rho^2$, where $\rho$ is
+    the correlation of (a)? \emph{Hint:} write $Y-\theta X$ as a control-variate
+    combination and compare $\theta$ with $\Cov(X,Y)/\Var(X)$.
+  \item Compute the leading bias of $\hat C^R_n$ and check it by simulation at $n=10$, with
+    enough runs to resolve it.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Efficiency with overheads]\label{ex:mc-overhead}
+\easy A pricing run of $n$ samples takes time $c_0+c_1n$, with a fixed overhead $c_0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that the efficiency of a run of $n$ samples, relative to the limit
+    $n\to\infty$, is $n/(n+n_0)$ with $n_0=c_0/c_1$. For which $n$ is it $90\%$?
+  \item In the course's timing experiment the relative efficiency at $n=2$ was about
+    $10^{-3}$. Estimate $n_0$, and the $n$ at which the efficiency reaches $90\%$.
+  \item A new method reduces the standard error at equal $n$ to $57\%$ of the plain one and
+    takes $1.6$ times as long per sample. Compute its relative efficiency. Measured on runs
+    of $n=2^{10}$ samples with the overhead of (b), shared by both methods, what relative
+    efficiency would you find instead?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Quadrature in one and in many dimensions]\label{ex:mc-sine}
+\medium Let $f(x)=\frac\pi2\sin(\pi x)$ on $[0,1]$, with $\int_0^1f=1$, and let $k\ge1$ be the
+number of cells.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that for any $f$ with $f(0)=f(1)$ the left and the right Riemann sums coincide
+    with the composite trapezoid rule.
+  \item Using the identities
+    \[
+      \sum_{i=0}^{k-1}\sin\big((2i+1)x\big)=\frac{\sin^2(kx)}{\sin x},\qquad
+      \sum_{i=0}^{k-1}\sin(2ix)=\frac{\sin\big((k-1)x\big)\sin(kx)}{\sin x},
+    \]
+    show that with $x=\pi/(2k)$ the midpoint and trapezoid rules equal $x/\sin x$ and
+    $x\cot x$. Deduce their errors to leading order in $1/k$.
+  \item For $f_d(x)=\prod_{j=1}^df(x_j)$ on $[0,1]^d$, write the product midpoint rule with
+    $N=k^d$ points in closed form, and its error to leading order. Compute the variance of
+    $f_d(U)$ for $U$ uniform on $[0,1]^d$.
+  \item Show that for $d=4$ the two errors decrease at the same rate in $N$, and compare
+    the constants. For $N\approx10^9$, for which $d\in\{1,\dots,8\}$ is Monte Carlo more
+    accurate (in root mean square) than the product midpoint rule?
+\end{enumerate}
+\end{exercise}

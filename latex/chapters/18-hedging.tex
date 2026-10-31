@@ -1,0 +1,628 @@
+% Chapter 18: Hedging in practice.
+
+The Black--Scholes price is the initial wealth of a strategy that replicates the claim
+exactly, under three idealisations: the hedger trades continuously, knows the volatility, and
+trades for free. A dealer who sells an option and hedges it gives up all three, and this
+chapter measures what each one costs. Rebalancing at $m$ dates leaves an error whose standard
+deviation falls like $m^{-1/2}$, with a constant set by the gamma of the claim
+(\cref{sec:hd-discrete}). Hedging with the wrong volatility leaves an error that does not
+vanish however often one trades: the gamma-weighted gap between the hedging variance and the
+realised variance, whose sign is known for convex payoffs (\cref{sec:hd-wrong-vol}).
+Proportional transaction costs make frequent trading expensive; Leland's enlarged volatility
+pays for them on average, and its limits are now precisely understood
+(\cref{sec:hd-leland}). The laboratory is the course's hedging homework, posed there with $S=K=3900$,
+$\sigma=25\%$, $r=3\%$, $y=1.3\%$ and $100{,}000$ paths, and rerun here on the test case with $50{,}000$
+paths.
+
+\paragraph{Setting.} The market is the standard model of \cref{def:sm-model}: under $\Prob$,
+$\dd S_t=(\mu-y)S_t\,\dd t+\sigma S_t\,\dd W_t$, where $\mu$ is the total expected return, and
+$\theta=(\mu-r)/\sigma$; the risk-neutral measure $\Q$ is the case $\mu=r$. A European claim
+pays $F(S_T)$ and is worth $V(t,S_t)$ at time $t$, with $V$ given by
+\cref{prop:sm-risk-neutral}; for $t<T$ we write $\Delta=\partial_sV$ and $\Gamma=\partial_{ss}V$
+(for calls and puts, \cref{prop:bsf-greeks}), and $\tau=T-t$. One share bought at time $0$,
+with its dividends reinvested in the stock, is worth $e^{yt}S_t$ at time $t$; its discounted
+value
+\begin{equation}\label{eq:hd-stilde}
+  \tilde S_t=e^{-(r-y)t}S_t\quad\text{satisfies}\quad
+  \dd\tilde S_t=\tilde S_t\big((\mu-r)\,\dd t+\sigma\,\dd W_t\big)=\sigma\tilde S_t\,\dd W^\Q_t .
+\end{equation}
+Unless stated otherwise, $F$ is \emph{Lipschitz}: $|F(a)-F(b)|\le L|a-b|$. Calls, puts and
+call spreads qualify; digital options do not. Then, as in the proof of
+\cref{prop:cv-nonlinear}(ii), $V(t,s)=e^{-r\tau}\int F(e^u)\,p_\tau(u-\log s)\,\dd u$ with
+$p_\tau$ the $\mathcal N(\nu\tau,\sigma^2\tau)$ density, so $V$ is infinitely differentiable on
+$[0,T)\times(0,\infty)$ (the derivatives fall on the Gaussian kernel) and solves the
+Black--Scholes equation there; $|\Delta|\le Le^{-y\tau}$; $V$ is continuous on
+$[0,T]\times(0,\infty)$ with $V(T,\cdot)=F$; and, with $H_t=e^{-yt}\Delta(t,S_t)$,
+\begin{equation}\label{eq:hd-replication}
+  Y:=e^{-rT}F(S_T)=V(0,S_0)+\int_0^TH_t\,\dd\tilde S_t\qquad\text{almost surely.}
+\end{equation}
+\Cref{prop:cv-nonlinear} proves this under $\Q$; it holds $\Prob$-almost surely because the
+two measures have the same null sets, and the stochastic integral is the same under both
+(the remark after \eqref{eq:sm-discounted-wealth}).
+
+\section{Discrete delta hedging}\label{sec:hd-discrete}
+
+Fix $m\ge1$, let $h=T/m$, $t_j=jh$, and let $\eta(t)=t_j$ and $\eta^+(t)=t_{j+1}$ for
+$t\in[t_j,t_{j+1})$. The seller receives $V_0=V(0,S_0)$, buys $\delta_j=\Delta(t_j,S_{t_j})$
+shares at $t_j$, reinvests the dividends in the stock as they are paid, so that she holds
+$\delta_je^{y(t-t_j)}$ shares at $t\in[t_j,t_{j+1}]$, and keeps the rest of her wealth in the
+money market; this is the convention of the course's homework and of \cref{ch:08-antithetic-control}. Her wealth at
+$t\in[t_j,t_{j+1}]$ is $\delta_je^{y(t-t_j)}S_t+e^{r(t-t_j)}(X_{t_j}-\delta_jS_{t_j})$, so
+$e^{-rt}X_t-e^{-rt_j}X_{t_j}=e^{-yt_j}\delta_j(\tilde S_t-\tilde S_{t_j})$, and her
+\emph{discounted hedging error} is
+\begin{equation}\label{eq:hd-error}
+  e_m:=e^{-rT}\big(X_T-F(S_T)\big)=V_0+M_m-Y,\qquad
+  M_m=\sum_{j=0}^{m-1}e^{-yt_j}\delta_j\big(\tilde S_{t_{j+1}}-\tilde S_{t_j}\big).
+\end{equation}
+$M_m$ is the control variate of \cref{prop:cv-nonlinear}(ii). Since $M_m=\int_0^TH_{\eta(t)}\,\dd\tilde S_t$,
+\eqref{eq:hd-replication} gives
+\begin{equation}\label{eq:hd-error-integral}
+  e_m=\int_0^T\big(H_{\eta(t)}-H_t\big)\,\dd\tilde S_t .
+\end{equation}
+The error is the stochastic integral of the drift of the hedge ratio within each period. Two
+lemmas describe that drift and average it.
+
+\begin{lemma}[The dynamics of the hedge]\label{lem:hd-delta-dynamics}
+For $t<T$, $H_t=e^{-yt}\Delta(t,S_t)$ satisfies
+\[
+  \dd H_t=b_t\big(\dd W^\Q_t-\sigma\,\dd t\big)=b_t\big(\dd W_t+(\theta-\sigma)\,\dd t\big),\qquad
+  b_t=\sigma e^{-yt}S_t\,\Gamma(t,S_t).
+\]
+\end{lemma}
+
+\begin{proof}
+Differentiating $\partial_tV+\frac12\sigma^2s^2\partial_{ss}V+(r-y)s\,\partial_sV-rV=0$ in $s$ gives
+$\partial_t\Delta+\frac12\sigma^2s^2\partial_s\Gamma+(r-y+\sigma^2)s\Gamma-y\Delta=0$. By It\^o's formula
+under $\Q$, where $\dd S=(r-y)S\,\dd t+\sigma S\,\dd W^\Q$,
+$\dd H=e^{-yt}\big(\partial_t\Delta-y\Delta+(r-y)S\Gamma+\frac12\sigma^2S^2\partial_s\Gamma\big)\dd t
++e^{-yt}\sigma S\Gamma\,\dd W^\Q=-\sigma b\,\dd t+b\,\dd W^\Q$. Finally $W^\Q_t=W_t+\theta t$.
+\end{proof}
+
+For the call, $H_t=e^{-yT}N(d_+)$; the lemma says that it drifts downwards under $\Q$, at a
+rate proportional to the gamma.
+
+\begin{lemma}[Averaging a sawtooth]\label{lem:hd-sawtooth}
+If $\varphi$ is integrable on $(0,T)$, then
+$\frac1h\int_0^T\varphi(u)\big(\eta^+(u)-u\big)\,\dd u\to\frac12\int_0^T\varphi(u)\,\dd u$ as $m\to\infty$.
+\end{lemma}
+
+\begin{proof}
+For $\varphi=\1_{[a,b)}$, each period inside $[a,b)$ contributes
+$\int_{t_j}^{t_{j+1}}(t_{j+1}-u)\,\dd u=h^2/2$, there are $(b-a)/h+O(1)$ of them, and the at most
+two periods that meet $[a,b)$ only partly contribute at most $h^2$ each; so the claim holds,
+with an error $O(h)$, and by linearity it holds for step functions. Continuous functions are
+dense in $L^1(0,T)$ (\textcite{rudin-rca}, Theorem~3.14), and each is a uniform limit of step
+functions, so for $\varepsilon>0$ there is a step function $\varphi_\varepsilon$ with
+$\|\varphi-\varphi_\varepsilon\|_1<\varepsilon$. Since $0\le\eta^+(u)-u\le h$, replacing $\varphi$ by
+$\varphi_\varepsilon$ changes the left side by at most $\varepsilon$ and the right side by at most
+$\varepsilon/2$.
+\end{proof}
+
+\begin{proposition}[The error of discrete delta hedging]\label{prop:hd-discrete-error}
+Let $F$ be Lipschitz, and assume the integrability condition
+\begin{equation}\label{eq:hd-integrability}
+  I_\mu:=\int_0^T\varphi_\mu(t)\,\dd t<\infty,\qquad
+  \varphi_\mu(t)=\E\big[e^{-2rt}S_t^4\,\Gamma(t,S_t)^2\big],
+\end{equation}
+the expectation being under $\Prob$, with drift $\mu$. There is a constant $C$, independent of
+$m$ (it depends on $\mu$, through $\theta$ and $I_\mu$), such that:
+\begin{enumerate}[label=(\roman*)]
+  \item $\EQ[e_m]=0$ for every $m$, and $|\E[e_m]|\le C(\mu-r)^2h$;
+  \item as $m\to\infty$,
+    \begin{equation}\label{eq:hd-variance}
+      \E\big[e_m^2\big]=\frac{\sigma^4h}{2}\,I_\mu+o(h)
+      =2h\int_0^T\E\Big[e^{-2rt}\big(\tfrac12\sigma^2S_t^2\Gamma(t,S_t)\big)^2\Big]\dd t+o(h);
+    \end{equation}
+  \item for the call and the put, $\varphi_\mu(t)\le C'(T-t)^{-1/2}$ on $[0,T)$ for some
+    constant $C'$, so \eqref{eq:hd-integrability} holds for every $\mu$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Let $G_t=H_{\eta(t)}-H_t$; $|G_t|\le2Le^{-yT}$ because $|H_t|\le e^{-yt}Le^{-y(T-t)}$. By
+\eqref{eq:hd-error-integral} and \eqref{eq:hd-stilde}, $e_m=A_m+(\mu-r)B_m$ with
+$A_m=\int_0^TG_t\sigma\tilde S_t\,\dd W_t$ and $B_m=\int_0^TG_t\tilde S_t\,\dd t$. Note that
+$\tilde S_t^2b_t^2=\sigma^2e^{-2rt}S_t^4\Gamma(t,S_t)^2$, so $\E[\tilde S_t^2b_t^2]=\sigma^2\varphi_\mu(t)$.
+
+\emph{The martingale part.} By the It\^o isometry,
+$\E[A_m^2]=\int_0^T\sigma^2\E[G_t^2\tilde S_t^2]\,\dd t$. Let $\hat\Prob$ have density
+$\exp(2\sigma W_T-2\sigma^2T)$ with respect to $\Prob$ on $\F_T$. By Girsanov's theorem
+$\hat W_t=W_t-2\sigma t$ is a $\hat\Prob$-Brownian motion, and since
+$\tilde S_t^2=\tilde S_0^2e^{ct}\exp(2\sigma W_t-2\sigma^2t)$ with $c=2(\mu-r)+\sigma^2$,
+$\E[X\tilde S_t^2]=\tilde S_0^2e^{ct}\hat\E[X]$ for every $\F_t$-measurable $X\ge0$. By
+\cref{lem:hd-delta-dynamics}, for $t_j\le t<T$,
+\[
+  H_t-H_{t_j}=\underbrace{\int_{t_j}^tb_u\,\dd\hat W_u}_{=:\,\mathcal I}
+  +\underbrace{(\sigma+\theta)\int_{t_j}^tb_u\,\dd u}_{=:\,\mathcal J},
+\]
+where $\hat\E\int_0^Tb_u^2\,\dd u=\tilde S_0^{-2}\int_0^Te^{-cu}\sigma^2\varphi_\mu(u)\,\dd u<\infty$ by
+\eqref{eq:hd-integrability}. So $\hat\E[\mathcal I^2]=\int_{t_j}^t\hat\E[b_u^2]\,\dd u$, and by the
+Cauchy--Schwarz inequality $\hat\E[\mathcal J^2]\le(\sigma+|\theta|)^2h\,\hat\E[\mathcal I^2]$. Since
+$|\hat\E(\mathcal I+\mathcal J)^2-\hat\E\mathcal I^2|\le2\|\mathcal I\|\|\mathcal J\|+\|\mathcal J\|^2$,
+$\hat\E[G_t^2]$ lies between $1-\varepsilon_h$ and $1+\varepsilon_h$ times $\hat\E[\mathcal I^2]$, with
+$\varepsilon_h=2(\sigma+|\theta|)\sqrt h+(\sigma+|\theta|)^2h$. Integrating, exchanging the order of
+integration (Fubini--Tonelli) and using $\sigma^2\tilde S_0^2e^{cu}\hat\E[b_u^2]=\sigma^2\E[\tilde S_u^2b_u^2]=\sigma^4\varphi_\mu(u)$,
+\[
+  \E[A_m^2]=\big(1+O(\varepsilon_h)\big)\int_0^T\sigma^4\varphi_\mu(u)\,\kappa(u)\,\dd u,\qquad
+  \kappa(u)=\int_u^{\eta^+(u)}e^{c(t-u)}\,\dd t .
+\]
+As $e^{-|c|h}(\eta^+(u)-u)\le\kappa(u)\le e^{|c|h}(\eta^+(u)-u)$, \cref{lem:hd-sawtooth} gives
+$\E[A_m^2]=\frac{\sigma^4h}2I_\mu+o(h)$.
+
+\emph{The drift part.} Write $B_m=\sum_jD_j$ with $D_j=\int_{t_j}^{t_{j+1}}G_t\tilde S_t\,\dd t$ and
+$\F_j=\F_{t_j}$. The terms $D_j-\E[D_j\mid\F_j]$ are orthogonal, and by the Cauchy--Schwarz
+inequality $\E[D_j^2]\le h\int_{t_j}^{t_{j+1}}\E[G_t^2\tilde S_t^2]\,\dd t$, so their sum has second
+moment at most $h\,\E[A_m^2]/\sigma^2=O(h^2)$. For the conditional means, the product rule,
+\cref{lem:hd-delta-dynamics} and \eqref{eq:hd-stilde} give, for $t_j\le u<T$,
+\[
+  \dd\big((H_u-H_{t_j})\tilde S_u\big)=\theta\big(\tilde S_ub_u-\sigma G_u\tilde S_u\big)\dd u
+  +\big(\tilde S_ub_u-\sigma G_u\tilde S_u\big)\dd W_u ,
+\]
+and the $\dd W$-integral has conditional mean zero (its integrand is square integrable by
+\eqref{eq:hd-integrability} and $G$ is bounded). Hence, with $Z_u=\tilde S_u|b_u|+\sigma|G_u|\tilde S_u$,
+$|\E[D_j\mid\F_j]|\le|\theta|h\,\E\big[\int_{t_j}^{t_{j+1}}Z_u\,\dd u\,\big|\,\F_j\big]$, and by the
+triangle and Cauchy--Schwarz inequalities
+\[
+  \Big\|\sum_j\E[D_j\mid\F_j]\Big\|_2\le|\theta|h\sum_j\Big(h\int_{t_j}^{t_{j+1}}\E Z_u^2\,\dd u\Big)^{1/2}
+  \le|\theta|h\Big(T\int_0^T\E Z_u^2\,\dd u\Big)^{1/2}=O(h),
+\]
+because $\int_0^T\E Z_u^2\,\dd u\le2\sigma^2I_\mu+2\E[A_m^2]$ is bounded. So $\|B_m\|_2=O(h)$ and
+$|\E B_m|\le C_1|\theta|h$.
+
+\emph{Conclusion.} (i) $\E[A_m]=0$, so $\E[e_m]=(\mu-r)\E[B_m]$, of size at most
+$C_1(\mu-r)^2h/\sigma$, where $C_1$ depends on $\mu$ only through $\theta$, $I_\mu$ and
+$\sup_m\E[A_m^2]\le4L^2\sigma^2\int_0^T\E\tilde S_t^2\,\dd t$; for calls and puts the bound of (iii) shows that
+$C_1$ stays bounded for $\mu$ in bounded sets. Under $\Q$, $\mu=r$. (ii) $\|e_m-A_m\|_2=|\mu-r|\|B_m\|_2=O(h)$, so
+$|\E e_m^2-\E A_m^2|\le\|e_m-A_m\|_2(\|e_m\|_2+\|A_m\|_2)=O(h^{3/2})$; the second form of
+\eqref{eq:hd-variance} is the identity $\sigma^4S^4\Gamma^2=4(\frac12\sigma^2S^2\Gamma)^2$. (iii) By
+\cref{prop:bsf-greeks}, $S^4\Gamma^2=S^2e^{-2y\tau}N'(d_+)^2/(\sigma^2\tau)\le e^{2|y|T}S^2/(2\pi\sigma^2\tau)$. On $[0,T/2]$, $\tau\ge T/2$
+and $\varphi_\mu$ is bounded. On $[T/2,T)$, $\log S_t\sim\mathcal N(m_t,v_t)$ with
+$v_t=\sigma^2t\ge\sigma^2T/2$; the identity $e^{2x}\frac{e^{-(x-m_t)^2/2v_t}}{\sqrt{2\pi v_t}}
+=e^{2m_t+2v_t}\frac{e^{-(x-m_t-2v_t)^2/2v_t}}{\sqrt{2\pi v_t}}$ bounds the density of $\log S_t$,
+weighted by $e^{2x}$, by $e^{2m_t+2v_t}/\sqrt{2\pi v_t}$, and $N'(d_+)^2=e^{-(x-c_t)^2/\sigma^2\tau}/(2\pi)$,
+with $x=\log S_t$ and $c_t$ deterministic, integrates to $\sigma\sqrt{\pi\tau}/(2\pi)$. So
+$\E[S_t^2N'(d_+)^2]\le C\sqrt\tau$ and $\varphi_\mu(t)\le C'/\sqrt\tau$.
+\end{proof}
+
+\paragraph{Reading the proposition.} To halve the error, rebalance four times as often. The
+constant is the time integral of the squared ``cash gamma'' where the stock is likely to be:
+near expiry, $S^4\Gamma^2$ is of order $1/\tau$ within a distance of order $\sigma\sqrt\tau$ of the
+strike and negligible elsewhere, and the stock is there with probability of order
+$\sqrt\tau$, which turns the blow-up into the integrable $\tau^{-1/2}$ of (iii). Completing the
+square in the Gaussian integral of the proof gives $\varphi_\mu$ in closed form
+(\coderef{code/src/mfe230d/hedging.py}, \texttt{gamma\_moment}); for the test case,
+$I_r=60{,}391.4$, and the leading standard deviation of the error, in time-$T$ money, is
+$e^{rT}\sigma^2\sqrt{TI_r/2}\,m^{-1/2}=7.02\,m^{-1/2}$: $0.97$ for weekly and $0.44$ for daily
+rebalancing, against a premium of $7.36$. Condition \eqref{eq:hd-integrability} is not a
+technicality. It fails for the digital option, whose gamma is of order $1/\tau$ at a distance of
+order $\sigma\sqrt\tau$ from the strike (and of order $\tau^{-1/2}$ at the strike itself;
+\exref{ex:hd-integrability}); there the mean squared error is only of order $h^{1/2}$
+\citep[with the correction note of \citealp{gobet-correction}]{gobet-temam}.
+
+The expansion is classical. For calls and puts, \textcite{bertsimas-kogan-lo} show that $\sqrt m\,e_m$
+converges in law to a mixture of centred normal laws, described by the same integrand;
+\textcite{toft-1996} gives closed forms, for a finite number of dates, for the expected hedging
+error and the variance of the cash flows of a discretely rebalanced option hedge, with a drift
+$\mu\ne r$ and with a cost-adjusted hedging volatility; and \textcite{zhang-thesis} proves that $m\,\E[e_m^2]$ converges to a nonzero
+limit for calls and puts. The IEOR 222 notes derive the same constant for smooth payoffs from a gamma--theta
+Taylor expansion; that route needs bounded higher derivatives, which the call does not have,
+and the change to $\hat\Prob$ above avoids it.
+
+\paragraph{How accurate is the leading term?} Under $\Q$ the variance can be computed exactly,
+by one-dimensional quadrature (\exref{ex:hd-exact}). For the test-case call it gives standard
+deviations $6.040$, $3.223$, $1.925$, $0.949$ and $0.437$ for $m=1,4,12,52,252$, so that
+$\sqrt m$ times the standard deviation increases towards $7.02$ from below
+(\cref{fig:hd-discrete}(b)). Divided by the standard deviation $12.570$ of the discounted payoff,
+the exact values for $m=1$, $12$ and $52$ are $0.4757$, $0.1516$ and $0.0748$: the standard-error
+ratios of the hedge used as a control variate in \cref{ch:08-antithetic-control}, simulated
+there as $0.48$, $0.15$ and $0.075$. The leading term predicts $0.553$, $0.160$ and $0.0767$: it
+overstates the error by $16\%$ for a static hedge ($m=1$) and by $2.6\%$ weekly.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \setlength{\tabcolsep}{4.5pt}
+  \begin{tabular}{@{}rrrrrrccc@{}}
+    \toprule
+    & \multicolumn{5}{c}{$\mu=r$ (under $\Q$)} & \multicolumn{3}{c}{mean / sd under $\Prob$}\\
+    \cmidrule(lr){2-6}\cmidrule(l){7-9}
+    $m$ & mean & sd & exact sd & leading & MAE & $\mu=10\%$ & $\mu=20\%$ & $\mu=-10\%$\\
+    \midrule
+    none & $0.010$ & $12.651$ & $12.696$ & -- & $9.342$ & $-5.667$ / $16.830$ & $-14.453$ / $21.352$ & $4.286$ / $8.013$\\
+    $1$ & $-0.000$ & $6.017$ & $6.040$ & $7.021$ & $4.749$ & $-0.830$ / $7.238$ & $-3.694$ / $9.462$ & $-1.086$ / $6.041$\\
+    $4$ & $0.010$ & $3.207$ & $3.223$ & $3.510$ & $2.459$ & $-0.194$ / $3.367$ & $-0.855$ / $3.490$ & $-0.257$ / $3.046$\\
+    $12$ & $-0.001$ & $1.942$ & $1.925$ & $2.027$ & $1.466$ & $-0.062$ / $1.965$ & $-0.266$ / $1.911$ & $-0.097$ / $1.801$\\
+    $52$ & $-0.001$ & $0.956$ & $0.949$ & $0.974$ & $0.715$ & $-0.017$ / $0.954$ & $-0.064$ / $0.903$ & $-0.019$ / $0.888$\\
+    $252$ & $-0.004$ & $0.437$ & $0.437$ & $0.442$ & $0.326$ & $-0.006$ / $0.436$ & $-0.014$ / $0.410$ & $-0.008$ / $0.409$\\
+    \bottomrule
+  \end{tabular}
+  \caption{The course's discrete-hedging experiment on the test case: the seller's error
+    $X_T-(S_T-K)^+$ in time-$T$ money, for no hedge and for $m$ rebalancing dates. Our
+    implementation (numpy \texttt{default\_rng}, seed $2026$, $n=50{,}000$ paths, the same
+    normals in every column). ``exact sd'' is computed by quadrature (\exref{ex:hd-exact}),
+    ``leading'' is $e^{rT}\sqrt{\sigma^4hI_r/2}$. The standard errors of the means are
+    $\text{sd}/\sqrt n$: at most $0.096$, and $0.002$ for $m=252$ under $\Q$; the means under $\Q$ are
+    within $2.3$ standard errors of $0$.}
+  \label{tab:hd-hw5}
+\end{table}
+
+\Cref{tab:hd-hw5} is the course's experiment: $n$ paths, no hedge, a static hedge, and
+quarterly, monthly, weekly and daily rebalancing, under $\Q$ and under three real-world
+drifts. Under $\Q$ the mean is exactly zero, by (i), and the simulated means are consistent with
+it: the largest, $-0.0043$ for $m=252$, is $2.2$ standard errors from zero, and among six rows
+one such deviation occurs with probability about $0.15$. The standard deviations match the
+exact ones;
+the mean absolute error is about $0.75$ of the standard deviation (it would be $0.80$ for a
+normal law), a first sign of the heavy tails visible in \cref{fig:hd-discrete}(a), which come
+from the paths that end near the strike. Without a hedge the seller carries the whole risk,
+and under $\Prob$ the mean is minus the risk premium of the call. The drift enters the
+hedged error in two ways, both small. Its mean is of order $(\mu-r)^2h$ and, to leading order, negative
+(\exref{ex:hd-drift-bias}), and its variance changes through $I_\mu$: the limits of $\sqrt m$
+times the standard deviation are $7.02$, $7.00$, $6.56$ and $6.55$ for $\mu=r$, $10\%$, $20\%$
+and $-10\%$, because a strong drift in either direction carries the stock away from the strike,
+where the gamma is. The hedger does not need to know $\mu$.
+
+\begin{remark}[Dividends paid into the money market]\label{rem:hd-dividends}
+If the dividends are paid into the money market and the seller holds exactly $\delta_j$ shares
+on $[t_j,t_{j+1})$, as in \eqref{eq:sm-wealth}, her discounted gain over the period is
+$\delta_j\int_{t_j}^{t_{j+1}}e^{-yu}\,\dd\tilde S_u$ instead of $e^{-yt_j}\delta_j(\tilde S_{t_{j+1}}-\tilde S_{t_j})$.
+The difference $\int_0^T\delta_{\eta(u)}(e^{-yu}-e^{-y\eta(u)})\,\dd\tilde S_u$ has an integrand
+bounded by $L|y|e^{|y|T}h$, hence an $L^2$ norm $O(h)$, so \cref{prop:hd-discrete-error}(ii) is
+unchanged. The mean under $\Prob$ is no longer of order $(\mu-r)^2h$: the extra term has mean
+$(\mu-r)\E\int_0^T\delta_{\eta(u)}(e^{-yu}-e^{-y\eta(u)})\tilde S_u\,\dd u$, linear in $\mu-r$, and (i) holds with
+$(\mu-r)^2$ replaced by $|\mu-r|(|y|+|\mu-r|)$; the mean is still $0$ under $\Q$.
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch18-discrete}
+  \caption{Discrete delta hedging of the test-case call. (a) Histograms of the seller's error
+    $X_T-(S_T-K)^+$ under $\Q$ for $m=12$, $52$ and $252$ ($20{,}000$ paths, seed $1812$).
+    (b) $\sqrt m$ times the root-mean-square error against $m$: exact values under $\Q$ (line,
+    by quadrature), and simulations ($10{,}000$ paths for each $m$, seed $18+m$) for $\mu=r$, $20\%$ and $-10\%$;
+    the dashed lines are the limits $e^{rT}\sigma^2\sqrt{TI_\mu/2}$ of
+    \cref{prop:hd-discrete-error}, $7.02$ for $\mu=r$ and, almost on top of each other, $6.56$ and
+    $6.55$ for $\mu=20\%$ and $-10\%$.}
+  \label{fig:hd-discrete}
+\end{figure}
+
+\demo{18-hedging.ipynb}{rebalance the call hedge at $m$ dates of your choice, under any drift,
+volatility and strike; watch the error distribution narrow like $m^{-1/2}$ and its constant
+change with the drift and the moneyness.}
+
+\section{Hedging at the wrong volatility}\label{sec:hd-wrong-vol}
+
+The volatility of the hedge must be chosen before the volatility of the stock is known. In
+this section the stock follows
+\[
+  \dd S_t=(\mu_t-y)S_t\,\dd t+\sigma_tS_t\,\dd W_t ,
+\]
+where $\mu_t$ and $\sigma_t$ are progressively measurable, $|\mu_t|\le\bar\mu$ and
+$0\le\sigma_t\le\bar\sigma$: the realised volatility may be random, depend on the path, and even
+vanish for a while. The dealer uses a constant \emph{hedging volatility} $\sigma_h>0$: $V_h$ is the
+Black--Scholes price function at volatility $\sigma_h$ (with the same $r$ and $y$), and
+$\Delta_h$, $\Gamma_h$ its delta and gamma. She sells the claim for $V_h(0,S_0)$, holds
+$\Delta_h(t,S_t)$ shares at time $t$, and her wealth follows \eqref{eq:sm-wealth}:
+$\dd X_t=\Delta_h\,\dd S_t+y\Delta_hS_t\,\dd t+r(X_t-\Delta_hS_t)\,\dd t$, $X_0=V_h(0,S_0)$.
+
+\begin{proposition}[The P\&L of hedging at the wrong volatility]\label{prop:hd-wrong-vol}
+Let $F$ be Lipschitz. Then $s^2|\Gamma_h(t,s)|\le C_hs\big(1+(T-t)^{-1/2}\big)$ for a constant
+$C_h$, and almost surely
+\begin{equation}\label{eq:hd-wrong-vol}
+  e^{-rT}\big(X_T-F(S_T)\big)=\frac12\int_0^Te^{-rt}\,\Gamma_h(t,S_t)\,S_t^2\,\big(\sigma_h^2-\sigma_t^2\big)\,\dd t,
+\end{equation}
+the integral converging absolutely. A buyer who pays $V_h(0,S_0)$ and holds $-\Delta_h$ shares ends
+with the opposite, $\frac12\int_0^Te^{-rt}\Gamma_hS_t^2(\sigma_t^2-\sigma_h^2)\,\dd t$.
+\end{proposition}
+
+\begin{proof}
+\emph{The bound.} Write $R=e^{\nu_h\tau+\sigma_h\sqrt\tau Z}$, $\nu_h=r-y-\frac12\sigma_h^2$,
+$Z\sim\mathcal N(0,1)$. $F$ is differentiable almost everywhere with $|F'|\le L$, and
+$\Delta_h(t,s)=e^{-r\tau}\E[F'(sR)R]$. Substituting $u=\log s+\nu_h\tau+\sigma_h\sqrt\tau z$ in this
+Gaussian integral and differentiating the kernel in $s$ gives
+$s\,\Gamma_h(t,s)=e^{-r\tau}\E\big[F'(sR)R\,(Z/(\sigma_h\sqrt\tau)-1)\big]$, so
+$s^2|\Gamma_h|\le sLe^{-r\tau}\E[R(1+|Z|/(\sigma_h\sqrt\tau))]$, which has the stated form. (For the call,
+$s^2\Gamma_h=se^{-y\tau}N'(d_+)/(\sigma_h\sqrt\tau)\le s/(\sigma_h\sqrt{2\pi\tau})$.)
+
+\emph{The identity.} Fix $T'<T$. On $[0,T']$, $V_h$ is $C^{1,2}$ and solves
+$\partial_tV_h-rV_h=-(r-y)s\Delta_h-\frac12\sigma_h^2s^2\Gamma_h$. By It\^o's formula,
+\[
+  \dd\big(e^{-rt}V_h(t,S_t)\big)=e^{-rt}\Big((\mu_t-r)S_t\Delta_h+\tfrac12(\sigma_t^2-\sigma_h^2)S_t^2\Gamma_h\Big)\dd t
+  +e^{-rt}\Delta_h\sigma_tS_t\,\dd W_t ,
+\]
+while $\dd(e^{-rt}X_t)=e^{-rt}\Delta_h(\dd S_t-(r-y)S_t\,\dd t)=e^{-rt}\Delta_hS_t\big((\mu_t-r)\,\dd t+\sigma_t\,\dd W_t\big)$.
+Subtracting, the $\dd W$ terms and the drift cancel, and
+$e^{-rT'}(X_{T'}-V_h(T',S_{T'}))=\frac12\int_0^{T'}e^{-rt}\Gamma_hS_t^2(\sigma_h^2-\sigma_t^2)\,\dd t$. Let
+$T'\uparrow T$: $X$ is continuous, $V_h(T',S_{T'})\to F(S_T)$ by the continuity of $V_h$ on
+$[0,T]\times(0,\infty)$, and the integrand is bounded by
+$C_h(\sigma_h^2+\bar\sigma^2)e^{|r|T}\sup_{u\le T}S_u\,(1+(T-t)^{-1/2})$, which is integrable on $[0,T]$
+along every path.
+\end{proof}
+
+No probability is involved: \eqref{eq:hd-wrong-vol} holds path by path, whatever the drift. The
+hedger's P\&L accrues at the rate $\frac12\Gamma_hS^2$, the ``cash gamma'', times the spread between
+the variance she charged and the variance the stock realises. With $\sigma_t\equiv\sigma_h$ the hedge
+replicates, as it should.
+
+\begin{corollary}[Robustness]\label{cor:hd-robust}
+Let $F$ be Lipschitz and $\sigma_h>0$. The following are equivalent:
+\begin{enumerate}[label=(\alph*)]
+  \item $F$ is convex;
+  \item for every model as above with $\sigma_t\le\sigma_h$ for all $t$, the dealer superhedges:
+    $X_T\ge F(S_T)$ almost surely.
+\end{enumerate}
+Under (a), $\sigma_t\ge\sigma_h$ for all $t$ implies $X_T\le F(S_T)$ almost surely.
+\end{corollary}
+
+\begin{proof}
+(a)$\Rightarrow$(b) and the last claim: for each $z$, $s\mapsto F(se^{\nu_h\tau+\sigma_h\sqrt\tau z})$ is
+convex, so $V_h(t,\cdot)$, an average of such functions, is convex and $\Gamma_h\ge0$; apply
+\eqref{eq:hd-wrong-vol}. (b)$\Rightarrow$(a): if every $V_h(t,\cdot)$, $t<T$, were convex, so would be their
+pointwise limit $F$. So if $F$ is not convex, $\Gamma_h(t_0,s_0)<0$ for some $t_0\in(0,T)$ and $s_0$ (a
+negative value at $t=0$ persists for small $t>0$, by continuity), and by continuity $\Gamma_h<0$ on $[t_0,t_0+\varepsilon]\times[s_0e^{-a},s_0e^a]$ for some $a>0$ and every small
+enough $\varepsilon>0$; take $\varepsilon$ so small that also $t_0+\varepsilon<T$ and
+$|r-y|\varepsilon<a/2$. Consider the model with
+$\mu_t=r$, $\sigma_t=0$ on $[t_0,t_0+\varepsilon]$ and $\sigma_t=\sigma_h$ elsewhere. On the event $\{S_{t_0}\in[s_0e^{-a/2},s_0e^{a/2}]\}$, which has positive
+probability because $\sigma_t=\sigma_h>0$ on $[0,t_0)$ gives $S_{t_0}$ a positive density, the stock moves deterministically in $[s_0e^{-a},s_0e^a]$ during
+$[t_0,t_0+\varepsilon]$, and the right side of \eqref{eq:hd-wrong-vol} reduces to
+$\frac12\sigma_h^2\int_{t_0}^{t_0+\varepsilon}e^{-rt}\Gamma_hS_t^2\,\dd t<0$.
+\end{proof}
+
+This is the robustness of the Black--Scholes formula of \textcite{el-karoui-jeanblanc-shreve}:
+a dealer who overestimates the volatility of a convex claim is safe, whatever the realised
+volatility does, as long as the hedger's model keeps the price convex in the spot. Their Theorem~6.2 is the superhedging statement. In the
+Black--Scholes model with constant $\sigma_h$ convexity is automatic; their Theorem~5.2 proves it for
+diffusion models whose volatility depends on time and the spot, and their Section~4 shows that
+it can fail when the model volatility depends on the past of the path. \textcite{hobson-1998}
+gives a proof by coupling. The identity \eqref{eq:hd-wrong-vol} itself is the formula that
+traders know as the P\&L of a delta-hedged option \citep{carr-faq-1997,ellersgaard-jonsson-poulsen-2017}.
+
+\paragraph{Degenerate cases.} The bound of the proposition blows up like $1/\sigma_h$: at
+$\sigma_h=0$, $V_h(t,s)=e^{-r\tau}F(se^{(r-y)\tau})$ is not twice differentiable for a call, the
+delta is a step function (hold $e^{-y\tau}$ shares when the forward is above the strike: the
+\emph{stop-loss start-gain} strategy), and the dealer, who charged only the intrinsic value of
+the forward, loses a local time of the forward at the strike instead of
+$\frac12\int\Gamma_hS^2\sigma_t^2\,\dd t$ \citep{carr-jarrow-1990}. The proposition needs $\sigma_h>0$. At the
+other end, if the payoff has $s^2\Gamma_h$ independent of $s$ (the log contract), the P\&L depends
+on the path only through $\int_0^T\sigma_t^2\,\dd t$: the dealer is short realised variance
+(\exref{ex:hd-variance-swap}).
+
+\subsection{Implied or realised volatility?}\label{sec:hd-implied}
+
+Suppose the stock has a constant volatility $\sigma_r$, the market prices the call at an
+implied volatility $\sigma_i<\sigma_r$, and a trader buys it for $V_i(0,S_0)$. She can hedge at either
+volatility, with different consequences \citep{ahmad-wilmott-2005}.
+
+\emph{Hedging at the realised volatility.} By \cref{prop:hd-wrong-vol} with $\sigma_h=\sigma_r$, the
+hedge replicates the payoff, so her discounted P\&L at $T$ is the deterministic amount
+$V_r(0,S_0)-V_i(0,S_0)$, whatever the path and the drift. Marked to market at the implied
+volatility, her P\&L at time $t$ is $(V_r-V_i)(0,S_0)-e^{-rt}(V_r-V_i)(t,S_t)$: random, and
+possibly negative before $T$.
+
+\emph{Hedging at the implied volatility.} By \cref{prop:hd-wrong-vol} with $\sigma_h=\sigma_i$, her
+discounted P\&L is $\frac12(\sigma_r^2-\sigma_i^2)\int_0^Te^{-rt}\Gamma_i(t,S_t)S_t^2\,\dd t>0$. It accrues
+without a $\dd W$ term, smoothly, but how much accrues depends on the path: most when the stock
+stays near the strike close to expiry, little when it runs away early.
+
+\begin{proposition}[The expected P\&L of the implied hedge; \citealp{ahmad-wilmott-2005}]\label{prop:hd-implied-mean}
+Let $S$ be geometric Brownian motion with volatility $\sigma_r$ and total return $\mu$, and
+$\Gamma_i$ the gamma of the call (or put) at volatility $\sigma_i>0$. For $0\le t\le T$, with
+$\log S_t\sim\mathcal N(m_t,v_t)$, $c_t=\log K-(r-y+\frac12\sigma_i^2)\tau$ and $w_t=\sigma_i^2\tau$,
+\[
+  \E\big[S_t^2\Gamma_i(t,S_t)\big]=e^{-y\tau}\,
+  \frac{\exp\big(\bar x_t+\frac12s_t^2-\frac{(c_t-m_t)^2}{2(v_t+w_t)}\big)}{\sqrt{2\pi(v_t+w_t)}},\qquad
+  \bar x_t=\frac{c_tv_t+m_tw_t}{v_t+w_t},\quad s_t^2=\frac{v_tw_t}{v_t+w_t},
+\]
+(at $t=T$, $S_T^2\Gamma_i$ is read as $K^2$ times the density of $S_T$ at $K$, the limit as $t\uparrow T$),
+and the expected discounted P\&L of the implied hedge is
+$\frac12(\sigma_r^2-\sigma_i^2)\int_0^Te^{-rt}\E[S_t^2\Gamma_i(t,S_t)]\,\dd t$. If $\mu=r$, this equals
+$V_r(0,S_0)-V_i(0,S_0)$.
+\end{proposition}
+
+\begin{proof}
+$S^2\Gamma_i=e^{-y\tau}e^x N'((x-c_t)/\sqrt{w_t})/\sqrt{w_t}$ with $x=\log S$, and
+$N'((x-c)/\sqrt w)/\sqrt w$ is the $\mathcal N(c,w)$ density at $x$. The product of the
+$\mathcal N(c,w)$ and $\mathcal N(m,v)$ densities is the $\mathcal N(m,v+w)$ density at $c$ times the
+$\mathcal N(\bar x,s^2)$ density, and $\int e^x$ against the latter is $e^{\bar x+s^2/2}$. The expectation
+of the P\&L follows by Tonelli's theorem (the integrand is nonnegative). If $\mu=r$, take
+$\Q$-expectations in \eqref{eq:hd-wrong-vol} for the seller at $\sigma_i$: her discounted wealth is a
+$\Q$-martingale, since its integrand $e^{-rt}\sigma_r\Delta_i(t,S_t)S_t$ is square integrable, so $\EQ[e^{-rT}X_T]=V_i(0,S_0)$, while
+$\EQ[e^{-rT}F(S_T)]=V_r(0,S_0)$.
+\end{proof}
+
+With $\sigma_i=20\%$, $\sigma_r=25\%$ and the rest of the test case, the realised hedge locks in
+$e^{rT}(V_r-V_i)=1.970$ (time-$T$ money; $V_r=9.315$). The implied hedge earns on average $1.970$,
+$1.987$, $1.984$, $1.899$ and $1.839$ for $\mu=r$, $5\%$, $10\%$, $20\%$ and $-10\%$: in the real world
+the expected profit depends on the drift, through the time the stock spends near the strike.
+For $\mu=10\%$, its continuous-time standard deviation is $0.828$ ($20{,}000$ paths, daily Riemann
+sums), and its smallest value on these paths is $0.216$. \Cref{fig:hd-implied} shows both hedges rebalanced daily:
+the realised hedge, $1.972$ on average, is no longer exactly locked in, but its standard
+deviation, $0.545$, is the discrete-hedging error of \cref{sec:hd-discrete} at volatility $25\%$;
+the implied hedge has mean $1.983$ and standard deviation $0.998$. The realised hedge has the
+smaller final risk and the noisier path, and it needs a volatility that nobody knows in
+advance; \textcite{ellersgaard-jonsson-poulsen-2017} find, in simulations and data, that hedging
+at the implied volatility is often the better practical choice.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch18-implied}
+  \caption{A call bought at the implied volatility $20\%$ on a stock whose volatility is $25\%$
+    ($\mu=10\%$, rest of the test case), delta hedged daily at the implied or at the realised
+    volatility. (a) The P\&L marked to market at the implied volatility, in time-$T$ money,
+    along three paths (one colour per path; solid: hedged at implied, dashed: hedged at
+    realised); the dotted line is the locked-in value $1.970$. (b) Histograms of the final
+    P\&L over $20{,}000$ paths (seed $18$); dotted: $1.970$; dashed: the expected P\&L $1.984$
+    of the implied hedge (\cref{prop:hd-implied-mean}).}
+  \label{fig:hd-implied}
+\end{figure}
+
+\demo{18-hedging.ipynb}{choose the implied and the realised volatility and the drift; compare
+the mark-to-market paths and the final P\&L of the two hedges with the expected value of
+\cref{prop:hd-implied-mean}.}
+
+\section{Transaction costs and Leland's volatility}\label{sec:hd-leland}
+
+Let a trade of $q$ shares at the price $S$ cost $\frac k2|q|S$: $k\ge0$ is the proportional
+\emph{round-trip} cost of \textcite{leland-1985}, and the course's one-way cost $k'$ is $k/2$. The
+hedger of \cref{sec:hd-discrete} now uses a hedging volatility $\hat\sigma>0$: she sells the claim
+for $\hat V_0=\hat V(0,S_0)$, the Black--Scholes price at $\hat\sigma$, holds
+$\hat\delta_j=\hat\Delta(t_j,S_{t_j})$ shares from $t_j$, and at each $t_j$, $1\le j\le m-1$, pays
+$\frac k2|\hat\delta_j-e^{yh}\hat\delta_{j-1}|S_{t_j}$ (dividends are reinvested, so she arrives at $t_j$ with
+$e^{yh}\hat\delta_{j-1}$ shares). As in Leland's paper and the course's homework, the trades that
+set up the hedge at $t_0$ and settle it at $T$ are not charged; with constant $k$ they would
+add a cost of order $k$ that does not depend on $m$.
+
+Each rebalance moves the delta by about $\Gamma\,\Delta S$, of order $\sqrt h$, so the cost per
+period is of order $k\sqrt h$ and the total cost of order $k/\sqrt h$: without an adjustment,
+frequent hedging ruins the hedger. The next lemma makes the cost per period precise.
+
+\begin{lemma}[The cost of one rebalance]\label{lem:hd-one-period}
+Let $\hat\Delta$, $\hat\Gamma$ be the delta and gamma of the call (or the put) at a fixed volatility
+$\hat\sigma>0$, let $t<T$ and $S_t=s$, and let the stock have volatility $\sigma$ and any drift $\mu$. As
+$h\downarrow0$,
+\[
+  \E\Big[\tfrac12S_{t+h}\,\big|\hat\Delta(t+h,S_{t+h})-e^{yh}\hat\Delta(t,s)\big|\Big]
+  =\tfrac12s^2\hat\Gamma(t,s)\,\sigma\sqrt{2h/\pi}+O(h).
+\]
+\end{lemma}
+
+\begin{proof}
+Let $t'=(t+T)/2$ and $h\le t'-t$. On $[t,t']\times(0,\infty)$, $\partial_t\hat\Delta$ and $x^2\partial_x\hat\Gamma$
+are bounded, since they are products of $N'(d_\pm)$ with polynomials in $d_\pm$ and
+$\tau^{-1/2}$ (\cref{prop:bsf-greeks}). With $R=S_{t+h}/s-1$, Taylor's formula in $t$ and then in
+$x$ gives
+$\hat\Delta(t+h,S_{t+h})-e^{yh}\hat\Delta(t,s)=\hat\Gamma(t,s)sR+\rho$ with
+$|\rho|\le C\big(h+R^2\max(1,(1+R)^{-2})\big)$, the last factor bounding $s^2/\xi^2$ for $\xi$ between $s$
+and $S_{t+h}$. Since $||a+\rho|-|a||\le|\rho|$ and the moments of $1+R=e^{(\mu-y-\sigma^2/2)h+\sigma\sqrt hZ}$
+and of $(1+R)^{-1}$ are bounded, the left side equals
+$\frac12s^2\hat\Gamma(t,s)\E[(1+R)|R|]+O(h)$, and
+$\E[(1+R)|R|]=\sigma\sqrt h\,\E|Z|+O(h)=\sigma\sqrt{2h/\pi}+O(h)$ because $R=\sigma\sqrt hZ+O(h)$ in $L^2$.
+\end{proof}
+
+\paragraph{Leland's argument (heuristic).} By the lemma, the expected cost of the rebalance
+at the end of a period is about $k\cdot\frac12s^2\hat\Gamma\sigma\sqrt{2h/\pi}$. By
+\cref{prop:hd-wrong-vol}, a hedger who charges the variance $\hat\sigma^2$ in a market of variance
+$\sigma^2$ earns, over the same period, $\frac12(\hat\sigma^2-\sigma^2)s^2\hat\Gamma h$. For a convex claim,
+$\hat\Gamma\ge0$, and the two balance at every date and every spot exactly when
+\begin{equation}\label{eq:hd-leland}
+  \hat\sigma^2=\sigma^2\Big(1+\sqrt{\frac2\pi}\,\frac{k}{\sigma\sqrt h}\Big),
+\end{equation}
+\emph{Leland's volatility}; $A=\sqrt{2/\pi}\,k/(\sigma\sqrt h)$ is the \emph{Leland number}. The argument is a
+heuristic: the lemma is applied with $\hat\sigma$ depending on $h$, near expiry its $O(h)$ is not
+uniform, and the discrete-hedging error of \cref{sec:hd-discrete} comes on top. What is true is
+the following.
+
+\begin{theorem}[Leland's volatility]\label{thm:hd-leland}
+In the standard model with $y=0$, let $F(s)=(s-K)^+$, let $k_m=k_0m^{-\alpha}$ with $k_0>0$ and
+$0\le\alpha\le\frac12$ (equivalently $k_m=k_0(h/T)^\alpha$), and let $\hat\sigma_m$ be \eqref{eq:hd-leland} with $k=k_m$
+and $h=T/m$. Let $X^{(m)}_T$ be the terminal wealth of the hedger who sells the call for its
+price at $\hat\sigma_m$, holds $\hat\Delta_m(t_j,S_{t_j})$ shares and pays the costs $k_m$.
+\begin{enumerate}[label=(\roman*)]
+  \item If $0<\alpha\le\frac12$, then $X^{(m)}_T\to(S_T-K)^+$ in probability as $m\to\infty$.
+  \item If $\alpha=0$ (a fixed cost $k_0$), then $X^{(m)}_T$ converges in probability to
+    $(S_T-K)^++\ell(S_T)$ for an explicit function $\ell$ that is not identically zero: Leland's
+    strategy does not replicate the call.
+\end{enumerate}
+\end{theorem}
+
+The theorem is not proved here. For $\alpha=\frac12$ the volatility
+$\hat\sigma=\sigma(1+\sqrt{2/\pi}\,k_0/(\sigma\sqrt T))^{1/2}$ does not depend on $m$; \textcite{leland-1985}
+conjectured the convergence, and \textcite{lott-1993} gave the first rigorous proof, in this
+case. \textcite{kabanov-safarian-1997} extended (i) to $0<\alpha<\frac12$ and computed the limit of
+(ii) explicitly (their Theorem~2), which refuted Leland's claim that a constant cost is replicated
+in the limit. For $\alpha=\frac12$ and convex, piecewise smooth payoffs, \textcite{denis-kabanov-2010}
+show that the mean squared error is $A/m+o(1/m)$ and identify $A$. Section~2 of
+\textcite{nguyen-pergamenshchikov-2017} surveys these results (its Theorems~2.2, 2.3, 2.4 and 2.7
+are, in this order, the results of Lott, of Kabanov and Safarian for $0<\alpha\le\frac12$, of Denis and
+Kabanov, and the limit for $\alpha=0$), including Pergamenshchikov's
+rate $m^{-1/4}$ for the fluctuations when $\alpha=0$ and the fact that the limit $\ell$ is
+nonpositive (the call is asymptotically underhedged); \textcite{kabanov-safarian-2009},
+Chapter~1, is a book-length treatment. The cited
+results are stated without dividends, and typically with $r=0$, to which a constant rate reduces
+by discounting. Two edge cases: for $k=0$, $\hat\sigma=\sigma$ and the theorem is
+\cref{prop:hd-discrete-error}; for $\alpha>\frac12$, outside the theorem, $k_m/\sqrt h\to0$, so $\hat\sigma_m\to\sigma$, and
+heuristically the expected costs, of order $k_m/\sqrt h$, tend to zero. Leland's balance needs $\hat\Gamma\ge0$: for a book
+whose gamma changes sign it fails, and the correct adjustment leads to a nonlinear pricing
+equation (\exref{ex:hd-nonconvex}).
+
+\begin{table}[ht]
+  \centering
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}rccrrrrccc@{}}
+    \toprule
+    & & & \multicolumn{2}{c}{hedged at $\sigma$} & \multicolumn{2}{c}{Leland, $\mu=r$} & \multicolumn{3}{c}{Leland, mean / sd under $\Prob$}\\
+    \cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-10}
+    $m$ & $\hat\sigma$ & $\hat V_0$ & mean & sd & mean & sd & $\mu=10\%$ & $\mu=20\%$ & $\mu=-10\%$\\
+    \midrule
+    $1$ & $0.2078$ & $7.670$ & $0.031$ & $5.988$ & $0.339$ & $5.983$ & $-0.447$ / $7.167$ & $-3.289$ / $9.343$ & $-0.805$ / $6.040$\\
+    $4$ & $0.2154$ & $7.964$ & $-0.497$ & $3.336$ & $0.128$ & $3.336$ & $-0.080$ / $3.487$ & $-0.784$ / $3.610$ & $-0.181$ / $3.150$\\
+    $12$ & $0.2260$ & $8.377$ & $-1.027$ & $2.058$ & $0.058$ & $2.037$ & $-0.012$ / $2.070$ & $-0.269$ / $2.019$ & $-0.062$ / $1.915$\\
+    $52$ & $0.2510$ & $9.355$ & $-2.246$ & $1.337$ & $0.013$ & $1.063$ & $-0.005$ / $1.066$ & $-0.076$ / $1.013$ & $-0.016$ / $0.998$\\
+    $252$ & $0.3011$ & $11.303$ & $-4.992$ & $1.980$ & $-0.007$ & $0.555$ & $-0.011$ / $0.553$ & $-0.028$ / $0.524$ & $-0.018$ / $0.517$\\
+    \bottomrule
+  \end{tabular}
+  \caption{The course's transaction-cost experiment: round-trip cost $k=2\%$ (the homework's
+    one-way $k'=1\%$), test case, seller's error $X_T-(S_T-K)^+$ in time-$T$ money. ``Hedged at
+    $\sigma$'': premium and deltas at $\sigma=20\%$; ``Leland'': premium $\hat V_0$ and deltas at $\hat\sigma$ of
+    \eqref{eq:hd-leland}. Our implementation (numpy \texttt{default\_rng}, seed $7$,
+    $n=50{,}000$ paths); standard errors of the means at most $0.042$.}
+  \label{tab:hd-leland}
+\end{table}
+
+\Cref{tab:hd-leland} runs the course's experiment. Hedging at $\sigma$, the seller loses the
+costs, $2.25$ weekly and $4.99$ daily on average, against $2.27$ and $5.00$ from summing the lemma,
+$e^{rT}k\,\mathcal C/\sqrt h$ with
+$\mathcal C=\frac12\sigma\sqrt{2/\pi}\int_0^Te^{-rt}\E[S_t^2\Gamma(t,S_t)]\,\dd t=15.58$ (by
+\cref{prop:hd-implied-mean} with $\sigma_i=\sigma_r=\sigma$). The loss grows like $\sqrt m$, and more frequent
+hedging even increases the standard deviation, through the randomness of the costs. With
+Leland's volatility the premium rises from $7.36$ to $9.36$ weekly and $11.30$ daily, the mean
+error is within $0.06$ of zero for $m\ge12$, and the standard deviation falls, although more
+slowly than without costs ($1.06$ against $0.95$ weekly, $0.555$ against $0.437$ daily). For $m=1$
+there is no rebalance, hence no cost, and the adjustment only overcharges. The strategy is as
+robust to the drift as the plain hedge: the means under $\Prob$ have the size of the drift
+effect of \cref{tab:hd-hw5}.
+
+What of the failure in \cref{thm:hd-leland}(ii)? \Cref{fig:hd-leland}(b) refines the grid to
+$m=10^5$. With $k=2\%$ the mean error stays within a few hundredths of zero
+($-0.020\pm0.004$ at $m=10^4$, where $\hat\sigma=0.60$) while the standard deviation keeps falling
+($0.175$). With $k=10\%$ the mean is still drifting down ($-0.23$ at $m=10^3$, $-0.31$ at $10^4$,
+$-0.36$ at $10^5$, each $\pm0.016$ at most), and the standard deviation, $0.34$ at $m=10^5$, falls only
+slowly (Pergamenshchikov's rate is $m^{-1/4}$): the limit of Kabanov and Safarian is nonzero and
+lies below $-0.35$. For the costs of a liquid market, it is a small effect.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch18-leland}
+  \caption{Transaction costs on the test-case call. (a) Mean (solid) and standard deviation
+    (dashed) of the seller's error $X_T-(S_T-K)^+$ against $m$, with round-trip cost $k=2\%$,
+    hedging at $\sigma$ or at Leland's $\hat\sigma$, and without costs ($10{,}000$ paths for each $m$, seed
+    $180+m$). (b) The mean error of Leland's strategy on finer grids, for $k=2\%$ and $k=10\%$, with
+    $\pm2$ standard errors ($2{,}000$ paths for each $m$, seed $1985+m$).}
+  \label{fig:hd-leland}
+\end{figure}
+
+\demo{18-hedging.ipynb}{set the cost $k$ and the number of dates $m$; compare the error of the
+plain hedge with that of Leland's strategy, and push $m$ up to see where the adjustment stops
+working.}
+
+\begin{incode}
+\coderef{code/src/mfe230d/hedging.py} implements the experiments of this chapter:
+\texttt{hedge\_experiment} (and \texttt{hedge\_stream}, memory-light for large $m$) simulates the
+seller's hedge with dividends reinvested, transaction costs and any hedging volatility;
+\texttt{gamma\_integral} and \texttt{asymptotic\_sd} compute the constant of
+\cref{prop:hd-discrete-error}; \texttt{gamma\_s2\_moment} and \texttt{expected\_vol\_pnl} the formulas of
+\cref{prop:hd-implied-mean}; \texttt{leland\_vol} and \texttt{one\_period\_cost} \eqref{eq:hd-leland} and
+\cref{lem:hd-one-period}. The tests in \coderef{code/tests/test_hedging.py} reproduce every number
+quoted here.
+\end{incode}
+
+\furtherreading
+\textcite{bertsimas-kogan-lo} is a readable introduction to discrete hedging, and
+\textcite{toft-1996} adds transaction costs and the trade-off between cost and risk
+(\exref{ex:hd-tradeoff}); \textcite{kamal-derman-1999} give the traders' rule of thumb of
+\exref{ex:hd-kamal-derman}. For irregular payoffs, \textcite{gobet-temam} compute the rates.
+\textcite{el-karoui-jeanblanc-shreve} is the reference on robustness, and
+\textcite{ahmad-wilmott-2005} and \textcite{ellersgaard-jonsson-poulsen-2017} discuss which
+volatility to hedge with. \textcite{kabanov-safarian-2009}, Chapter~1, covers Leland's approach
+with complete proofs.

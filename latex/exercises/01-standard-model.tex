@@ -1,0 +1,156 @@
+% Exercises for Chapter 1 (The standard model, revisited). Statements only: solutions are kept privately.
+% Throughout, the standard model is that of Definition sm-model, N and N' are the standard normal
+% distribution function and density, Z ~ N(0,1), and d_pm are the Black--Scholes arguments.
+
+\begin{exercise}[A trinomial Brownian step]\label{ex:sm-trinomial}
+\easy A tree replaces the Brownian increment over a step of length $h$ by a variable $\zeta$ that
+takes the values $\beta\sqrt h$, $0$ and $-\beta\sqrt h$ with probabilities $p_u$, $p_0$ and $p_d$,
+where $\beta>0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E[\zeta]=0$ and $\E[\zeta^2]=h$ hold if and only if $p_u=p_d=1/(2\beta^2)$ and
+    $p_0=1-1/\beta^2$. For which $\beta$ is this a probability distribution, and which $\beta$
+    gives back the binomial step?
+  \item Find the $\beta$ for which, in addition, $\E[\zeta^4]$ equals the fourth moment $3h^2$ of
+    $\mathcal N(0,h)$, and the corresponding probabilities.
+  \item With these values, compare $\E[\zeta^6]$ with the sixth moment of $\mathcal N(0,h)$.
+  \item Let $f$ have bounded derivatives up to order six. Expand $\E[f(x+\zeta)]-\E[f(x+\sqrt hZ)]$
+    in powers of $h$, and explain why the choice of (b) makes one step of the tree more accurate
+    for smooth payoffs than any other $\beta$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Probabilities under the two measures]\label{ex:sm-two-measures}
+\easy In the standard model, let $K>0$ and $\theta=(\mu-r)/\sigma$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\Q(S_T>K)=N(d_-)$ and $\Prob(S_T>K)=N(d_-+\theta\sqrt T)$, with
+    $d_-=\big(\log(S_0/K)+\nu T\big)/(\sigma\sqrt T)$. Which of the two enters the price of the
+    digital call paying $\1_{\{S_T>K\}}$, and why?
+  \item Show that the density $Z_T=\frac{\dd\Q}{\dd\Prob}$ on $\F_T$ is a function of $S_T$ alone,
+    $Z_T=c\,(S_T/S_0)^{-\theta/\sigma}$, and find the constant $c$. For $\mu>r$, which terminal
+    prices does $\Q$ weight more heavily than $\Prob$?
+  \item Take the test case $S_0=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, with $\mu=6\%$.
+    Compute both probabilities and the price of the digital call. A colleague prices it as
+    $e^{-\mu T}\Prob(S_T>K)$; how far off is she?
+  \item Define the rate $\rho(K)$ by $e^{-\rho(K)T}\Prob(S_T>K)=$ the price of the digital. Compute
+    $\rho(80)$, $\rho(100)$ and $\rho(120)$, and find the limits of $\rho(K)$ as $K\downarrow0$ and
+    as $K\to\infty$ (for $\mu>r$). Can a single risk-adjusted discount rate price all digitals?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The dividend stream]\label{ex:sm-dividend-stream}
+\easy In the standard model, the holder of one share receives the dividends $yS_s\,\dd s$. Let
+$u(t,x)$ be the value at time $t$, when $S_t=x$, of the dividends paid between $t$ and $T$:
+$u(t,x)=\EQ\big[\int_t^Te^{-r(s-t)}yS_s\,\dd s\,\big|\,S_t=x\big]$.
+\begin{enumerate}[label=(\alph*)]
+  \item Write the equation \noteref{eq:sm-fk-pde} and the terminal condition that
+    \noteref{thm:sm-feynman-kac} associates with this expectation (identify $b$, $\sigma$, $r$,
+    $c$ and $g$).
+  \item Look for a solution of the form $u(t,x)=a(T-t)\,x$, and find $a$.
+  \item Check hypothesis (b) of \noteref{thm:sm-feynman-kac}, and conclude that
+    $u(t,x)=x\big(1-e^{-y(T-t)}\big)$.
+  \item Recover the same value directly, by exchanging the expectation and the time integral.
+    Justify the exchange.
+  \item Interpret $x=u(t,x)+xe^{-y(T-t)}$ with \noteref{rem:sm-forward}. What happens when $y<0$?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A Gaussian payoff]\label{ex:sm-gaussian-payoff}
+\medium In the standard model, let $X_t=\log(S_t/K)$ for a constant $K>0$, and consider the claim
+that pays $f_\alpha(X_T)=(2\pi\alpha)^{-1/2}e^{-X_T^2/(2\alpha)}$ at $T$, for a constant $\alpha>0$: a
+bet on $S_T$ ending close to $K$.
+\begin{enumerate}[label=(\alph*)]
+  \item Find the dynamics of $X$ under $\Q$, and the equation that the price $F(t,x)$, written as a
+    function of $x=\log(S_t/K)$, must satisfy.
+  \item Compute $F(t,x)=e^{-r\tau}\EQ[f_\alpha(X_T)\mid X_t=x]$, $\tau=T-t$, in closed form, using that
+    a sum of independent normal variables is normal. Check directly that it solves the equation of
+    (a), and that $F(t,x)\to f_\alpha(x)$ as $t\uparrow T$.
+  \item Show that $f_\alpha(X_T)\to\delta(X_T)$ as $\alpha\downarrow0$, in the sense of
+    \noteref{sec:sm-green}, and compute $F_0(t,x)=\lim_{\alpha\downarrow0}F(t,x)$. Show that
+    $F_0(t,\log(S/K))=K\,G(t,S;T,K)$, and explain the factor $K$ by a change of variables in the
+    integral $\int\delta(\log(\xi/K))\,\varphi(\xi)\,\dd\xi$.
+  \item Compare $F$ with $F_0$, using the heat kernel \noteref{eq:sm-heat-kernel}. In what sense is
+    the Gaussian payoff ``an Arrow--Debreu security that has already been diffusing for a while''?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Moments from the forward equation]\label{ex:sm-forward-moments}
+\medium In the standard model, fix $t$ and $x>0$, let $q\in\R$, and for $\tau>0$ let
+$m_q(\tau)=\int_0^\infty\xi^q\,G(t,x;t+\tau,\xi)\,\dd\xi$, the price at $t$ of the claim paying
+$S_{t+\tau}^q$ at $t+\tau$.
+\begin{enumerate}[label=(\alph*)]
+  \item Using the forward equation \noteref{eq:sm-forward} and two integrations by parts, show that
+    $m_q'(\tau)=\lambda_q\,m_q(\tau)$ with $\lambda_q=q(r-y)+\frac12q(q-1)\sigma^2-r$. Justify the
+    differentiation under the integral sign and the vanishing of the boundary terms. (\emph{Hint:}
+    in $\eta=\log\xi$, $G$ and its derivatives are a polynomial times a Gaussian.)
+  \item Use \noteref{prop:sm-green}(iii) to find $m_q(0+)$, solve the equation, and compare with
+    \noteref{eq:sm-moments}.
+  \item For which $q$ is $m_q(\tau)=x^q$ for every $\tau$? Find these $q$ for the test case
+    ($r=1\%$, $y=2\%$, $\sigma=20\%$) and for $y=0$. What does the answer say about the process
+    $e^{-rt}S_t^q$ under $\Q$?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Butterflies and the Arrow--Debreu price]\label{ex:sm-butterfly}
+\medium For $\varepsilon>0$ let $\Lambda_\varepsilon(x)=c_\varepsilon(\varepsilon-|x|)^+$, a tent of width
+$2\varepsilon$.
+\begin{enumerate}[label=(\alph*)]
+  \item Find $c_\varepsilon$ such that $\int\Lambda_\varepsilon=1$, and show that
+    $\Lambda_\varepsilon(x-K)=c_\varepsilon\big[(x-K+\varepsilon)^+-2(x-K)^++(x-K-\varepsilon)^+\big]$: the
+    payoff of a butterfly. Show that $\Lambda_\varepsilon(\cdot-K)\to\delta_K$ as $\varepsilon\downarrow0$.
+  \item Let $C(K)$ be the price at time $0$ of the call with strike $K$ in the standard model, and
+    $B_\varepsilon(K)=c_\varepsilon\big[C(K-\varepsilon)-2C(K)+C(K+\varepsilon)\big]$ the price of the
+    butterfly. Show that $B_\varepsilon(K)\to G(0,S_0;T,K)$ and that
+    $B_\varepsilon(K)-G(0,S_0;T,K)=\frac{\varepsilon^2}{12}\,\partial_{KK}G(0,S_0;T,K)+O(\varepsilon^4)$.
+    You may use \noteref{rem:sm-arrow-debreu}.
+  \item \emph{Computational.} For the test case and $K=100$, compute $B_\varepsilon(100)$ in double
+    precision with the Black--Scholes call of \texttt{mfe230d.bs}, for
+    $\varepsilon=10,1,10^{-1},10^{-2},\dots,10^{-7}$, and compare with $G(0,100;1,100)$. Explain the
+    errors you observe for large and for small $\varepsilon$, and estimate the best $\varepsilon$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A dipole]\label{ex:sm-dipole}
+\hard Let $k$ be the heat kernel \noteref{eq:sm-heat-kernel} and, for $0\le t<T$ and $x\in\R$,
+\[
+  u(t,x)=-\partial_xk(T-t,x)=\frac{x}{\sqrt{2\pi}\,(T-t)^{3/2}}\,e^{-x^2/(2(T-t))} .
+\]
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $u$ solves $\partial_tu+\frac12\partial_{xx}u=0$ on $[0,T)\times\R$ and that
+    $u(t,x)\to0$ as $(t,x)\to(T,x_0)$ for every $x_0\ne0$. Does $u$ have a limit at $(T,0)$?
+  \item Let $W$ be a Brownian motion, $x_0\ne0$ and $X=x_0+W$; take $b=0$, $\sigma=1$, $r=c=0$,
+    $g=0$ and $E=\{0\}$ in \noteref{thm:sm-feynman-kac}. Show that $u(t,X_t)$ is a martingale on
+    $[0,T']$ for every $T'<T$ and that $u(t,X_t)\to0$ almost surely as $t\uparrow T$. Deduce that the
+    It\^o integral $\int_0^tu_x(s,X_s)\,\dd W_s$ is defined on $[0,T]$ but is not a martingale there,
+    so hypothesis (a) of the theorem fails. Which property of the family $(u(t,X_t))_{t<T}$ is
+    missing, and on which paths is the expectation carried just before $T$?
+  \item Show that $\int_\R u(t,x)\,\varphi(x)\,\dd x\to\varphi'(0)$ as $t\uparrow T$, for every
+    $\varphi\in C^1(\R)$ with $\varphi$ and $\varphi'$ bounded. So the terminal value of $u$ is the
+    distribution $-\delta_0'$, and not $0$.
+  \item With $r=0$ and $W$ as the underlying, the price of the Arrow--Debreu security paying
+    $\delta_a(x_0+W_T)$ is $k(T,a-x_0)$. Show that $u(0,x_0)$ is the limit as $\varepsilon\downarrow0$
+    of the price of a portfolio of $1/(2\varepsilon)$ Arrow--Debreu securities at $\varepsilon$ and
+    $-1/(2\varepsilon)$ at $-\varepsilon$, and relate this portfolio to (c).
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Discounting at a quadratic rate]\label{ex:sm-quadratic}
+\hard Let $W$ be a Brownian motion, $\lambda>0$, and
+$u(t,x)=\E\big[\exp\big(-\frac{\lambda^2}{2}\int_t^T(x+W_s-W_t)^2\,\dd s\big)\big]$: the
+Feynman--Kac expectation with $X=x+W$, discount rate $r(t,x)=\frac12\lambda^2x^2$, $c=0$ and $g=1$.
+\begin{enumerate}[label=(\alph*)]
+  \item Look for a solution of the equation of \noteref{thm:sm-feynman-kac} of the form
+    $u(t,x)=\exp\big(a(T-t)+b(T-t)x^2\big)$. Show that $a'=b$ and $b'=2b^2-\frac12\lambda^2$ with
+    $a(0)=b(0)=0$, and solve: $b(\tau)=-\frac\lambda2\tanh(\lambda\tau)$,
+    $a(\tau)=-\frac12\log\cosh(\lambda\tau)$.
+  \item Check the hypotheses of \noteref{thm:sm-feynman-kac}, and deduce that
+    $\E\big[\exp\big(-\frac{\lambda^2}2\int_0^TW_s^2\,\dd s\big)\big]=(\cosh\lambda T)^{-1/2}$.
+  \item What goes wrong in parts (a) and (b) if $\frac12\lambda^2x^2$ is replaced by
+    $-\frac12\lambda^2x^2$?
+  \item \emph{Computational.} For $\lambda=2$, $T=1$ and $x=0$, estimate the expectation by
+    simulating $W$ on a uniform grid of $m$ steps (\texttt{mfe230d.paths}) and approximating the
+    integral by the trapezoid rule, for $m=4$, $16$ and $64$ with $10^5$ paths each. Report the
+    estimates with their standard errors. Is the discretisation bias visible? How does it scale
+    with the step $h=T/m$? (\emph{Hint:} the discretised expectation can be computed exactly from
+    the covariance matrix of $(W_{t_1},\dots,W_{t_m})$, as a determinant.)
+\end{enumerate}
+\end{exercise}

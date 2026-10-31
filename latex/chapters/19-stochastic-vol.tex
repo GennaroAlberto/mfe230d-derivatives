@@ -1,0 +1,583 @@
+% Chapter 19: Stochastic volatility.
+\providecommand{\Log}{\operatorname{Log}}
+\providecommand{\Arg}{\operatorname{Arg}}
+
+In the Black--Scholes model every option on the same underlying has the same implied volatility. Market
+smiles say otherwise (\cref{rem:sk-smile-data}): equity-index volatility is higher for low strikes, and it
+moves, mostly against the index. The \emph{Heston model} makes the variance a mean-reverting diffusion
+correlated with the price. It keeps exactly the structure that made Black--Scholes tractable in
+\cref{ch:02-black-scholes}: the characteristic function of the log-price is known in closed form, so
+European options are priced by one Fourier integral.
+
+\Cref{sec:sv-model,sec:sv-cf,sec:sv-fourier} show that the model is well posed, derive the characteristic
+function, and settle two issues that trip up implementations: the branch of the complex logarithm and moments
+that explode at finite maturities. \Cref{sec:sv-simulation} simulates the model and measures the bias of two
+schemes against the Fourier price; \cref{sec:sv-smiles} shows the smiles the model produces.
+
+\section{The Heston model}\label{sec:sv-model}
+
+\begin{definition}[Heston model]\label{def:sv-heston}
+Let $W$ and $W^\perp$ be independent Brownian motions under $\Q$ with a filtration $(\F_t)$, let
+$\rho\in[-1,1]$, $\bar\rho=\sqrt{1-\rho^2}$ and $W^S=\rho W+\bar\rho W^\perp$. The \emph{Heston model} with
+parameters $\kappa>0$ (speed of mean reversion), $\theta>0$ (long-run variance), $\xi>0$ (volatility of
+variance), $\rho$ (correlation) and $V_0\ge0$ is
+\begin{equation}\label{eq:sv-heston}
+  \dd V_t=\kappa(\theta-V_t)\,\dd t+\xi\sqrt{V_t}\,\dd W_t,\qquad
+  \dd S_t=S_t\big((r-y)\,\dd t+\sqrt{V_t}\,\dd W^S_t\big),\qquad S_0=S>0 .
+\end{equation}
+We write $X_t=\ln S_t$, $Q_t=\int_0^tV_s\,\dd s$ and $F=Se^{(r-y)T}$ for the forward.
+\end{definition}
+
+Given $V$, $S_t=S\exp\big((r-y)t-\frac12Q_t+\int_0^t\sqrt V\,\dd W^S\big)$. With $\rho<0$ falls in the price come
+with rises in volatility, the leverage effect behind the equity skew. The variance is the square-root
+diffusion of \textcite{cox-ingersoll-ross}, sampled exactly in \cref{ch:10-stratification}.
+
+\begin{proposition}[Well-posedness]\label{prop:sv-wellposed}
+\begin{enumerate}[label=(\roman*)]
+  \item The variance equation has a pathwise unique strong solution, and $V_t\ge0$ for all $t$, almost
+    surely. Hence \eqref{eq:sv-heston} has a unique strong solution.
+  \item \emph{(Feller.)} If $V_0>0$ and $2\kappa\theta\ge\xi^2$, then $V_t>0$ for all $t\ge0$, almost surely.
+    If $V_0=0$ and $2\kappa\theta\ge\xi^2$, then $V_t>0$ for all $t>0$, almost surely. If $2\kappa\theta<\xi^2$,
+    $V$ reaches $0$ with positive probability.
+  \item \emph{(Moments.)} For $0\le s\le t$, with $e=e^{-\kappa(t-s)}$,
+    \begin{equation}\label{eq:sv-cir-moments}
+      \E[V_t\mid\F_s]=\theta+(V_s-\theta)e,\qquad
+      \Var(V_t\mid\F_s)=V_s\frac{\xi^2e(1-e)}{\kappa}+\theta\frac{\xi^2(1-e)^2}{2\kappa}.
+    \end{equation}
+  \item \emph{(Martingale.)} For every $\rho\in[-1,1]$, $\big(e^{-(r-y)t}S_t\big)_{t\ge0}$ is a true martingale.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) With $\sqrt{v^+}$ in place of $\sqrt v$, the coefficients are continuous with linear growth, which gives a
+weak solution (\textcite{karatzas-shreve}, Theorem~5.4.22 and Remark~5.4.23). The drift is Lipschitz and
+$|\sqrt{v^+}-\sqrt{w^+}|\le\sqrt{|v-w|}$, the Yamada--Watanabe condition for pathwise uniqueness
+(Proposition~5.2.13); weak existence and pathwise uniqueness give a strong solution (Corollary~5.3.23). The
+process $0$ solves the same equation with the smaller drift $-\kappa v$, so the comparison theorem
+(Proposition~5.2.18) gives $V\ge0$, and $\sqrt{V^+}=\sqrt V$. The price is then the explicit exponential above.
+
+(ii) For $v>0$ let $s'(v)=v^{-q}e^{2\kappa v/\xi^2}$ with $q=2\kappa\theta/\xi^2$, and $s(v)=\int_1^vs'$. Then
+$\kappa(\theta-v)s'+\frac12\xi^2vs''=0$, so for $0<a<V_0<b$ and $\tau=\inf\{t:V_t\notin(a,b)\}$, It\^o's formula
+makes $s(V_{t\wedge\tau})$ a bounded local martingale, hence a martingale. The exit time $\tau$ is finite
+almost surely because the diffusion coefficient is bounded below on $[a,b]$ (Section~5.5), so optional
+stopping gives $\Q(V\text{ hits }a\text{ before }b)=(s(b)-s(V_0))/(s(b)-s(a))$. If $q\ge1$, $s(a)\to-\infty$ as
+$a\downarrow0$, so $V$ reaches $0$ before $b$ with probability $0$, for every $b$; its paths are continuous, so the
+hitting time of $b$ tends to $\infty$ as $b\to\infty$, and $V$ never reaches $0$. If $V_0=0$, the law of $V_s$ is a multiple of a chi-square law with $4\kappa\theta/\xi^2>0$
+degrees of freedom \citep[Section~3.4.1]{glasserman-mc}, so $V_s>0$ almost surely; applying the first case
+after each time $s=1/n$ (Markov property) and taking the union over $n$ gives $V_t>0$ for all $t>0$. The
+converse for $q<1$, where $s(0+)>-\infty$, is Feller's test \citep{feller-1951}; see
+\textcite{karatzas-shreve}, Section~5.5.
+
+(iii) Given $V_s$, $V_t=c\,\chi'^2_d(\lambda)$, a noncentral chi-square variable with $d=4\kappa\theta/\xi^2$
+degrees of freedom and noncentrality $\lambda=V_se/c$, where $c=\xi^2(1-e)/(4\kappa)$
+\citep[Section~3.4.1]{glasserman-mc}. Its mean is $c(d+\lambda)$ and its variance $c^2(2d+4\lambda)$; substitute.
+
+(iv) $Z_t=e^{-(r-y)t}S_t/S=\exp\big(\int_0^t\sqrt V\,\dd W^S-\frac12Q_t\big)$ is a positive local martingale,
+hence a supermartingale, and it suffices to show $\E Z_T\ge1$ for each $T$. Let $\tau_n=\inf\{t:V_t\ge n\}$.
+By Novikov's condition $Z_{t\wedge\tau_n}$ is a martingale, and under $\Q_n$, $\dd\Q_n/\dd\Q=Z_{T\wedge\tau_n}$,
+Girsanov's theorem makes $W^n_t=W_t-\rho\int_0^{t\wedge\tau_n}\sqrt{V_s}\,\dd s$ a Brownian motion on $[0,T]$. Up to
+$\tau_n$, $V$ solves $\dd V=(\kappa\theta-(\kappa-\rho\xi)V)\,\dd t+\xi\sqrt V\,\dd W^n$. Let $\tilde V$ be the solution of
+this equation on all of $[0,T]$, driven by $W^n$; it exists by the argument of (i), whatever the sign of
+$\kappa-\rho\xi$. The process equal to $V$ up to $\tau_n$ and continued after $\tau_n$ by the strong solution started
+from $V_{\tau_n}$ and driven by $W^n$ is another solution on $[0,T]$, so pathwise uniqueness gives $V=\tilde V$ up to
+$\tau_n$. Hence
+\[
+  \E Z_T\ge\E\big[Z_{T\wedge\tau_n}\1_{\{\tau_n>T\}}\big]=\Q_n(\tau_n>T)=\Q_n\Big(\sup_{t\le T}\tilde V_t<n\Big)=p_n,
+\]
+where $p_n$ is the probability that the solution of this equation driven by any Brownian motion stays below
+$n$ on $[0,T]$, which does not depend on the Brownian motion (pathwise uniqueness implies uniqueness in law).
+Its paths are continuous, so $p_n\to1$, and $\E Z_T\ge1$. A supermartingale with constant mean is a martingale.
+\end{proof}
+
+Property (iv) can fail in other stochastic volatility models \citep{sin-1998}; Heston is safe because under the
+share measure the variance is again a square-root diffusion (see also \citealp{keller-ressel-2011}, Corollary~2.7).
+
+\begin{remark}[The physical measure and the market price of volatility risk]\label{rem:sv-risk}
+Under $\Prob$ let $\dd V=\kappa^{\Prob}(\theta^{\Prob}-V)\,\dd t+\xi\sqrt V\,\dd B$. The variance is not traded, so the
+market is incomplete: each market price of risk $\lambda_V$ for $B$ gives a risk-neutral measure, under which
+the drift of $V$ is $\kappa^{\Prob}(\theta^{\Prob}-V)-\xi\sqrt V\lambda_V$. \textcite{heston}, Section~1, takes a
+premium proportional to $V$ ($\lambda_V=\kappa_V\sqrt V$ in the course notes), which keeps the form
+\eqref{eq:sv-heston} with $\kappa=\kappa^{\Prob}+\xi\kappa_V$ and $\kappa\theta=\kappa^{\Prob}\theta^{\Prob}$
+(\exref{ex:sv-risk-premium}). Option prices identify only the $\Q$-parameters.
+\end{remark}
+
+\begin{proposition}[The pricing equation]\label{prop:sv-pde}
+Let $f$ be a payoff with $|f(s)|\le A(1+s)$, and
+\[
+  \mathcal Lu=(r-y)s\,\partial_su+\kappa(\theta-v)\,\partial_vu+\tfrac12vs^2\,\partial_{ss}u+\rho\xi vs\,\partial_{sv}u
+  +\tfrac12\xi^2v\,\partial_{vv}u .
+\]
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{(Verification.)} Let $u$ be continuous on $[0,T]\times(0,\infty)\times[0,\infty)$ with
+    $u(T,s,v)=f(s)$ and $|u(t,s,v)|\le A'(1+s+v)$, and $C^{1,2}$ on an open set containing
+    $[0,T)\times(0,\infty)\times[0,\infty)$, where it solves
+    \begin{equation}\label{eq:sv-pde}
+      \partial_tu+\mathcal Lu-ru=0 .
+    \end{equation}
+    Then $u(t,S_t,V_t)=e^{-r(T-t)}\EQ[f(S_T)\mid\F_t]$ for $t\le T$; in particular $u(0,S,V_0)$ is the price.
+    At $v=0$ the equation reads $\partial_tu+(r-y)s\,\partial_su+\kappa\theta\,\partial_vu-ru=0$.
+  \item \emph{(Converse.)} \textcite{ekstrom-tysk} show, for a class of models that contains Heston's and
+    under conditions on $f$ stated there, that the price is the unique classical solution of \eqref{eq:sv-pde}
+    with terminal value $f$ in a suitable growth class, the equation holding up to $v=0$ in the degenerate form
+    above. When Feller's condition fails, $0$ is attainable and this degenerate equation is the boundary
+    condition at $v=0$, needed for uniqueness; when it holds, no condition at $v=0$ is needed.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By It\^o's formula and \eqref{eq:sv-pde}, $M_t=e^{-rt}u(t,S_t,V_t)$ is a local martingale on $[0,T)$; let
+$\tau_n\uparrow T$ localise it. The families $\{S_\tau\}$ and $\{V_\tau\}$, over stopping times $\tau\le T$, are
+uniformly integrable: $e^{-(r-y)\tau}S_\tau=\E[e^{-(r-y)T}S_T\mid\F_\tau]$ by
+\cref{prop:sv-wellposed}(iv) and optional sampling, and by \eqref{eq:sv-cir-moments} the process
+$e^{\kappa t}(V_t-\theta)$ is a martingale, so $|V_\tau|\le\theta+e^{\kappa T}\E[V_T+\theta\mid\F_\tau]$;
+conditional expectations of one integrable variable are uniformly integrable. Hence $\{M_\tau\}$ is
+uniformly integrable, and letting $n\to\infty$ in $M_{t\wedge\tau_n}=\E[M_{\tau_n}\mid\F_t]$ gives
+$M_t=\E[M_T\mid\F_t]$ with $M_T=e^{-rT}f(S_T)$. At $v=0$ the second-order coefficients vanish.
+\end{proof}
+
+The course derives \eqref{eq:sv-pde} by hedging with the stock and other options; \emph{one} option with
+nonzero sensitivity to $V$ suffices (\exref{ex:sv-risk-premium}). It is \textcite{heston}'s equation~(6).
+
+\section{Affine structure and the characteristic function}\label{sec:sv-cf}
+
+The coefficients of \eqref{eq:sv-heston} in $(X,V)$ are \emph{affine} in the state: the drift
+$(r-y-\frac12V,\ \kappa\theta-\kappa V)$ and the instantaneous covariance $V\big(\begin{smallmatrix}1&\rho\xi\\
+\rho\xi&\xi^2\end{smallmatrix}\big)$ are affine functions of $V$ and do not depend on $X$. For such processes
+the conditional characteristic function is the exponential of an affine function of the state
+\citep{duffie-pan-singleton,duffie-filipovic-schachermayer}. We guess
+$\E[e^{iuX_T}\mid\F_t]=\exp\big(iuX_t+iu(r-y)\tau+C(u,\tau)+D(u,\tau)V_t\big)$, $\tau=T-t$, and substitute in
+\eqref{eq:sv-pde} written in $x=\ln s$ without the term $-ru$ (a conditional expectation is a martingale). The terms
+without $v$ and those proportional to $v$ must vanish separately, which gives the \emph{Riccati equations}
+\begin{equation}\label{eq:sv-riccati}
+  \partial_\tau D=\tfrac12\xi^2D^2-\beta(u)D-\tfrac12(u^2+iu),\qquad\partial_\tau C=\kappa\theta D,\qquad
+  C(u,0)=D(u,0)=0,
+\end{equation}
+with $\beta(u)=\kappa-i\rho\xi u$. These are the equations of the course's notes, which transform the call
+price in $\ln(S/K)$ and stop after solving for $D$. The quadratic $\frac12\xi^2D^2-\beta D-\frac12(u^2+iu)$ has
+roots $(\beta\pm d)/\xi^2$, where
+\begin{equation}\label{eq:sv-d}
+  d(u)=\sqrt{\beta(u)^2+\xi^2(u^2+iu)},\qquad g(u)=\frac{\beta-d}{\beta+d},
+\end{equation}
+and $\sqrt{\cdot}$ and $\Log$ denote principal branches ($\operatorname{Re}\sqrt z\ge0$, $\Arg\in(-\pi,\pi]$).
+We write $\varphi(u)=\E[e^{iuX_T}]$, the convention $\varphi_Y(z)=\E[e^{izY}]$ of \cref{ch:02-black-scholes}.
+
+\begin{theorem}[The characteristic function]\label{thm:sv-cf}
+Let $T\ge0$ and, for $u\in\C$ and $t\ge0$,
+\begin{equation}\label{eq:sv-stable}
+  D(u,t)=\frac{\beta-d}{\xi^2}\,\frac{1-e^{-dt}}{1-ge^{-dt}},\qquad
+  C(u,t)=\frac{\kappa\theta}{\xi^2}\Big((\beta-d)t-2\Log\frac{1-ge^{-dt}}{1-g}\Big).
+\end{equation}
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{(Real arguments.)} For $u\in\R$, \eqref{eq:sv-riccati} has a unique solution $(C,D)$ on $[0,\infty)$
+    (by (ii) and (iii) it is \eqref{eq:sv-stable} when $\rho\xi\le2\kappa$), $\operatorname{Re}D\le0$, and
+    \begin{equation}\label{eq:sv-cf}
+      \varphi(u)=\exp\big(iu(\ln S+(r-y)T)+C(u,T)+D(u,T)V_0\big).
+    \end{equation}
+  \item \emph{(Stable form.)} If $\operatorname{Re}d(u)>0$ and $|g(u)|<1$, then
+    $\operatorname{Re}(1-ge^{-dt})>0$ for all $t\ge0$, and \eqref{eq:sv-stable} solves \eqref{eq:sv-riccati} on
+    $[0,\infty)$. The set of such $u$ is open, and on it $C$ and $D$ are analytic in $u$.
+  \item \emph{(When the stable form applies.)} For real $u$, $\operatorname{Re}d(u)>0$, and $|g(u)|<1$ if
+    $\rho\xi\le2\kappa$. At $u-i$, $u$ real, the same holds if $\rho\xi<\kappa$; there \eqref{eq:sv-cf} gives
+    $\varphi(u-i)=\E[S_Te^{iuX_T}]$. In particular, for $\rho\le0$ the stable form with principal branches is
+    exact at every point used by \cref{prop:sv-fourier}(i) and (iii).
+  \item \emph{(Moments.)} For real $a$ let $T^*(a)=\sup\{T:\EQ[S_T^a]<\infty\}$. Then $T^*(a)=\infty$ for
+    $a\in[0,1]$. Otherwise, with $\kappa_a=\kappa-\rho\xi a$ and $\Delta_a=\kappa_a^2-\xi^2a(a-1)$,
+    \begin{equation}\label{eq:sv-explosion}
+      T^*(a)=\begin{cases}
+        \infty, & \Delta_a\ge0,\ \kappa_a>0,\\[0.3ex]
+        \dfrac{2}{\gamma_a}\Big(\dfrac\pi2+\arctan\dfrac{\kappa_a}{\gamma_a}\Big),\ \ \gamma_a=\sqrt{-\Delta_a}, & \Delta_a<0,\\[1.2ex]
+        \dfrac{1}{\sqrt{\Delta_a}}\ln\dfrac{\kappa_a-\sqrt{\Delta_a}}{\kappa_a+\sqrt{\Delta_a}}, & \Delta_a>0,\ \kappa_a<0,
+      \end{cases}
+    \end{equation}
+    ($2/|\kappa_a|$ if $\Delta_a=0>\kappa_a$), and $T^*$ is nonincreasing on $[1,\infty)$. Moments of order
+    $a>1$ can thus be infinite at a finite maturity.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) The right side of \eqref{eq:sv-riccati} is a polynomial in $D$, so there is a unique maximal solution on
+some $[0,t^*)$, and if $t^*<\infty$ then $|D|\to\infty$ at $t^*$. Write $D=a+ib$. The real part of the right
+side is
+\[
+  \tfrac12\xi^2(a^2-b^2)-\kappa a-\rho\xi ub-\tfrac12u^2
+  =a\big(\tfrac12\xi^2a-\kappa\big)-\tfrac12(\xi b+\rho u)^2-\tfrac12(1-\rho^2)u^2\le a\big(\tfrac12\xi^2a-\kappa\big).
+\]
+Since $a(0)=0$ and $0$ solves $y'=y(\frac12\xi^2y-\kappa)$, the comparison theorem for scalar ordinary
+differential equations gives $a\le0$ on $[0,t^*)$. If $t^*<\infty$, then $w=1/D$, defined near $t^*$, satisfies
+$\partial_tw=-\frac12\xi^2+\beta w+\frac12(u^2+iu)w^2\to-\frac12\xi^2$ and $w\to0$ as $t\uparrow t^*$, so
+$w(t)=\frac12\xi^2(t^*-t)(1+o(1))$ and $\operatorname{Re}D=\operatorname{Re}w/|w|^2>0$ near $t^*$, a contradiction. So
+$t^*=\infty$, and $\operatorname{Re}C=\kappa\theta\int\operatorname{Re}D\le0$. Now let
+$M_t=\exp\big(iuX_t+iu(r-y)(T-t)+C(u,T-t)+D(u,T-t)V_t\big)$. It\^o's formula and \eqref{eq:sv-riccati} show that
+the drift of $M$ vanishes, and $|M_t|\le1$; a bounded local martingale is a martingale, so
+$\varphi(u)=\E M_T=M_0$.
+
+(ii) $|e^{-dt}|=e^{-t\operatorname{Re}d}\le1$, so $|ge^{-dt}|<1$ and $\operatorname{Re}(1-ge^{-dt})>0$, as well as
+$\operatorname{Re}(1-g)>0$. The principal logarithms of both are continuous and their arguments lie in
+$(-\frac\pi2,\frac\pi2)$, so the $\Log$ of the ratio is the difference of the $\Log$s and is continuous in $t$.
+With $r_\pm=(\beta\pm d)/\xi^2$ we have $gr_+=r_-$, and \eqref{eq:sv-stable} gives
+$D-r_-=r_-e^{-dt}(g-1)/(1-ge^{-dt})$ and $D-r_+=(r_--r_+)/(1-ge^{-dt})$, so
+$(D-r_-)/(D-r_+)=ge^{-dt}$. Differentiating, $\partial_tD\,(r_--r_+)/(D-r_+)^2=-dge^{-dt}$, that is
+$\partial_tD=\frac12\xi^2(D-r_+)(D-r_-)$, which is \eqref{eq:sv-riccati}; and $D(u,0)=0$. Differentiating $C$,
+\[
+  \partial_tC=\frac{\kappa\theta}{\xi^2}\,\frac{(\beta-d)(1-ge^{-dt})-2gde^{-dt}}{1-ge^{-dt}}=\kappa\theta D,
+\]
+because $(\beta-d)(1-g)=2gd$. The conditions are open in $u$ ($\operatorname{Re}d>0$ means
+$\beta^2+\xi^2(u^2+iu)\notin(-\infty,0]$), and compositions of analytic functions are analytic.
+
+(iii) For real $u$, $\Delta=\beta^2+\xi^2(u^2+iu)$ has $\operatorname{Re}\Delta=\kappa^2+\xi^2(1-\rho^2)u^2>0$, so
+$\operatorname{Re}d>0$. Next, $|g|<1$ if and only if $\operatorname{Re}(\beta\bar d)>0$. With $d=p+iq$,
+$2pq=\operatorname{Im}\Delta=\xi u(\xi-2\kappa\rho)$ and $p^2\ge\operatorname{Re}\Delta$, so
+\[
+  2p\operatorname{Re}(\beta\bar d)=2p(\kappa p-\rho\xi uq)=2\kappa p^2-\rho\xi^2u^2(\xi-2\kappa\rho)
+  \ge2\kappa^3+\xi^2u^2(2\kappa-\rho\xi)>0
+\]
+when $\rho\xi\le2\kappa$. At $u-i$, $\beta=\kappa'-i\rho\xi u$ with $\kappa'=\kappa-\rho\xi$, and $u^2+iu$ becomes $u^2-iu$;
+the same computation gives $2p\operatorname{Re}(\beta\bar d)\ge2\kappa'^3+\xi^2u^2(2\kappa-\rho\xi)>0$ when $\kappa'>0$.
+For the identity, the share measure $\dd\Q^S/\dd\Q=S_T/F$ is a probability by \cref{prop:sv-wellposed}(iv);
+under it (Girsanov) $X$ has drift $r-y+\frac12V$ and $V$ has drift $\kappa\theta-\kappa'V$, and the argument of (i), which did not use the sign of $\kappa$, gives
+$\E^S[e^{iuX_T}]$ by the Riccati equations of $u-i$. Multiply by $F$.
+
+(iv) For real $a$ the Riccati equation of $u=-ia$ is real,
+$\partial_\tau D=\frac12\xi^2D^2-\kappa_aD+\frac12a(a-1)$. For $a\in[0,1]$ its roots have product
+$a(a-1)/\xi^2\le0$, so $D$ stays between $0$ and the nonpositive root. Otherwise separating variables gives the
+blow-up time \eqref{eq:sv-explosion} (\exref{ex:sv-explosion}). For $T<T^*(a)$, $M_t$ defined as in (i) with
+$a$ in place of $iu$ is a positive local martingale, hence a supermartingale, and
+$\E[S_T^a]=\E M_T\le M_0<\infty$. That $\E[S_T^a]=\infty$ for $T>T^*(a)$, with the whole formula
+\eqref{eq:sv-explosion}, is \textcite{andersen-piterbarg}, Proposition~3.1; \textcite{keller-ressel-2011},
+Theorem~4.1 and~(6.2), proves it for affine models when $\kappa>\rho\xi$. Finally, by Lyapunov's
+inequality $\E[S_T^b]\le1+\E[S_T^a]$ for $1\le b\le a$, so $T^*$ is nonincreasing on $[1,\infty)$.
+\end{proof}
+
+\begin{remark}[The little Heston trap]\label{rem:sv-trap}
+\textcite{heston}, equation~(17), uses $g_H=1/g$ and $e^{+dt}$:
+$C=\frac{\kappa\theta}{\xi^2}\big((\beta+d)t-2\Log\frac{1-g_He^{dt}}{1-g_H}\big)$. Since
+$\frac{1-g_He^{dt}}{1-g_H}=e^{dt}\,\frac{1-ge^{-dt}}{1-g}$, this is algebraically \eqref{eq:sv-stable}; but
+$\Log(e^{dt}z)=dt+\Log z$ only while $t\operatorname{Im}d+\Arg z\in(-\pi,\pi]$. For real $u$, $\operatorname{Im}d$ is $0$ at
+$u=0$ and tends to $(\xi-2\kappa\rho)/(2\bar\rho)$ as $u\to\infty$ ($|\rho|<1$), so when $\operatorname{Im}d\ne0$ the argument
+wraps around at long maturities, $C$ jumps by $\pm4\pi i\kappa\theta/\xi^2$ and $\varphi$ by the factor $e^{\pm4\pi i\kappa\theta/\xi^2}\ne1$ unless
+$2\kappa\theta/\xi^2$ is an integer (\textcite{albrecher-trap}, Proposition~1). Their Theorem~3 shows that the
+stable form does not cross the cut along the line of \cref{prop:sv-fourier}(ii); \textcite{kahl-jaeckel}
+repair Heston's form by counting rotations; \textcite{lord-kahl} prove the principal branch correct in the
+whole strip where $\varphi$ is finite if $\rho\xi\le\kappa$, and in part of it if $\kappa<\rho\xi<2\kappa$
+(Theorem~3 of \textcite{lord-kahl-wp}). Part (iii) is the case we need, with a short proof.
+\end{remark}
+
+\Cref{fig:sv-fourier}(a) shows the trap for the 2005 Eurostoxx calibration of \textcite{fang-oosterlee} and
+\textcite{albrecher-trap} ($V_0=0.0175$, $\kappa=1.5768$, $\theta=0.0398$, $\xi=0.5751$, $\rho=-0.5711$; Feller's
+ratio $0.38$) at $T=10$. For the at-the-money call with $r=2.5\%$, $y=0$, the stable form gives $18.77$, $24.50$
+and $43.17$ at $T=4$, $6$ and $15$, the values of \textcite{albrecher-trap}, Table~1; Heston's form gives
+$18.77$, $23.92$ and $31.99$ in our Carr--Madan implementation ($\alpha=0.75$, step $0.01$; their wrong values, $23.90$ and $32.57$, differ
+because the error depends on where the nodes fall relative to the jumps).
+
+\paragraph{Degenerate cases.} The theorem holds as stated for $\rho=\pm1$, without Feller's condition and for
+$V_0=0$. For $\xi=0$ (Black--Scholes with a deterministic variance, \exref{ex:sv-degenerate}) the closed form,
+which divides by $\xi^2$, is replaced in the code by its limit.
+
+\section{Pricing by Fourier inversion}\label{sec:sv-fourier}
+
+\begin{proposition}[Fourier pricing]\label{prop:sv-fourier}
+Let $k=\ln K$, $C(K)=e^{-rT}\EQ[(S_T-K)^+]$ and $P(K)$ the put; $C-P=Se^{-yT}-Ke^{-rT}$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{(Gil-Pelaez.)} For every $K$ with $\Q(S_T=K)=0$, which holds for every $K$ when $|\rho|<1$,
+    \begin{equation}\label{eq:sv-gp}
+    \begin{gathered}
+      C=Se^{-yT}P_1-Ke^{-rT}P_2,\\
+      P_2=\frac12+\frac1\pi\int_0^\infty\operatorname{Re}\frac{e^{-iuk}\varphi(u)}{iu}\,\dd u,\qquad
+      P_1=\frac12+\frac1\pi\int_0^\infty\operatorname{Re}\frac{e^{-iuk}\varphi(u-i)}{iuF}\,\dd u,
+    \end{gathered}
+    \end{equation}
+    where $P_2=\Q(S_T>K)$, $P_1=\Q^S(S_T>K)$, the integrands are bounded near $0$ and the integrals converge
+    at $\infty$. Moreover $|\varphi(u)|\le L(\frac12\bar\rho^2u^2)$, where $L(\lambda)=\EQ[e^{-\lambda Q_T}]$ is
+    explicit and $\ln L(\lambda)=-\sqrt{2\lambda}\,(V_0+\kappa\theta T)/\xi+O(1)$ as $\lambda\to\infty$.
+  \item \emph{(Carr--Madan.)} Let $\alpha>0$. The damped price $c(k)=e^{\alpha k}C(e^k)$ is integrable on $\R$ if and
+    only if $\EQ[S_T^{1+\alpha}]<\infty$, that is, $T<T^*(1+\alpha)$ in \eqref{eq:sv-explosion}. Then its
+    transform is
+    \begin{equation}\label{eq:sv-cm}
+    \begin{gathered}
+      \psi(v)=\int_\R e^{ivk}c(k)\,\dd k=\frac{e^{-rT}\varphi(v-(\alpha+1)i)}{\alpha^2+\alpha-v^2+i(2\alpha+1)v},\\
+      C(K)=\frac{e^{-\alpha k}}{\pi}\int_0^\infty\operatorname{Re}\big(e^{-ivk}\psi(v)\big)\,\dd v .
+    \end{gathered}
+    \end{equation}
+  \item \emph{(COS.)} Let $Y=\ln(S_T/K)$, $a<0<b$, $\omega_k=k\pi/(b-a)$, and let
+    $V_k=\frac2{b-a}\int_a^0K(1-e^y)\cos(\omega_k(y-a))\,\dd y$ be the cosine coefficients of the put payoff.
+    With $\varphi_Y(u)=\varphi(u)e^{-iuk}$ and $\sum'$ a sum whose first term is halved, let
+    \[
+      P_N=e^{-rT}\,{\sum_{k=0}^{N-1}}'\operatorname{Re}\big(\varphi_Y(\omega_k)e^{-i\omega_ka}\big)V_k .
+    \]
+    If $Y$ has a density $f$ that is square integrable on $[a,b]$, and $\varepsilon=\Q(Y\notin[a,b])$, then
+    \begin{equation}\label{eq:sv-cos-error}
+      |P-P_N|\le e^{-rT}\Big(K\,\Q(Y<a)+\varepsilon\,{\sum_{k<N}}'|V_k|+\frac{b-a}2\Big|\sum_{k\ge N}A_kV_k\Big|\Big),
+    \end{equation}
+    where $A_k=\frac2{b-a}\int_a^bf(y)\cos(\omega_k(y-a))\,\dd y$; the last term tends to $0$ as $N\to\infty$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) \emph{Gil-Pelaez's formula.} For any random variable $Y$ and continuity point $x$ of its distribution
+function, $\Q(Y>x)=\frac12+\lim\frac1\pi\int_\epsilon^U\operatorname{Im}\big(e^{-iux}\E e^{iuY}\big)\,\frac{\dd u}u$ as
+$\epsilon\downarrow0$, $U\to\infty$ \citep{gil-pelaez}. Indeed the integral equals
+$\E\big[\frac1\pi\int_\epsilon^U\sin(u(Y-x))\frac{\dd u}u\big]$ by Fubini (the integrand is bounded on
+$[\epsilon,U]$). The inner integral is bounded uniformly in $\epsilon$, $U$ and $Y$, and tends to
+$\frac12\operatorname{sgn}(Y-x)$, so by dominated convergence the limit is
+$\frac12(\Q(Y>x)-\Q(Y<x))=\Q(Y>x)-\frac12$. Note that
+$\operatorname{Im}(e^{-iux}\varphi)/u=\operatorname{Re}(e^{-iux}\varphi/(iu))$. Apply this to $Y=X_T$ under $\Q$ and
+under $\Q^S$, whose characteristic function is $\varphi(u-i)/F$ by \cref{thm:sv-cf}(iii); and
+$e^{-rT}\E[S_T\1_{\{S_T>K\}}]=e^{-rT}F\,\Q^S(S_T>K)=Se^{-yT}P_1$. Given $\F^W_T$, $X_T$ is normal with variance
+$\bar\rho^2Q_T$ (\cref{prop:st-mixing}(i)), and $Q_T>0$ almost surely: on $\{Q_T=0\}$, $V=0$ on $[0,T]$ and the
+variance equation would give $V_T=\kappa\theta T>0$. So for $|\rho|<1$, $X_T$ has no atoms. Near $u=0$ the
+integrands are bounded because $X_T$ has finite first moments under both measures: by \eqref{eq:sv-explosion},
+$T^*(a)\to\infty$ as $a\to0$ and as $a\to1$, so $\E[S_T^a]<\infty$ for $a$ in a neighbourhood of $[0,1]$. For the bound,
+\[
+  |\varphi(u)|=\big|\E\,\E[e^{iuX_T}\mid\F^W_T]\big|\le\E\,e^{-\frac12u^2\bar\rho^2Q_T}=L(\tfrac12\bar\rho^2u^2),
+\]
+and $L(\lambda)=Ae^{-BV_0}$ is the bond price of \textcite{cox-ingersoll-ross} with short rate $\lambda V$: with
+$\gamma=\sqrt{\kappa^2+2\xi^2\lambda}$, $B=2\lambda(e^{\gamma T}-1)/\big((\gamma+\kappa)(e^{\gamma T}-1)+2\gamma\big)
+=\sqrt{2\lambda}/\xi+O(1)$ and $\ln A=-\kappa\theta T\gamma/\xi^2+O(1)=-\kappa\theta T\sqrt{2\lambda}/\xi+O(1)$.
+
+(ii) For $s>0$, $\int_\R e^{(\alpha+iv)k}(s-e^k)^+\,\dd k=s^{\alpha+1+iv}/\big((\alpha+iv)(\alpha+1+iv)\big)$, and for
+$v=0$ the integrand is nonnegative. By Tonelli, $\int c=e^{-rT}\E[S_T^{1+\alpha}]/(\alpha(\alpha+1))$, which proves the
+equivalence; then Fubini, with $\E[S_T^{1+\alpha}e^{ivX_T}]=\varphi(v-(\alpha+1)i)$ and
+$(\alpha+iv)(\alpha+1+iv)=\alpha^2+\alpha-v^2+i(2\alpha+1)v$, gives $\psi$. Since $|\psi(v)|\le\psi(0)\alpha(\alpha+1)/
+|(\alpha+iv)(\alpha+1+iv)|$ is integrable and $c$ is continuous, the inversion theorem (\textcite{rudin-rca},
+Theorem~9.11) gives $c(k)=\frac1{2\pi}\int_\R e^{-ivk}\psi(v)\,\dd v$; $c$ is real, so $\psi(-v)=\overline{\psi(v)}$
+and the integral is twice the integral of the real part over $(0,\infty)$.
+
+(iii) Let $g(y)=K(1-e^y)^+$, so $P=e^{-rT}\int gf$. The functions $\cos(\omega_k(y-a))$, $k\ge0$, are an
+orthogonal basis of $L^2[a,b]$ with squared norms $b-a$ for $k=0$ and $\frac{b-a}2$ otherwise, so Parseval's
+identity gives $\int_a^bgf=\frac{b-a}2\sum'_kA_kV_k$. Outside $[a,b]$, $gf$ vanishes for $y>b>0$ and $g\le K$.
+Next, $F_k=\frac2{b-a}\operatorname{Re}(\varphi_Y(\omega_k)e^{-i\omega_ka})=\frac2{b-a}\int_\R f(y)\cos(\omega_k(y-a))\,\dd y$,
+so $|A_k-F_k|\le\frac2{b-a}\varepsilon$, and $P_N=e^{-rT}\frac{b-a}2\sum'_{k<N}F_kV_k$. Combine. The series
+$\sum A_kV_k$ converges by Parseval, so its tail tends to $0$.
+\end{proof}
+
+Gil-Pelaez's form \eqref{eq:sv-gp} is the one \textcite{heston}, equation~(18), gives. Carr and Madan's
+transform \eqref{eq:sv-cm} is their equation~(6), \citet[Section~3.1]{carr-madan-fft}; the damping plays
+the role of $a=1+\alpha$ in the transform of the payoff of \cref{sec:bsf-fourier}, and
+\cref{thm:sv-cf}(iv) is what fixes the admissible range: $0<\alpha<a_+(T)-1$, where
+$a_+(T)=\sup\{a\ge1:\E[S_T^a]<\infty\}$. In the test case below $a_+(1)=38.50$; for $\kappa=1$, $\xi=1$,
+$\rho=0.8$, $T^*(2)=1.77$, so at $T=2$ no damping $\alpha\ge1$ is admissible, and the call payoff, whose
+square grows like $S_T^2$, has infinite variance: plain Monte Carlo then has no central limit theorem
+(\cref{thm:mc-clt}). \textcite{carr-madan-fft} suggest a quarter of the upper bound for $\alpha$.
+
+The put coefficients are explicit \citep[(20)--(25)]{fang-oosterlee}: $V_k=\frac{2K}{b-a}(\psi_k-\chi_k)$ with
+$\psi_0=-a$, $\psi_k=\sin(-\omega_ka)/\omega_k$ ($k\ge1$) and
+$\chi_k=\big(\cos(\omega_ka)-e^a+\omega_k\sin(-\omega_ka)\big)/(1+\omega_k^2)$; calls follow by parity, as
+\textcite{fang-oosterlee} recommend. In \eqref{eq:sv-cos-error} the first two terms are truncation errors, and
+$\sum|V_k|<\infty$ since $V_k=O(k^{-2})$. For the last term \textcite{fang-oosterlee}, Lemma~4.2 and~(47), state
+exponential convergence for smooth densities; strictly, the coefficients of a $C^2$ density are only
+$O(k^{-2})$, with a constant proportional to $|f'(a)|+|f'(b)|$, which is of the order of the truncation error. So
+the interval matters more than $N$.
+\textcite{fang-oosterlee} take $[c_1\pm12\sqrt{c_2}]$ for Heston, with $c_1$, $c_2$ the mean and variance of
+$Y$. We use the moments of \cref{thm:sv-cf}(iv) instead: by Chernoff's inequality $\Q(Y>b)\le e^{-pb}\E[e^{pY}]$
+and $\Q(Y<a)\le e^{pa}\E[e^{-pY}]$ wherever the moments are finite, and we take the narrowest $[a,b]$ for which
+the best bounds are below $10^{-14}$.
+
+\paragraph{Quadrature.} The integrands in (i) and (ii) have even real parts ($\varphi(-u)=\overline{\varphi(u)}$)
+and extend analytically to a strip, so the midpoint rule on $(0,\infty)$, the trapezoidal rule on $\R$,
+converges geometrically, as in \cref{sec:bsf-fourier}. With step $h$ the rule inverts the periodisation, with
+period $2\pi/h$, of the function of $k$ being recovered: for (i) the distribution of $X_T$, for (ii) the damped
+price $c$, which decays only like $e^{\alpha k}$ as $k\to-\infty$ and $e^{-(a_+-1-\alpha)k}$ as $k\to\infty$; a small
+damping needs a fine step. The truncation point is set by the decay of $\varphi$, about
+$e^{-\bar\rho(V_0+\kappa\theta T)u/\xi}$ by (i): slow for large $\xi$, short maturities and small variance, and
+lost as $|\rho|\to1$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch19-fourier}
+  \caption{(a) $\operatorname{Re}\varphi(u)$ for $S=1$, $r=y=0$, $T=10$ and the Eurostoxx parameters of
+    \textcite{fang-oosterlee}, from \eqref{eq:sv-stable} and from Heston's form, both with principal logarithms.
+    (b) Absolute error of the at-the-money put in the test case with $\rho=-0.7$ against the number of nodes $N$:
+    Gil-Pelaez and Carr--Madan ($\alpha=1.5$ and $\alpha=9.4$) with the midpoint rule on $[0,125]$, and COS on the
+    Chernoff interval $[-4.53,1.35]$. The dotted line is $10^{-8}$.}
+  \label{fig:sv-fourier}
+\end{figure}
+
+\paragraph{The laboratory.} Take the test case $S=K=100$, $T=1$, $r=1\%$, $y=2\%$ with $V_0=\theta=0.04$,
+$\kappa=2$, $\xi=0.3$ (Feller's ratio $1.78$), the parameters of \cref{ch:10-stratification}. The three methods,
+each run to convergence, give the at-the-money put
+\[
+  P=8.153429952752\quad(\rho=0),\qquad P=7.948021924422\quad(\rho=-0.7),
+\]
+and agree to $10^{-13}$: these are the prices $8.1534$ and $7.9480$ of \cref{ch:10-stratification}. In
+\cref{fig:sv-fourier}(b), Gil-Pelaez reaches $10^{-8}$ with $64$ nodes and COS with $128$ terms; Carr--Madan
+needs $384$ nodes with $\alpha=1.5$ and $64$ with $\alpha=9.4$, a quarter of $a_+(1)-1$. We also reproduce the
+Eurostoxx prices of \textcite{fang-oosterlee}, Section~5.3 ($r=y=0$): $22.318945791$ at $T=10$, to all printed
+digits, and $5.785155434$ at $T=1$, $1.6\times10^{-8}$ below their reference computed by Carr--Madan's method.
+On their interval of twelve exact standard deviations, our COS put, and the call by parity, stall at an error
+of $3.9\times10^{-5}$ at $T=1$, whatever $N$: the left tail of $Y$ is heavier than that. The call priced directly on
+the same interval converges to $8\times10^{-9}$, and their table (Section~5.3) reports errors down to $3\times10^{-7}$
+with parity, a discrepancy we cannot resolve. The Chernoff interval $[-7.40,2.56]$ removes the error for both.
+
+\demo{19-stochastic-vol.ipynb}{the characteristic function in both forms, and the three inversions for any
+damping.}
+
+\section{Simulation}\label{sec:sv-simulation}
+
+Path-dependent payoffs (\cref{ch:15-asian,ch:16-barriers}) and American options (\cref{prop:am-lsm}) need
+paths of $(S,V)$. The variance can be sampled exactly by its noncentral chi-square transitions
+(\cref{prop:sv-wellposed}(iii); \texttt{stratified.cir\_exact}), and given its path the log-price is normal
+(\cref{prop:st-mixing}), with moments determined by $Q_t$ and
+$\int_0^t\sqrt V\,\dd W=(V_t-V_0-\kappa\theta t+\kappa Q_t)/\xi$. \textcite{broadie-kaya} sample $V_T$, then $Q_T$ given
+$(V_0,V_T)$ by inverting its conditional characteristic function (built from modified Bessel functions,
+with branch issues of their own, \citealp[Section~5.3]{lord-kahl-wp}), then $S_T$: exact but slow.
+\Cref{ch:10-stratification} instead averages the Black--Scholes value given $(V_T,Q_T)$, which removes the noise
+of $W^\perp$ (\cref{thm:st-conditional}), with $Q_T$ by the trapezoidal rule on $64$ exact variance steps.
+
+Discretisation schemes are faster. Euler's scheme does not apply as it stands: its variance can become
+negative, and \cref{thm:ps-euler} does not cover $\sqrt v$, which is not Lipschitz at $0$.
+\textcite{lord-koekkoek-vandijk} write the fixes in one form, with $\tilde V_0=V_0$, step $h$ and
+$\Delta W_k\sim\mathcal N(0,h)$:
+\[
+  \tilde V_{k+1}=f_1(\tilde V_k)+\kappa\big(\theta-f_2(\tilde V_k)\big)h+\xi\sqrt{f_3(\tilde V_k)}\,\Delta W_k,\qquad V_k=f_3(\tilde V_k).
+\]
+Absorption takes $f_1=f_2=f_3=(\cdot)^+$; reflection $f_1=f_2=f_3=|\cdot|$; partial truncation $f_1=f_2=\mathrm{id}$,
+$f_3=(\cdot)^+$; and their \emph{full truncation} $f_1=\mathrm{id}$, $f_2=f_3=(\cdot)^+$: the auxiliary
+$\tilde V$ may go negative, but the drift and the diffusion only ever see $\tilde V^+$.
+
+\begin{proposition}[Full truncation]\label{prop:sv-full-truncation}
+Let $h=T/m$, $t_k=kh$, and let the full-truncation scheme for $V$ be combined with the log-Euler step
+$\ln\bar S_{k+1}=\ln\bar S_k+(r-y-\frac12V_k)h+\sqrt{V_k}\,(\rho\Delta W_k+\bar\rho\Delta W^\perp_k)$, $\bar S_0=S$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{(Exact forward.)} For every $h$, $\E[\bar S_{k+1}\mid\F_{t_k}]=e^{(r-y)h}\bar S_k$, so
+    $\E\bar S_m=F$.
+  \item \emph{(Conditioning.)} Given $W$, $\ln\bar S_m$ is normal with mean
+    $\ln S+(r-y)T-\frac12\bar Q+\rho\bar I$ and variance $\bar\rho^2\bar Q$, where $\bar Q=\sum_kV_kh$ and
+    $\bar I=\sum_k\sqrt{V_k}\Delta W_k$; the Black--Scholes value at spot $Se^{\rho\bar I-\rho^2\bar Q/2}$ and
+    volatility $\bar\rho\sqrt{\bar Q/T}$ is an unbiased estimator of the scheme's price, with no larger variance.
+  \item \emph{(Proved convergence.)} \textcite{lord-koekkoek-vandijk}, Section~3, prove that the
+    full-truncation approximation of $V$ converges strongly in $L^1$ as $h\to0$, and that Monte Carlo prices of
+    vanilla and barrier options converge for the Euler (not log-Euler) discretisation of $S$, stopped when $S$
+    or $V$ leaves a bounded set.
+  \item \emph{(Not proved.)} No rate is known in general. \textcite{cozma-reisinger}, Theorem~1.1, prove strong
+    order $\frac12$ in $L^p$ for the variance when $2\kappa\theta/\xi^2>3$ and $2\le p<2\kappa\theta/\xi^2-1$, a regime
+    that excludes every parameter set of this chapter. No weak order is proved; \textcite{lord-koekkoek-vandijk}
+    estimate it numerically, close to $1$ in their Heston test.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Given $\F_{t_k}$, $V_k$ is known and $G_k=\sqrt{V_k}(\rho\Delta W_k+\bar\rho\Delta W^\perp_k)\sim\mathcal N(0,V_kh)$,
+so $\E[e^{-V_kh/2+G_k}\mid\F_{t_k}]=1$. Iterate with the tower property.
+(ii) $V_k$ is a function of the increments of $W$ only; this is \cref{prop:st-mixing}(iv), and
+\cref{thm:st-conditional} for the variance.
+\end{proof}
+
+Full truncation preserves the forward exactly but not the law of $V$, and the error in that law near zero is
+large when Feller's condition fails badly (\cref{fig:sv-bias}(b)).
+\textcite{andersen-qe} replaces the Euler step by a draw from a law that matches the first two conditional
+moments \eqref{eq:sv-cir-moments} exactly, and the log-price step by one that uses the identity for
+$\int\sqrt V\,\dd W$ above.
+
+\begin{proposition}[The quadratic-exponential scheme]\label{prop:sv-qe}
+Fix $h>0$ and $v\ge0$, let $m$ and $s^2$ be the conditional mean and variance \eqref{eq:sv-cir-moments} of
+$V_{t+h}$ given $V_t=v$, and $\psi=s^2/m^2$. Let $Z\sim\mathcal N(0,1)$ and $U$ uniform on $(0,1)$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{(Quadratic branch.)} If $\psi\le2$, let $b^2=2\psi^{-1}-1+\sqrt{2\psi^{-1}}\sqrt{2\psi^{-1}-1}$ and
+    $a=m/(1+b^2)$. Then $a(b+Z)^2$ has mean $m$ and variance $s^2$.
+  \item \emph{(Exponential branch.)} If $\psi\ge1$, let $p=(\psi-1)/(\psi+1)\in[0,1)$ and $\beta=(1-p)/m$. Then the
+    variable equal to $0$ if $U\le p$ and to $\beta^{-1}\ln\frac{1-p}{1-U}$ otherwise has the law
+    $p\,\delta_0+(1-p)\,\mathrm{Exp}(\beta)$, mean $m$ and variance $s^2$.
+  \item \emph{(Switching.)} For any $\psi_c\in[1,2]$, the step that uses (i) when $\psi\le\psi_c$ and (ii) otherwise
+    matches the conditional mean and variance of $V_{t+h}$ exactly, from every state $v\ge0$ and for every $h$.
+  \item \emph{(Martingale correction.)} Let the log-price step be
+    \[
+      \ln\hat S_{t+h}=\ln\hat S_t+(r-y)h+K_0+K_1v+K_2\hat V_{t+h}+\sqrt{K_3v+K_4\hat V_{t+h}}\;Z_S,
+    \]
+    with $Z_S\sim\mathcal N(0,1)$ independent of the variance step, $\gamma_1=\gamma_2=\frac12$,
+    $K_1=\gamma_1h(\frac{\kappa\rho}\xi-\frac12)-\frac\rho\xi$, $K_2=\gamma_2h(\frac{\kappa\rho}\xi-\frac12)+\frac\rho\xi$,
+    $K_3=\gamma_1h\bar\rho^2$, $K_4=\gamma_2h\bar\rho^2$, and $A=K_2+\frac12K_4$. Then
+    $\E[\hat S_{t+h}\mid\hat S_t,v]=e^{(r-y)h}\hat S_t$ if and only if $K_0=-\ln M-(K_1+\frac12K_3)v$, where
+    $M=\E[e^{A\hat V_{t+h}}]$ is
+    \[
+      M=\frac{\exp\big(Ab^2a/(1-2Aa)\big)}{\sqrt{1-2Aa}}\ \text{on (i), if }Aa<\tfrac12;\qquad
+      M=p+\frac{\beta(1-p)}{\beta-A}\ \text{on (ii), if }A<\beta;
+    \]
+    and $M=\infty$ otherwise. If $\rho\le0$, then $A\le0$ and both conditions hold.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\E(b+Z)^2=1+b^2$ and $\Var(b+Z)^2=4b^2+2$, so the mean is $a(1+b^2)=m$ and the variance matches if and
+only if $x=b^2\ge0$ solves $(4x+2)/(1+x)^2=\psi$, that is $\psi x^2+(2\psi-4)x+\psi-2=0$, whose roots, real for
+$\psi\le2$, are $2\psi^{-1}-1\pm\sqrt{2\psi^{-1}}\sqrt{2\psi^{-1}-1}$; the larger is nonnegative.
+(ii) $\Q(\hat V>x)=\Q\big(U>1-(1-p)e^{-\beta x}\big)=(1-p)e^{-\beta x}$ for $x\ge0$. The mean is $(1-p)/\beta=m$; the
+second moment is $2(1-p)/\beta^2$, so the variance is $(1-p)(1+p)/\beta^2=\psi m^2$.
+(iii) follows. (iv) Given $v$ and $\hat V_{t+h}$, the log-price is normal, so
+$\E[\hat S_{t+h}\mid\hat S_t,v,\hat V_{t+h}]=\hat S_te^{(r-y)h}\exp\big(K_0+(K_1+\frac12K_3)v+A\hat V_{t+h}\big)$; take
+the expectation over $\hat V_{t+h}$. On (i), the Gaussian integral
+$\E e^{\lambda(b+Z)^2}=(1-2\lambda)^{-1/2}e^{\lambda b^2/(1-2\lambda)}$ for $\lambda<\frac12$ (and $\infty$ otherwise), with
+$\lambda=Aa$; on (ii), $\E e^{A\hat V}=p+(1-p)\beta/(\beta-A)$ for $A<\beta$. Finally
+$A=\frac\rho\xi(1+\kappa\gamma_2h)-\frac12\gamma_2h\rho^2\le0$ for $\rho\le0$, while $a>0$ and $\beta>0$.
+\end{proof}
+
+The $K_j$ come from the exact identity
+$\ln S_{t+h}=\ln S_t+(r-y)h-\frac12\int V+\frac\rho\xi\big(V_{t+h}-V_t-\kappa\theta h+\kappa\int V\big)+\bar\rho\int\sqrt V\,\dd W^\perp$
+with $\int_t^{t+h}V\approx h(\gamma_1V_t+\gamma_2V_{t+h})$; uncorrected, $K_0=-\rho\kappa\theta h/\xi$ (\textcite{andersen-qe},
+Sections~3.2 and~4.3 of the preprint, with $\psi_c=1.5$). Proved are moment matching and the exact forward; the third
+moment of $V$ and the joint law of $(V_{t+h},\int V)$ are not matched. Andersen proves weak consistency (preprint,
+Section~4.4, Proposition~10); beyond that no convergence theorem for the scheme is known to us.
+For $\rho>0$ and long steps (iv) can fail: then $\E\hat S_{t+h}=\infty$ after one step. Given the variance path the
+QE log-price is normal, so the conditioning of \cref{prop:sv-full-truncation}(ii) applies too.
+
+\paragraph{The bias in the laboratory.} \Cref{fig:sv-bias} measures the bias of the at-the-money put against
+its Fourier price for $h=1,\frac12,\dots,\frac1{32}$. Each run uses the conditional estimator, which has the
+scheme's mean, with the forward $\E[\bar S_m\mid W]e^{-(r-y)T}$, of mean $S$ by
+\cref{prop:sv-full-truncation}(i) and \cref{prop:sv-qe}(iv), as a control variate with an estimated
+coefficient (\cref{thm:cv-optimal}; its $O(1/n)$ bias, \cref{prop:cv-estimated-beta}, is negligible); together they
+cut the standard error of the plain payoff by a factor of about five. Our implementation (numpy
+\texttt{default\_rng}, seeds $[19,i,j]$ for step $i$ and scheme $j$) uses $2^{19}$ paths in the test case and
+$2^{18}$ in the second case. In the test case ($\rho=-0.7$, reference $7.948022$, standard errors about $0.003$),
+full truncation is biased by $0.397$, $0.305$, $0.085$, $0.025$, $0.011$ and $0.003$, a decay of at least
+order one from $h=\frac14$ on, while QE is off by $0.020$ at $h=1$ and by at most $0.011$ at smaller steps. With
+the parameters of \textcite{andersen-qe}'s Case~I ($V_0=\theta=0.04$, $\kappa=0.5$, $\xi=1$, $\rho=-0.9$, Feller's ratio
+$0.04$; here with $T=1$ and the test-case $r$, $y$; reference $4.576954$), full truncation is still $0.54$ too
+high at $h=\frac1{32}$, $12\%$ of the price, while QE's bias is $0.094$ at $h=1$, $-0.021$ at $h=\frac14$ and
+$-0.001$ at $h=\frac1{32}$: there QE at the coarsest step beats full truncation at the finest. Multilevel
+estimators also need coupled fine and coarse paths (\cref{prop:ml-variance-decay}), immediate for Euler but not
+for QE.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch19-bias}
+  \caption{Absolute bias of the at-the-money put ($S=K=100$, $T=1$, $r=1\%$, $y=2\%$) against the time step $h$,
+    for full truncation (log-Euler for $S$) and QE with the martingale correction, against the Fourier price.
+    (a) Test case, $\rho=-0.7$, $2^{19}$ paths per point. (b) $V_0=\theta=0.04$, $\kappa=0.5$, $\xi=1$, $\rho=-0.9$,
+    $2^{18}$ paths per point. Open markers: $|\text{bias}|$ below twice its standard error. Dotted: twice the
+    standard error of the QE estimates. Dashed: slope one.}
+  \label{fig:sv-bias}
+\end{figure}
+
+\section{Smiles}\label{sec:sv-smiles}
+
+\Cref{fig:sv-smiles} inverts Heston prices into Black--Scholes implied volatilities
+(\cref{prop:bsf-implied-vol}) at $T=1$. The correlation sets the skew: $\rho<0$ gives the downward-sloping
+equity smile, $\rho>0$ its mirror image, and $\rho=0$ a smile with its minimum near the money. The volatility of
+variance $\xi$ sets the curvature and, with $\rho\ne0$, amplifies the skew. Mean reversion $\kappa$ damps both:
+over a maturity of a few $1/\kappa$ the variance forgets its starting point, its integrated value $Q_T$
+concentrates, and the smile flattens. For short maturities a small-time expansion gives the at-the-money skew
+$\partial\sigma_{\mathrm{imp}}/\partial\ln K\to\rho\xi/(4\sqrt{V_0})$ \citep[Chapter~3]{gatheral-volatility-surface};
+we use it only as a heuristic, and in the test case with $\rho=-0.7$ it predicts $-0.2625$, while finite
+differences of Fourier prices give $-0.261$ at $T=0.01$ and $-0.146$ at $T=1$.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{ch19-smiles}
+  \caption{Implied volatility of Heston prices against the strike, $T=1$, test-case $S$, $r$, $y$, $V_0=\theta=0.04$;
+    out-of-the-money options. Base parameters $\kappa=2$, $\xi=0.3$, $\rho=-0.7$; each panel varies one of them.
+    (a) $\rho\in\{-0.7,0,0.7\}$; (b) $\xi\in\{0.1,0.3,0.6\}$; (c) $\kappa\in\{0.5,2,8\}$. Dotted: $\sqrt{V_0}=20\%$.}
+  \label{fig:sv-smiles}
+\end{figure}
+
+Calibration reverses the map by least squares on implied volatilities. Identification is the hard part: at one
+maturity $V_0$, $\kappa$ and $\theta$ enter mostly through the expected integrated variance, and $\kappa$ and $\xi$ trade
+off in the curvature (\exref{ex:sv-calibration}); fits often violate Feller's condition (\cref{fig:sv-bias}(b)).
+
+\demo{19-stochastic-vol.ipynb}{smiles for any parameters, and both schemes for any step.}
+
+\begin{incode}
+\coderef{code/src/mfe230d/heston.py}: \texttt{charfn}, \texttt{moment\_bound} (\cref{thm:sv-cf}); \texttt{price} and the
+three inversions (\cref{prop:sv-fourier}); \texttt{qe\_step}, \texttt{simulate}, \texttt{bias\_study}.
+\end{incode}
+
+\furtherreading
+\textcite{gatheral-volatility-surface}, Chapters~2 and~3, treats the model and its implied volatility surface.

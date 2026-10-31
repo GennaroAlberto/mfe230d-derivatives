@@ -1,0 +1,696 @@
+% Chapter 11: Quasi-Monte Carlo.
+\providecommand{\Corr}{\operatorname{Corr}}
+
+Monte Carlo integrates with random points, and its error $\sigma/\sqrt n$ (\cref{thm:mc-clt})
+is the price of that randomness: independent points leave gaps and clusters by chance.
+\emph{Quasi-Monte Carlo} (QMC) replaces them by deterministic points built to fill the unit
+cube as evenly as possible. For integrands that are smooth enough, the error then decreases
+almost like $1/n$ instead of $1/\sqrt n$, in any fixed dimension. The catch lies in ``smooth
+enough'' and ``fixed dimension'': option payoffs have kinks and jumps, the map from
+uniforms to normals is unbounded, and a path has as many dimensions as it has dates. This
+chapter separates what is proved from what is observed, and measures the rest.
+
+\Cref{sec:qmc-discrepancy} measures evenness by the discrepancy and bounds the error by the
+Koksma--Hlawka inequality. \Cref{sec:qmc-sequences} builds the classical low-discrepancy
+sequences of van der Corput, Halton and Sobol'. \Cref{sec:qmc-rqmc} randomises them, which
+restores unbiasedness and the error estimates of \cref{ch:06-monte-carlo}.
+\Cref{sec:qmc-effective} explains, through the effective dimension, why the Brownian-bridge
+and principal-component constructions of \cref{ch:07-path-simulation} make QMC so effective
+for Asian options.
+
+Throughout, $\lambda$ is the volume (Lebesgue measure) on $[0,1)^d$,
+$I(F)=\int_{[0,1)^d}F(u)\,\dd u$, and for points $P=(x_1,\dots,x_n)$ of $[0,1)^d$
+(repetitions allowed), $Q_P(F)=\frac1n\sum_{i=1}^nF(x_i)$ is the equal-weight rule. We write
+$D=\{1,\dots,d\}$; for $u\subseteq D$, $x_u=(x_j)_{j\in u}$, and $(x_u{:}1)$ is the point whose
+$j$-th coordinate is $x_j$ for $j\in u$ and $1$ for $j\notin u$.
+
+\section{Discrepancy and the Koksma--Hlawka inequality}\label{sec:qmc-discrepancy}
+
+Let $Z\sim\mathcal N(0,I_d)$ and let $f(Z)$ be a discounted payoff, with one coordinate per
+date or per asset. If $U$ is uniform on $(0,1)^d$, the vector
+$N^{-1}(U)=(N^{-1}(U_1),\dots,N^{-1}(U_d))$ has independent standard normal coordinates
+(\cref{prop:rng-inversion}), so
+\begin{equation}\label{eq:qmc-cube}
+  \E[f(Z)]=\int_{(0,1)^d}F(u)\,\dd u,\qquad F=f\circ N^{-1}.
+\end{equation}
+Monte Carlo evaluates $Q_P(F)$ at independent uniform points; QMC chooses the points. The
+dimension $d$ is the number of uniforms that one sample consumes, so it must be fixed:
+samplers that consume a random number of uniforms, such as rejection, are excluded. The map
+from uniforms to normals should also be monotone in each coordinate, as inversion is, so that
+evenly spread uniforms give evenly spread normals.
+
+\begin{definition}[Discrepancy]\label{def:qmc-discrepancy}
+Let $P=(x_1,\dots,x_n)$ be points of $[0,1)^d$. For $a\in[0,1]^d$, let
+$A_P(a)=\#\{i:x_i\in[0,a)\}$ count the points in the anchored box
+$[0,a)=\prod_{j=1}^d[0,a_j)$, and let
+\[
+  \delta_P(a)=\frac{A_P(a)}{n}-\lambda\big([0,a)\big)=\frac{A_P(a)}{n}-\prod_{j=1}^da_j
+\]
+be the \emph{local discrepancy}. The \emph{star discrepancy} of $P$ is
+$D^*_n(P)=\sup_{a\in[0,1]^d}|\delta_P(a)|$. For an infinite sequence, $D^*_n$ is the star
+discrepancy of its first $n$ points. The sequence is \emph{uniformly distributed} if
+$D^*_n\to0$, and it is a \emph{low-discrepancy sequence} if $D^*_n=O\big((\log n)^d/n\big)$.
+\end{definition}
+
+The local discrepancy is the integration error of $Q_P$ on the indicator of a box:
+$\delta_P(a)=Q_P(\1_{[0,a)})-I(\1_{[0,a)})$. In one dimension,
+$D^*_n(P)=\sup_x|\hat F_n(x)-x|$ is the Kolmogorov--Smirnov distance between the empirical
+distribution function $\hat F_n$ of the points and the uniform law, the statistic of the test
+used in \cref{ch:05-random-numbers}; for independent uniform points $\sqrt n\,D^*_n$ converges
+in law to Kolmogorov's distribution (\citealp{knuth-taocp2}, Section~3.3.1.B), so random points
+have discrepancy of order $n^{-1/2}$.
+No point set does better than order $1/n$: in one dimension $D^*_n\ge\frac1{2n}$
+(\exref{ex:qmc-one-dim}), and in dimension $d\ge2$ every set of $n$ points has
+$D^*_n\ge c_d(\log n)^{(d-1)/2}/n$ for a constant $c_d>0$ \citep{roth-1954}. For infinite
+sequences in $[0,1)$, $nD^*_n\ge c\log n$ for infinitely many $n$ \citep{schmidt-1972}.
+
+\subsection*{Variation and the error bound}
+
+The error bound needs a notion of variation. Call $f:[0,1]^d\to\R$ \emph{smooth} if all its
+mixed partial derivatives $\partial^uf=\partial^{|u|}f/\prod_{j\in u}\partial x_j$,
+$u\subseteq D$, exist and are continuous on the closed cube. For smooth $f$, the
+\emph{variation in the sense of Hardy and Krause} is
+\begin{equation}\label{eq:qmc-vhk}
+  V_{HK}(f)=\sum_{\emptyset\ne u\subseteq D}\int_{[0,1]^{|u|}}\big|\partial^uf(a_u{:}1)\big|\,\dd a_u ,
+\end{equation}
+one term per face of the cube that contains the corner $(1,\dots,1)$. In one dimension it is
+the total variation $\int_0^1|f'|$. The general definition, through sums of alternating
+differences over grids, agrees with \eqref{eq:qmc-vhk} for smooth $f$ \citep{owen-2005}.
+
+\begin{lemma}[Expansion from the corner]\label{lem:qmc-expansion}
+If $f$ is smooth, then for every $x\in[0,1]^d$
+\begin{equation}\label{eq:qmc-expansion}
+  f(x)=\sum_{u\subseteq D}(-1)^{|u|}\int_{[0,1]^{|u|}}\1\{x_u<a_u\}\,\partial^uf(a_u{:}1)\,\dd a_u,
+\end{equation}
+where $\1\{x_u<a_u\}=\prod_{j\in u}\1\{x_j<a_j\}$ and the term $u=\emptyset$ is
+$f(1,\dots,1)$. In particular $|f(x)-f(1,\dots,1)|\le V_{HK}(f)$.
+\end{lemma}
+
+\begin{proof}
+For a function $g$ of one variable with a continuous derivative,
+$g(x)=g(1)-\int_x^1g'(a)\,\dd a=g(1)-\int_0^1\1\{x<a\}\,g'(a)\,\dd a$. Apply this in $x_1$
+to $f$, with the other coordinates fixed. Each of the two resulting terms is a function of
+$x_2,\dots,x_d$ (integrated against $a_1$ in the second term) whose partial derivative in $x_2$
+is continuous; apply the identity in $x_2$ to it, under the integral sign, and so on. After
+the $d$-th step, each coordinate $j$ has either been set to $1$ or replaced by
+$-\int_0^1\1\{x_j<a_j\}(\cdot)\,\dd a_j$ with one more derivative $\partial_j$, which is
+\eqref{eq:qmc-expansion}. All integrands are continuous on compact sets, so the iterated
+integrals are integrals over $[0,1]^{|u|}$ (Fubini). The bound follows by taking absolute
+values in the terms $u\ne\emptyset$.
+\end{proof}
+
+\begin{theorem}[Koksma--Hlawka]\label{thm:qmc-koksma-hlawka}
+Let $f:[0,1]^d\to\R$ have bounded variation $V_{HK}(f)$ in the sense of Hardy and Krause.
+For all points $P=(x_1,\dots,x_n)$ of $[0,1)^d$,
+\begin{equation}\label{eq:qmc-kh}
+  \big|Q_P(f)-I(f)\big|\le V_{HK}(f)\,D^*_n(P).
+\end{equation}
+If $f$ is smooth, the error has the exact representation
+\begin{equation}\label{eq:qmc-zaremba}
+  Q_P(f)-I(f)=\sum_{\emptyset\ne u\subseteq D}(-1)^{|u|}\int_{[0,1]^{|u|}}
+  \delta_P(a_u{:}1)\,\partial^uf(a_u{:}1)\,\dd a_u .
+\end{equation}
+\end{theorem}
+
+The inequality is due to Koksma for $d=1$ and to Hlawka in general; see
+\textcite{niederreiter-qmc}, Chapter~2. We prove it for smooth $f$,
+which shows where the variation comes from.
+
+\begin{proof}[Proof for smooth $f$]
+Average \eqref{eq:qmc-expansion} over the points, and integrate it over $x$. For
+$j\notin u$ the points satisfy $x_{ij}<1$, so $\frac1n\sum_i\1\{x_{i,u}<a_u\}=A_P(a_u{:}1)/n$,
+while $\int\1\{x_u<a_u\}\,\dd x=\prod_{j\in u}a_j=\lambda([0,(a_u{:}1)))$. The terms $u=\emptyset$
+cancel, and the difference of the other terms is \eqref{eq:qmc-zaremba} (the sums are
+finite and the integrands bounded, so averaging commutes with the integrals). Each
+$[0,(a_u{:}1))$ is an anchored box, so $|\delta_P(a_u{:}1)|\le D^*_n(P)$, and
+\eqref{eq:qmc-kh} follows with $V_{HK}(f)$ given by \eqref{eq:qmc-vhk}.
+\end{proof}
+
+The bound separates the integrand from the points: the variation measures the integrand,
+the discrepancy the points. In one dimension it cannot be improved: the indicator
+$\1_{[0,a)}$ has variation $1$ and error $\delta_P(a)$, whose supremum over $a$ is
+$D^*_n(P)$.
+
+\begin{remark}[What the inequality says about option payoffs]\label{rem:qmc-payoffs}
+Very little, for three reasons.
+\begin{enumerate}[label=(\alph*)]
+  \item A function of bounded Hardy--Krause variation is bounded: \cref{lem:qmc-expansion}
+    gives $|f(x)-f(1,\dots,1)|\le V_{HK}(f)$ for smooth $f$, and the same inclusion--exclusion
+    argument, with differences in place of integrals, gives it in general. The integrand
+    $F=f\circ N^{-1}$ of \eqref{eq:qmc-cube} is unbounded as soon as the payoff is unbounded
+    in $Z$ (the stock, a call, an Asian call), so $V_{HK}(F)=\infty$ and \eqref{eq:qmc-kh}
+    is empty.
+  \item Bounded payoffs are not safe either. For a hyperplane $a\cdot x=c$ that cuts the cube,
+    a jump $\1\{a\cdot x>c\}$ has finite variation if only one $a_j$ is nonzero (a digital in
+    one coordinate has variation $1$) and infinite variation as soon as two are; a kink
+    $(a\cdot x-c)^+$ has finite variation if at most two $a_j$ are nonzero (its mixed differences
+    in those two coordinates have the constant sign of their product and telescope) and infinite
+    variation as soon as three are \citep{owen-2005}; the cases $\1\{x_1+x_2\le1\}$,
+    $(x_1+x_2-1)^+$ and $(x_1+x_2+x_3-1)^+$ are \exref{ex:qmc-variation}. A digital on an average of two
+    or more dates, or a put on an average of three or more, jumps or kinks across a curved surface
+    of this kind after the map $N^{-1}$. A put on the average of two dates has infinite variation
+    too, but because of $N^{-1}$ itself: with $u_j=N(z_j)$, the term $u=\{1,2\}$ of
+    \eqref{eq:qmc-vhk} becomes $\int|\partial_{z_1}\partial_{z_2}f|\,\dd z_1\dd z_2$ with Lebesgue
+    measure on $\R^2$, which diverges as $z_1\to-\infty$.
+  \item Even for smooth integrands the bound is hard to use: $V_{HK}$ involves $2^d-1$
+    integrals of mixed derivatives, computing $D^*_n$ exactly is infeasible beyond small $n$
+    and $d$, and $(\log n)^d/n$ falls below $n^{-1/2}$ only when $n^{1/2}>(\log n)^d$, which
+    for $d=10$ and $n\ge3$ means $n>10^{39}$.
+\end{enumerate}
+\end{remark}
+
+What does follow without any variation is convergence.
+
+\begin{proposition}[Convergence without a rate]\label{prop:qmc-riemann}
+Let $x_1,x_2,\dots$ be uniformly distributed in $[0,1)^d$, and let $F:[0,1)^d\to\R$ be Riemann
+integrable: for every $\varepsilon>0$ there are step functions $g\le F\le h$ (finite linear
+combinations of indicators of boxes $[a,b)\subseteq[0,1)^d$) with $I(h-g)\le\varepsilon$. Then $Q_n(F)\to I(F)$,
+where $Q_n$ uses the first $n$ points.
+\end{proposition}
+
+\begin{proof}
+A box $B=[a,b)\subseteq[0,1)^d$ is a signed combination of $2^d$ anchored boxes, by
+inclusion--exclusion: $\1_B=\sum_{v\subseteq D}(-1)^{|v|}\1_{[0,c^v)}$ with $c^v_j=a_j$ for
+$j\in v$ and $c^v_j=b_j$ otherwise. Hence $|Q_n(\1_B)-\lambda(B)|\le2^dD^*_n\to0$, and
+$Q_n(g)\to I(g)$ for every step function $g$. With $g\le F\le h$ as in the statement,
+$\limsup_nQ_n(F)\le\lim_nQ_n(h)=I(h)\le I(F)+\varepsilon$ and likewise
+$\liminf_nQ_n(F)\ge I(F)-\varepsilon$. Let $\varepsilon\downarrow0$.
+\end{proof}
+
+A bounded payoff whose discontinuities lie on a smooth surface, such as a digital on an
+average after the map $N^{-1}$, is Riemann integrable: on a fine grid, the cells that meet the
+closure of the surface have small total volume, and on the others the oscillation of $F$ is
+small. So QMC converges for it, at a rate that no theorem gives.
+For an unbounded $F\ge0$, uniform distribution alone does not even give convergence: replacing
+the points of indices $n=2^k$ by points so close to a point where $F$ is unbounded that
+$F(x_n)\ge n^2$ changes $D^*_n$ by
+at most $(\log_2n+1)/n$, but makes $Q_n(F)\ge n$ along $n=2^k$. In one dimension a truncation argument
+recovers a rate for monotone integrands (\exref{ex:qmc-unbounded}), and
+\textcite{owen-2006} gives conditions on the growth of the mixed derivatives near the boundary
+of the cube under which QMC keeps a rate close to $1/n$; they require mixed derivatives,
+which kinked payoffs do not have. Randomised QMC (\cref{sec:qmc-rqmc}) needs only
+$F\in L^2$.
+
+\section{Low-discrepancy sequences}\label{sec:qmc-sequences}
+
+\subsection{Van der Corput and Halton}
+
+Let $b\ge2$ be an integer. Every integer $i\ge0$ has a unique expansion
+$i=\sum_{k\ge0}a_k(i)\,b^k$ with digits $a_k(i)\in\{0,\dots,b-1\}$, finitely many of them
+nonzero. The \emph{radical inverse} mirrors the digits at the radix point,
+\[
+  \phi_b(i)=\sum_{k\ge0}a_k(i)\,b^{-k-1}\in[0,1),
+\]
+and the \emph{van der Corput sequence} in base $b$ is $\phi_b(0)$, $\phi_b(1)$,
+$\phi_b(2),\dots$; in base $2$ it starts $0$, $\frac12$, $\frac14$, $\frac34$, $\frac18$,
+$\frac58$, $\frac38$, $\frac78$. The
+\emph{Halton sequence} \citep{halton-1960} uses one base per coordinate,
+$x_i=\big(\phi_{b_1}(i),\dots,\phi_{b_d}(i)\big)$, with pairwise coprime bases, usually the
+first $d$ primes.
+
+\begin{proposition}[Van der Corput and Halton]\label{prop:qmc-van-der-corput}
+Let $b\ge2$.
+\begin{enumerate}[label=(\roman*)]
+  \item For every $k\ge0$, any $b^k$ consecutive points $\phi_b(i)$, $j\le i<j+b^k$, lie one
+    in each interval $[l\,b^{-k},(l+1)\,b^{-k})$, $0\le l<b^k$. The first $b^k$ points are
+    exactly the multiples of $b^{-k}$.
+  \item For every $n\ge1$, the first $n$ points of the van der Corput sequence satisfy
+    \[
+      D^*_n\le\frac{(b-1)\big(\lfloor\log_bn\rfloor+1\big)}{n},
+    \]
+    and $D^*_n=1/n$ when $n$ is a power of $b$.
+  \item Let $b_1,\dots,b_d$ be pairwise coprime and $k_1,\dots,k_d\ge0$. Any
+    $B=\prod_jb_j^{k_j}$ consecutive points of the Halton sequence lie one in each box
+    $\prod_j\big[l_jb_j^{-k_j},(l_j+1)b_j^{-k_j}\big)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) The tail $\sum_{r\ge k}a_r(i)b^{-r-1}$ is smaller than $\sum_{r\ge k}(b-1)b^{-r-1}=b^{-k}$,
+because the digits of an integer are eventually $0$. Hence the interval that contains
+$\phi_b(i)$ has index $\lfloor b^k\phi_b(i)\rfloor=\sum_{r<k}a_r(i)\,b^{k-1-r}$: the first $k$
+digits of $i$ in reverse order. It depends on $i$ only through $i\bmod b^k=\sum_{r<k}a_r(i)b^r$,
+and digit reversal is a bijection of $\{0,\dots,b^k-1\}$. Consecutive integers $j,\dots,j+b^k-1$
+take every residue modulo $b^k$ once. For $i<b^k$ the tail vanishes, so $\phi_b(i)=l\,b^{-k}$.
+
+(ii) Let $K=\lfloor\log_bn\rfloor$ and $n=\sum_{k=0}^Kc_kb^k$ in base $b$. Split the indices
+$0,\dots,n-1$ into consecutive blocks: $c_K$ blocks of length $b^K$, then $c_{K-1}$ of length
+$b^{K-1}$, and so on down to $c_0$ blocks of length $1$; there are
+$\sum_kc_k\le(b-1)(K+1)$ blocks. Fix $a\in[0,1]$ and a block of length $b^k$. By (i) it has
+one point in each interval of length $b^{-k}$; $[0,a)$ contains the
+$\lfloor ab^k\rfloor$ intervals to the left of $a$ and meets at most one more, so the block puts
+$\lfloor ab^k\rfloor$ or $\lfloor ab^k\rfloor+1$ points in $[0,a)$, which differs from
+$ab^k$ by less than $1$. Summing over blocks, $|A_P(a)-na|<(b-1)(K+1)$; divide by $n$. When
+$n=b^k$ the points are $l/n$, $A_P(a)=\lceil an\rceil$, and $\delta_P(a)=(\lceil an\rceil-an)/n$
+takes values in $[0,1/n)$ with supremum $1/n$.
+
+(iii) By (i), the box that contains $x_i$ is determined by the residues $i\bmod b_j^{k_j}$,
+$j=1,\dots,d$, through digit reversals, which are bijections. The moduli $b_j^{k_j}$ are pairwise
+coprime, so by the Chinese remainder theorem $i\bmod B\mapsto(i\bmod b_j^{k_j})_{j\le d}$ is a
+bijection. $B$ consecutive integers take every residue modulo $B$ once.
+\end{proof}
+
+Part (ii) is of the best possible order for a sequence in one dimension, by Schmidt's
+theorem; sharper constants are in \textcite{niederreiter-qmc}, Chapter~3. In base $2$, the
+largest value of $nD^*_n$ for $n\le4096$ is $4.78$, at $n=3413$, where (ii) allows $12$. Part
+(iii), with the decomposition into blocks of (ii) in each coordinate, gives the bound
+\[
+  D^*_n<\frac dn+\frac1n\prod_{j=1}^d\Big(\frac{b_j-1}{2\log b_j}\log n+\frac{b_j+1}{2}\Big)
+\]
+for the Halton sequence \citep[Chapter~3]{niederreiter-qmc}: a low-discrepancy sequence,
+but with a constant $\prod_j(b_j-1)/(2\log b_j)$ that grows superexponentially in $d$ when the
+$b_j$ are the first $d$ primes. The reason is
+visible in the coordinates with large bases. For $i<b$, $\phi_b(i)=i/b$: the coordinate
+creeps up in $b$ equal steps. Two coordinates with nearby large bases creep up together, and
+the first points of their projection lie on a few lines (\cref{fig:qmc-points}, right;
+\exref{ex:qmc-halton-lines}). Randomly permuting the digits in each base, as the scramble of
+\cref{sec:qmc-rqmc} does in base $2$, breaks the lines; shifting the points does not.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch11-points}
+  \caption{The first $256$ points of four sequences, projected on two coordinates.
+    Pseudo-random points (numpy \texttt{default\_rng}, seed $0$) leave gaps and clusters. The
+    Halton points in bases $2$ and $3$ and the Sobol' points in coordinates $1$ and $2$ fill
+    the square evenly; the grey grid shows that each of the $16\times16$ squares of side
+    $\frac1{16}$ holds exactly one Sobol' point. The Halton coordinates $15$ and $16$, with bases
+    $47$ and $53$, lie on a few parallel lines.}
+  \label{fig:qmc-points}
+\end{figure}
+
+\subsection{Nets and the Sobol' sequence}
+
+Uniformity in all coordinates at once is easiest to organise in a single base. The
+following notions are due to Sobol' and, in this generality, to Niederreiter
+\citep[Chapter~4]{niederreiter-qmc}.
+
+\begin{definition}[Nets and $(t,d)$-sequences]\label{def:qmc-net}
+Let $b\ge2$ and $0\le t\le m$ be integers. An \emph{elementary interval} in base $b$ is a box
+$E=\prod_{j=1}^d\big[l_jb^{-k_j},(l_j+1)b^{-k_j}\big)$ with integers $k_j\ge0$ and
+$0\le l_j<b^{k_j}$; its volume is $b^{-\sum_jk_j}$. A \emph{$(t,m,d)$-net} in base $b$ is a set of
+$n=b^m$ points of $[0,1)^d$ such that every elementary interval of volume $b^{t-m}$ contains
+exactly $b^t$ points. A sequence $x_0,x_1,\dots$ is a \emph{$(t,d)$-sequence} in base $b$ if,
+for every $m\ge t$ and $q\ge0$, the points $x_i$ with $qb^m\le i<(q+1)b^m$ form a
+$(t,m,d)$-net.
+\end{definition}
+
+A net with $t=0$ is balanced in every elementary interval of volume $1/n$: every square of
+side $\frac1{16}$ in \cref{fig:qmc-points}, but also every rectangle of $\frac12\times\frac1{128}$
+or $\frac1{256}\times1$. By \cref{prop:qmc-van-der-corput}(i), the van der Corput sequence in
+base $b$ is a $(0,1)$-sequence in base $b$.
+
+\begin{definition}[Sobol' sequence]\label{def:qmc-sobol}
+For each coordinate $j\ge2$, take a primitive polynomial over the field $\mathbb F_2$ of
+degree $s=s_j$, $p_j(z)=z^s+c_1z^{s-1}+\dots+c_{s-1}z+1$, a different one for each coordinate,
+and odd integers $m_1,\dots,m_s$
+with $m_k<2^k$. Extend them by
+\[
+  m_k=2c_1m_{k-1}\oplus2^2c_2m_{k-2}\oplus\dots\oplus2^{s-1}c_{s-1}m_{k-s+1}\oplus2^sm_{k-s}
+  \oplus m_{k-s},\qquad k>s,
+\]
+where $\oplus$ is the bitwise exclusive or of binary expansions, and define the
+\emph{direction numbers} $v_{k,j}=m_k/2^k$. For coordinate $1$, $s_1=1$ and $m_k=1$ for all $k$.
+The $i$-th point of the \emph{Sobol' sequence}, for $i=\sum_{k\ge1}i_k2^{k-1}$ with bits
+$i_k\in\{0,1\}$, has coordinates
+\[
+  x_{i,j}=i_1v_{1,j}\oplus i_2v_{2,j}\oplus i_3v_{3,j}\oplus\cdots,\qquad j=1,\dots,d.
+\]
+\end{definition}
+
+The recursion keeps every $m_k$ odd and smaller than $2^k$: the term $m_{k-s}$ is odd, all
+the others are even, and each is smaller than $2^k$. Coordinate $1$ is the van der Corput
+sequence in base $2$, since $x_{i,1}=\sum_ki_k2^{-k}=\phi_2(i)$. The construction is due to
+\textcite{sobol-1967}; its quality depends on the choice of the initial numbers $m_k$. We use
+those of \textcite{joe-kuo-2008}, chosen to improve the two-dimensional projections, for the
+first $128$ coordinates (see also \textcite{glasserman-mc}, Section~5.2.3).
+
+\begin{proposition}[Sobol' points form digital nets]\label{prop:qmc-digital-net}
+Fix $m\ge1$, and for each coordinate $j$ let $C_j$ be the $m\times m$ matrix over
+$\mathbb F_2$ whose $k$-th column holds the first $m$ binary digits of $v_{k,j}$.
+\begin{enumerate}[label=(\roman*)]
+  \item For $0\le i<2^m$, $x_{i,j}$ has at most $m$ binary digits, and they are
+    $C_j(i_1,\dots,i_m)^\top$ (arithmetic modulo $2$). Each $C_j$ is upper triangular with
+    ones on the diagonal. Consequently, in every block $q2^m\le i<(q+1)2^m$, each coordinate
+    has one point in each interval $[l2^{-m},(l+1)2^{-m})$.
+  \item Every block $q2^m\le i<(q+1)2^m$ is a $(t,m,d)$-net in base $2$ if and only if, for every
+    $(k_1,\dots,k_d)$ with $k_j\ge0$ and $\sum_jk_j=m-t$, the first $k_1$ rows of $C_1$, the first
+    $k_2$ rows of $C_2$, \dots, and the first $k_d$ rows of $C_d$ are linearly independent over
+    $\mathbb F_2$.
+  \item If the polynomials $p_j$ are distinct, the Sobol' sequence is a $(t,d)$-sequence in base
+    $2$ with $t\le\sum_{j=1}^d(s_j-1)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) The bitwise exclusive or adds binary digits modulo $2$ without carries, so digit $r$ of
+$x_{i,j}$ is $\sum_ki_k\,(\text{digit $r$ of }v_{k,j})$ modulo $2$. Since $m_k$ is odd and
+$m_k<2^k$, the digits of $v_{k,j}=m_k/2^k$ beyond the $k$-th are $0$ and the $k$-th is $1$:
+column $k$ of $C_j$ vanishes below row $k$ and has a $1$ in row $k$. For $i<2^m$ only
+$i_1,\dots,i_m$ can be nonzero, which gives the first claim. In the block of index $q$, write
+$i=i'+q2^m$ with $i'<2^m$; the bits of $q2^m$ contribute the same vector $e_j$ to the first $m$
+digits of every point, so those digits are $C_j(i'_1,\dots,i'_m)^\top+e_j$. As $i'$ runs over
+$\{0,\dots,2^m-1\}$, this runs over all $2^m$ digit strings, because $C_j$ is invertible.
+
+(ii) A point lies in the elementary interval with parameters $(k_j,l_j)$ if and only if, for
+each $j$, the first $k_j$ digits of its $j$-th coordinate are the $k_j$ digits of $l_j$. By (i)
+this is a system of $\sum_jk_j=m-t$ linear equations over $\mathbb F_2$ in the $m$ unknown bits of
+$i'$, whose matrix $M$ stacks the first $k_j$ rows of each $C_j$, and whose right-hand side is the
+vector of digits of the $l_j$ minus the shift of (i); as the $l_j$ vary, it runs over all of
+$\mathbb F_2^{m-t}$. If the rows of $M$ are independent, $M$ is onto and every system has exactly
+$2^{m-(m-t)}=2^t$ solutions. If they are dependent, $M$ is not onto, so some right-hand side has no
+solution: some elementary interval of volume $2^{t-m}$ is empty, and the block is not a
+$(t,m,d)$-net.
+
+(iii) is due to \textcite{sobol-1967}; see \textcite{dick-pillichshammer}, Chapter~8.
+\end{proof}
+
+By (ii), the exact $t$-value of the first $2^m$ points is the smallest $t$ that passes the rank
+test, which the code computes by Gaussian elimination over $\mathbb F_2$ and checks by counting
+points in every elementary interval. For the first $2^{10}$ points, the
+first $2$, $3$, $5$ and $8$ coordinates have $t=0$, $1$, $3$ and $5$, against the bounds $0$, $1$,
+$5$ and $15$ of (iii). Nets have low discrepancy: for a $(t,m,d)$-net in base $b$,
+$D^*_n\le C_{d,b}\,b^t(\log n)^{d-1}/n+O\big(b^t(\log n)^{d-2}/n\big)$, and for the first $n$ points
+of a $(t,d)$-sequence, for every $n\ge2$,
+$D^*_n\le C'_{d,b}\,b^t(\log n)^d/n+O\big(b^t(\log n)^{d-1}/n\big)$
+\citep[Chapter~4; Theorem~4.17 for sequences]{niederreiter-qmc}. In two dimensions the star discrepancy can be
+computed exactly, and at $n=2048$ it is $0.020$ for pseudo-random points, $0.0037$ for Halton and
+$0.0024$ for Sobol' (\cref{fig:qmc-convergence}, left).
+
+\begin{remark}[The origin, and $n$ not a power of two]\label{rem:qmc-origin}
+Both sequences start at $x_0=0$, which $N^{-1}$ sends to $-\infty$. A deterministic run with
+the normal map must drop the first point, which spoils the net property of the first $2^m$
+points, or move all the points: by (i) the first $2^m$ Sobol' points have coordinates that are
+multiples of $2^{-m}$, and adding $2^{-m-1}$ to every coordinate keeps each point in all the
+elementary intervals of side at least $2^{-m}$ that contained it, so the result is still a
+$(t,m,d)$-net, with no coordinate at $0$. Randomisation settles the issue. Second, the balance of
+\cref{def:qmc-net} concerns blocks of $2^m$ points with $m\ge t$. For other $n$, the first $n$
+points split into aligned blocks of sizes $2^k$ (as in the proof of
+\cref{prop:qmc-van-der-corput}(ii)), which are $(t,k,d)$-nets only for $k\ge t$; the blocks with
+$k<t$ carry no such guarantee. The discrepancy bound for sequences still holds, but the faster
+rates of \cref{sec:qmc-rqmc} are lost (\cref{fig:qmc-convergence}, right).
+\end{remark}
+
+\begin{incode}
+\coderef{code/src/mfe230d/qmc.py}: \texttt{van\_der\_corput(n, b)}, \texttt{halton(n, d)} and
+\texttt{sobol(n, d)} (natural order, direction numbers of \citeauthor{joe-kuo-2008} for up to
+$128$ coordinates; \texttt{scipy.stats.qmc.Sobol} returns the same points in Gray-code order,
+which the tests check); \texttt{star\_discrepancy} (exact, practical for $d\le2$);
+\texttt{t\_value(generator\_matrices(d, m))} and \texttt{is\_net}.
+\end{incode}
+
+\section{Randomised quasi-Monte Carlo}\label{sec:qmc-rqmc}
+
+A deterministic rule has no standard error, and its error bound is rarely usable
+(\cref{rem:qmc-payoffs}). Randomisation makes every point uniform while keeping the
+structure of the set. Three randomisations of points $x_1,\dots,x_n$ are in use; each draws its
+randomness once and applies it to all the points.
+\begin{enumerate}[label=(\alph*)]
+  \item \emph{Random shift} \citep{cranley-patterson}: $y_i=x_i+U\bmod1$ (coordinatewise
+    fractional part), with $U$ uniform on $[0,1)^d$.
+  \item \emph{Random digital shift} in base $2$: $y_i=x_i\oplus U$, digit by digit.
+  \item \emph{Nested uniform scramble} \citep{owen-1995}, in base $2$: in each coordinate,
+    independently, digit $k$ of $y$ is digit $k$ of $x$ flipped by a random bit
+    $e(x^{(1)},\dots,x^{(k-1)})$ attached to the first $k-1$ digits of $x$; all the bits $e$ are
+    independent fair coin tosses. Geometrically: swap the two halves of $[0,1)$ with probability
+    $\frac12$, then independently swap the two halves of each half, and so on.
+\end{enumerate}
+
+\begin{proposition}[Randomised QMC]\label{prop:qmc-rqmc}
+Let $y_1,\dots,y_n$ be obtained from $x_1,\dots,x_n\in[0,1)^d$ by (a), (b) or (c), let $F\in
+L^2([0,1)^d)$ with $\sigma^2=\Var F(U)$ for $U$ uniform, and let $\hat\mu=\frac1n\sum_iF(y_i)$.
+\begin{enumerate}[label=(\roman*)]
+  \item Each $y_i$ is uniformly distributed on $[0,1)^d$. Hence $\E\hat\mu=I(F)$, and
+    $\Var\hat\mu\le\sigma^2$.
+  \item The bound $\Var\hat\mu\le\sigma^2$, $n$ times the Monte Carlo variance, is attained for
+    some point sets and integrands under (a) and (b), and under (c) when all the points coincide.
+  \item Under (b) and (c), if $x_1,\dots,x_n$ is a $(t,m,d)$-net in base $2$, then so is
+    $y_1,\dots,y_n$, with probability one.
+  \item Let $\hat\mu^{(1)},\dots,\hat\mu^{(R)}$, $R\ge2$, be computed from independent
+    randomisations, with mean $\bar\mu_R$ and sample variance $s_R^2$. Then $\bar\mu_R$ is
+    unbiased, $\Var\bar\mu_R=\Var\hat\mu/R$, and $\E[s_R^2/R]=\Var\bar\mu_R$. If the replicates
+    are normally distributed, $\bar\mu_R\pm t_{R-1,1-\alpha/2}\,s_R/\sqrt R$ covers $I(F)$ with
+    probability exactly $1-\alpha$; without normality, its coverage tends to $1-\alpha$ as
+    $R\to\infty$.
+  \item Let $x_1,\dots,x_n$ be a $(t,m,d)$-net in base $2$, $n=2^m$, randomised by (c). Then
+    $\Var\hat\mu\le2^t3^d\sigma^2/n$. For the first $2^m$ points of a $(t,d)$-sequence,
+    $\Var\hat\mu=o(1/n)$ as $m\to\infty$, and if moreover $F$ is smooth,
+    $\Var\hat\mu=O\big(n^{-3}(\log n)^{d-1}\big)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Under (a), $u\mapsto x+u\bmod1$ is a translation of the torus and preserves volume. Under
+(b) and (c), recall that $U$ is uniform on $[0,1)$ if and only if its binary digits are
+independent fair bits (outside the null set of dyadic rationals). Under (b), each digit of $y$
+is a fixed digit of $x$ flipped by an independent fair bit; under (c), digit $k$ of $y$ is
+digit $k$ of $x$ flipped by the bit attached to one node at depth $k-1$, and different depths
+use different, independent bits. In both cases the digits of each coordinate of $y$ are
+independent fair bits, and different coordinates are independent. So
+$\E F(y_i)=I(F)$, and by the Cauchy--Schwarz inequality
+$\Var\hat\mu=n^{-2}\sum_{i,k}\Cov(F(y_i),F(y_k))\le n^{-2}\sum_{i,k}\sigma^2=\sigma^2$.
+
+(ii) For (a), take $d=1$, $x_i=(i-1)/n$ and $F(y)=\cos(2\pi ny)$: every
+$F(y_i)=\cos(2\pi nU)$, so $\hat\mu=\cos(2\pi nU)$ has variance $\frac12=\sigma^2$. For (b), take
+$n=2^m$ and $F(y)=(-1)^{y^{(m+1)}}$, the sign given by digit $m+1$: that digit is $0$ for every
+$x_i=(i-1)/n$, so it equals $U^{(m+1)}$ for every $y_i$, and $\hat\mu=\pm1$ with variance
+$1=\sigma^2$.
+If all points coincide, so do the $y_i$, and $\hat\mu=F(y_1)$.
+
+(iii) Under (b) and (c), the first $k$ digits of each coordinate of $y$ are a bijective function
+of the first $k$ digits of the same coordinate of $x$ (for (c), the composition of the flips
+along the path from the root). So each elementary interval is mapped onto an elementary
+interval of the same shape, and the counts of \cref{def:qmc-net} are preserved. The digit
+expansions involved are proper with probability one.
+
+(iv) The replicates are independent copies of $\hat\mu$, which is in $L^2$ by (i). Unbiasedness
+of $\bar\mu_R$ and of the sample variance for independent identically distributed variables give
+the first three claims; the normal case is the classical Student interval, and the limit as
+$R\to\infty$ is \cref{prop:mc-batch} with the replicates as batches.
+
+(v) The rate $o(1/n)$ for every $F\in L^2$ is due to \textcite{owen-scrambled-nets}, as is a
+bound by a small multiple of $\sigma^2/n$ for $t=0$; the bound $2^t3^d\sigma^2/n$ is
+\textcite{owen-1998}, Lemma~4. The rate for smooth $F$ is due to \textcite{owen-1997b};
+\textcite{owen-2008}, Section~5.1 and Theorem~3, repairs an error in its proof and weakens its
+hypothesis to the smoothness assumed here.
+\end{proof}
+
+Three comments. First, $\hat\mu$ is a sum of dependent terms, and the replicates of (iv), not the
+spread of the $F(y_i)$, measure its error: this is the batch-means principle of
+\cref{prop:mc-batch}. For a fixed number of replicates, the Student interval rests on
+approximate normality of each replicate, which \textcite{loh-2003} proved for scrambled
+$(0,m,d)$-nets and smooth integrands. Second, the budget: with $N=nR$ evaluations and
+$\Var\hat\mu\approx cn^{-\alpha}$, $\Var\bar\mu_R\approx cn^{1-\alpha}/N$, so for $\alpha>1$ one
+should take $n$ large and $R$ as small as a stable error estimate allows, say $10$ to $30$.
+Third, in one dimension the nested scramble of the first $2^m$ van der Corput points is a
+stratified sample with $2^m$ strata (\cref{ch:10-stratification}): one point in each interval
+$[l2^{-m},(l+1)2^{-m})$, uniform there and independent of the others
+(\exref{ex:qmc-scrambled-vdc}). In $d$ dimensions, by \cref{prop:qmc-digital-net}(i), each
+one-dimensional projection of the scrambled first $2^m$ Sobol' points is stratified in this way, as
+in Latin hypercube sampling (\cref{prop:st-lhs}), and the net also balances the elementary
+intervals in several coordinates at once.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch11-convergence}
+  \caption{Left: exact star discrepancy of the first $n$ points in two dimensions, for
+    pseudo-random points (seed $1$), Halton (bases $2$, $3$) and Sobol' (coordinates $1$, $2$),
+    with reference slopes $n^{-1/2}$ and $\log n/n$. Centre: the product of sines
+    $\prod_{j=1}^5\frac\pi2\sin(\pi x_j)$ of \cref{ch:06-monte-carlo}, whose integral is $1$:
+    root mean squared error $\sigma/\sqrt n$ of Monte Carlo, absolute errors of the Halton and
+    Sobol' rules, and the root mean squared error of nested-scrambled Sobol' points over $128$
+    independent scrambles (seed $7$). Right: $n$ times the root mean squared error of scrambled
+    Sobol' points for the same integrand in $d=2$, over $64$ scrambles (seed $8$), for every $n$
+    from $16$ to $4096$; the dots mark $n=2^m$.}
+  \label{fig:qmc-convergence}
+\end{figure}
+
+\Cref{fig:qmc-convergence} shows the three regimes. For the smooth integrand in $d=5$, at
+$n=2^{16}$, Monte Carlo has root mean squared error $5.3\times10^{-3}$, the scrambled Sobol'
+points $8.8\times10^{-5}$, and the deterministic Halton and Sobol' rules have errors
+$2.8\times10^{-5}$ and $1.9\times10^{-4}$ (our implementation: numpy \texttt{default\_rng}, seeds as
+in the caption). The deterministic errors jump around with $n$; the randomised one decreases
+steadily, with a fitted slope of $-0.99$ in $\log$--$\log$ scale between $n=2^8$ and $2^{16}$
+(from $-1.03$ to $-0.95$ over the four groups of $32$ scrambles; the replicate errors are
+heavy-tailed, so fewer scrambles give noticeably different values):
+the rate $n^{-3/2}$ of (v) is asymptotic, and its logarithmic factor $(\log n)^{(d-1)/2}$ still
+grows fast at these $n$ when $d=5$. In $d=2$ the asymptotic regime is visible:
+$n\times\text{RMSE}$ falls from $0.36$ at $n=2^8$ to $0.10$ at $n=2^{12}$ along powers of two,
+while between them it is of order $1$ (median $1.2$ for $2^{11}<n<2^{12}$), the order $1/n$
+that the smallest blocks of \cref{rem:qmc-origin} impose.
+
+\demo{11-quasi-monte-carlo.ipynb}{scramble the Sobol' points and watch the net survive; then
+compare Monte Carlo, QMC and scrambled QMC on smooth, kinked and discontinuous integrands, in the
+dimension of your choice, with replicate-based error bars.}
+
+\section{Effective dimension and path constructions}\label{sec:qmc-effective}
+
+A monthly Asian option is an integral in $12$ dimensions, a weekly one in $52$. The bounds of
+\cref{sec:qmc-sequences} are useless there, and yet QMC prices such options remarkably well.
+The explanation of \textcite{caflisch-morokoff-owen} is that the integrands are
+\emph{effectively} low-dimensional, provided the normals are mapped to the path in the right
+order. It rests on the analysis-of-variance (ANOVA) decomposition. Every $F\in
+L^2([0,1)^d)$ can be written uniquely as $F=\sum_{u\subseteq D}F_u$, where $F_u$ depends only
+on $x_u$, $F_\emptyset=I(F)$, and $\int_0^1F_u\,\dd x_j=0$ for $j\in u$; the terms are
+orthogonal, so $\sigma^2=\sum_{u\ne\emptyset}\sigma_u^2$ with $\sigma_u^2=I(F_u^2)$, and
+$\E[F(U)\mid U_v]=\sum_{u\subseteq v}F_u(U_u)$ for every $v\subseteq D$
+\citep{sobol-2001}. In particular
+\begin{equation}\label{eq:qmc-closed-share}
+  S_v:=\frac{\Var\E[F(U)\mid U_v]}{\sigma^2}=\frac1{\sigma^2}\sum_{\emptyset\ne u\subseteq v}\sigma_u^2
+\end{equation}
+is the share of the variance carried by the coordinates in $v$ and their interactions.
+
+\begin{lemma}[Pick and freeze]\label{lem:qmc-pick-freeze}
+Let $U,U'$ be independent and uniform on $[0,1)^d$, $v\subseteq D$, and let
+$U^{(v)}=(U_v,U'_{D\setminus v})$ keep the coordinates of $U$ in $v$ and take the others from
+$U'$. For $F\in L^2$, $\Var\E[F(U)\mid U_v]=\Cov\big(F(U),F(U^{(v)})\big)$.
+\end{lemma}
+
+\begin{proof}
+Given $U_v$, the variables $F(U)$ and $F(U^{(v)})$ are independent with the same conditional
+law, because they are the same function of $U_v$ and of the independent vectors
+$U_{D\setminus v}$ and $U'_{D\setminus v}$. With $h(U_v)=\E[F(U)\mid U_v]$, the tower property
+gives $\E[F(U)F(U^{(v)})]=\E[h(U_v)^2]$; subtract $I(F)^2=(\E h(U_v))^2$.
+\end{proof}
+
+The lemma turns each share into a covariance that plain Monte Carlo estimates
+\citep{sobol-2001}. In normal coordinates it reads the same with $Z,Z'$ in place of $U,U'$.
+
+\begin{remark}[Effective dimension]\label{rem:qmc-effective-dimension}
+Following \textcite{caflisch-morokoff-owen}, with a proportion $p$ such as $0.99$, $F$ has
+\emph{truncation dimension} $d_T$, the smallest $k$ with $S_{\{1,\dots,k\}}\ge p$, and
+\emph{superposition dimension} $d_S$, the smallest $s$ with
+$\sum_{0<|u|\le s}\sigma_u^2\ge p\sigma^2$. The first says how many leading coordinates matter,
+the second how many coordinates interact; $\sum_jS_{\{j\}}$, the share of the additive part, is
+the case $s=1$. Both depend on how the uniforms are turned into the path, although the price does
+not: the increments, Brownian-bridge and principal-component constructions of
+\cref{ch:07-path-simulation} give three integrands $F$ on $[0,1)^d$ with the same integral. The
+bridge and principal components put most of the variance of the path into the first normals
+(\cref{prop:ps-bridge,prop:ps-pca}), and QMC points are best in their first coordinates: the
+leading Sobol' coordinates use the polynomials of lowest degree, hence the smallest bounds on $t$
+(\cref{prop:qmc-digital-net}(iii)), and the leading Halton coordinates the smallest bases. For scrambled nets, part of this argument can be
+made exact. The variance of (c) splits as $\Var\hat\mu=n^{-1}\sum_{u\ne\emptyset}\sum_r
+\Gamma_{u,r}\sigma^2_{u,r}$, where the $\sigma^2_{u,r}\ge0$ split each $\sigma_u^2$ further by
+resolution $r$ and the gains $\Gamma_{u,r}$ depend only on the points \citep{owen-scrambled-nets};
+for a $(t,m,d)$-net in base $2$, $0\le\Gamma_{u,r}\le2^t3^d$ \citep{owen-1998}. The terms with $u\subseteq\{1,\dots,k\}$ make up the scrambled-net variance for
+the $k$-dimensional integrand $\E[F\mid U_1,\dots,U_k]$, which is $o(1/n)$ by
+\cref{prop:qmc-rqmc}(v); the others add at most $2^t3^d(1-S_{\{1,\dots,k\}})\sigma^2/n$. This much
+is a theorem. That a small $1-S_{\{1,\dots,k\}}$ makes QMC accurate at a given $n$ is a
+heuristic: nothing says how large $n$ must be before the $k$-dimensional part is integrated
+accurately, and the constant $2^t3^d$ is astronomically large for $d=64$. It is the measurements
+below that support it.
+\end{remark}
+
+For the \emph{geometric} average the shares are exact. On the dates $t_1<\dots<t_m$, with
+$W=AZ$ for the construction matrix $A$,
+\[
+  \log G=\log S+\nu\bar t+\frac\sigma m\sum_{i=1}^mW_{t_i}
+  =\log S+\nu\bar t+\frac\sigma m\,\big|A^\top\mathbf 1\big|\,(w\cdot Z),\qquad
+  w=\frac{A^\top\mathbf 1}{|A^\top\mathbf 1|},
+\]
+with $\bar t$ the mean date. So the geometric Asian call is $g(w\cdot Z)$ for a fixed
+function $g$ and a unit vector $w$ that depends on the construction. For such a \emph{ridge}
+payoff, $(w\cdot Z,w\cdot Z^{(v)})$ is a standard bivariate normal pair with correlation
+$\rho_v^2=\sum_{j\in v}w_j^2$. Write $\kappa_g(c)=\Corr\big(g(X),g(X')\big)$ for standard normal
+$X,X'$ with $\Corr(X,X')=c$; then \cref{lem:qmc-pick-freeze} gives
+\begin{equation}\label{eq:qmc-ridge}
+  S_v=\kappa_g\big(\rho_v^2\big),\qquad \rho_v^2=\sum_{j\in v}w_j^2 .
+\end{equation}
+For a linear payoff $\kappa_g(c)=c$; in general $\kappa_g(c)\le c$ (\exref{ex:qmc-ridge}). For
+the call, $\E[g(X')\mid X]$ is a Black--Scholes-type formula and $\kappa_g$ is a one-dimensional
+integral. \Cref{tab:qmc-shares} gives the result for $m=64$ equally spaced dates over one year
+in the test case.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lcccccccc@{}}
+    \toprule
+    construction & $w_1^2$ & $S_{\{1\}}$ & $S_{\{1,2\}}$ & $S_{\{1,\dots,4\}}$ & $S_{\{1,\dots,8\}}$
+      & $d_T$ & additive share \\
+    \midrule
+    increments & $0.046$ & $0.032$ & $0.063$ & $0.127$ & $0.253$ & $53$ & $0.684$\\
+    Brownian bridge & $0.756$ & $0.685$ & $0.914$ & $0.978$ & $0.994$ & $7$ & $0.860$\\
+    principal components & $0.986$ & $0.979$ & $0.997$ & $1.000$ & $1.000$ & $2$ & $0.989$\\
+    \bottomrule
+  \end{tabular}
+  \caption{Variance shares of the geometric Asian call with $m=64$ dates (test case), by
+    \eqref{eq:qmc-ridge} and quadrature: the linear share $w_1^2$ of the first normal, the
+    shares $S_v$ of the first $k$ normals, the truncation dimension $d_T$ for $p=0.99$, and the
+    share $\sum_jS_{\{j\}}$ of the additive part.}
+  \label{tab:qmc-shares}
+\end{table}
+
+The first normal of the bridge sets $W_T$, which carries about $\frac34$ of the variance of
+the average; the first principal component carries $98.6\%$ of it. The call loses a little
+of each share to nonlinear interactions, much more under the increments, where the average
+mixes all $64$ normals with comparable weights and only $68\%$ of the variance is additive.
+The arithmetic average is not a ridge payoff, but its shares, estimated by
+\cref{lem:qmc-pick-freeze}, are close to those of the geometric call (\cref{fig:qmc-asian},
+right).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch11-asian}
+  \caption{The arithmetic Asian call with $m=64$ dates, test case. Left: standard deviation of
+    the estimate with $n$ nested-scrambled Sobol' points, over $64$ independent scrambles
+    (seed $11$), under the three path constructions, against the Monte Carlo standard error
+    $\sigma/\sqrt n$ ($\sigma=7.12$, from the second moment of the payoff over all $2^{20}$
+    scrambled points). Right: share of the variance carried by the first $k$
+    normals: exact for the geometric Asian call (lines, \eqref{eq:qmc-ridge}), and estimated by
+    pick-freeze for the arithmetic one (circles, $2^{15}$ draws, seed $5$).}
+  \label{fig:qmc-asian}
+\end{figure}
+
+\begin{example}[Asian options by randomised QMC]\label{exa:qmc-asian}
+With $m=64$ dates, $n=2^{14}$ scrambled Sobol' points and $64$ scrambles (our implementation,
+seed $11$), the variance of the estimate is smaller than the Monte Carlo variance $\sigma^2/n$
+with the same $n$ by a factor of $33$ with increments, $2.2\times10^3$ with the bridge and
+$3.0\times10^4$ with principal components (\cref{fig:qmc-asian}, left). The replicate errors are
+heavy-tailed, and the factors are noisy: over the four groups of $16$ scrambles they range from
+$24$ to $50$, from $1.4\times10^3$ to $3.8\times10^3$, and from $1.5\times10^4$ to $6.2\times10^4$.
+From $n=2^8$ to $2^{14}$ the factor of the bridge grows from $1.5\times10^2$ and that of principal
+components from $6.0\times10^2$, while that of the increments levels off around $30$. The ranking
+is that of \cref{tab:qmc-shares}. Principal components cost $O(m^2)$
+operations per path against $O(m)$ for the other two, which does not change it here. For the course's monthly example ($m=12$), $n=2^{14}$
+points and $16$ scrambles (seed $2026$) give $4.56133\pm0.00011$ for the arithmetic Asian call
+with principal components and $4.56111\pm0.00038$ with the bridge, and $4.40291\pm0.00011$ for the
+geometric one, whose exact value is $4.40286$. The course's estimate $4.56058$ came from $10^8$
+plain paths, with a standard error of $7.5\times10^{-4}$, seven times that of principal components
+with $2.6\times10^5$ paths; the two estimates differ by one of its standard errors.
+\end{example}
+
+The constructions are not uniformly ranked. A payoff that depends only on the first date,
+$W_{t_1}$, is one-dimensional under the increments and spread over several normals by the
+bridge (\exref{ex:qmc-first-date}); \textcite{papageorgiou-bridge} constructs integrands for
+which the bridge does worse than the increments. The effective dimension belongs to the pair
+(payoff, construction), and it can be measured before pricing with \cref{lem:qmc-pick-freeze}.
+The use of the bridge for QMC is due to \textcite{moskowitz-caflisch}, and that of principal
+components to \textcite{acworth-broadie-glasserman}.
+
+\begin{incode}
+\coderef{code/src/mfe230d/qmc.py}: \texttt{random\_shift}, \texttt{digital\_shift} and
+\texttt{owen\_scramble} randomise points; \texttt{rqmc\_estimate(f, n, d, R)} returns the
+replicate mean, its standard error and a Student interval; \texttt{to\_normals} applies
+$N^{-1}$ (the accurate quantile of \cref{ch:05-random-numbers}); \texttt{asian\_call\_payoffs}
+builds the paths with \texttt{paths.gbm\_paths}; \texttt{lognormal\_call\_share},
+\texttt{ridge\_shares} and \texttt{pick\_freeze\_shares} compute the variance shares.
+\end{incode}
+
+\demo{11-quasi-monte-carlo.ipynb}{choose the number of dates and the construction, and compare the
+variance shares of the first normals with the accuracy of randomised QMC for the Asian call.}
+
+\paragraph{Course examples reproduced.} The course announced low-discrepancy sequences without
+covering them, so it has no worked examples on this topic. We reproduce the numbers of its Asian
+example that the chapter touches: the exact geometric Asian call $4.40286$, and the bare-bones
+estimate $4.56058$ of the arithmetic one, which agrees with our randomised QMC value within its
+standard error.
+
+\furtherreading
+\textcite{glasserman-mc}, Chapter~5, covers QMC for finance: discrepancy and the Koksma--Hlawka
+bound in Section~5.1, the Halton, Faure and Sobol' constructions in Section~5.2, lattice rules,
+which we have skipped, in Section~5.3, randomised QMC in Section~5.4, and numerical examples with
+the bridge and principal components in Section~5.5. \textcite{niederreiter-qmc}, Chapters~2--4,
+is the classical treatment of discrepancy, error bounds and $(t,m,s)$-nets, and
+\textcite{dick-pillichshammer} the modern one of digital nets, including their randomisation in
+Chapter~13. \textcite{owen-2005} explains the Hardy--Krause variation and why kinks and jumps
+defeat it.

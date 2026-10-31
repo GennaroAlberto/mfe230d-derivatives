@@ -1,0 +1,175 @@
+% Exercises for Chapter 10 (stratified sampling and conditional Monte Carlo).
+% Statements only: solutions are kept privately.
+% Unless stated otherwise: the test case S = K = 100, T = 1, r = 1%, y = 2%, sigma = 20%,
+% S_T = S exp(nu T + sigma sqrt(T) Z) with nu = r - y - sigma^2/2 and Z ~ N(0,1).
+
+\begin{exercise}[Stratifying a digital]\label{ex:st-digital}
+\easy Let $D=e^{-rT}\1_{\{S_T>K\}}$ in the Black--Scholes model, $z^*=(\ln(K/S)-\nu T)/(\sigma\sqrt T)$,
+$u^*=N(z^*)$ and $p=1-u^*=\Q(S_T>K)$. Stratify $U=N(Z)$ into $H$ equiprobable strata with
+proportional allocation, $n$ a multiple of $H$. You may use \noteref{thm:st-variance} and
+\noteref{prop:st-optimal}.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that at most one stratum has $\sigma_h>0$, and that
+    $n\Var\hat\mu^{\mathrm{st}}_n=e^{-2rT}\vartheta(1-\vartheta)/H$, where $\vartheta\in[0,1]$
+    is the fraction of that stratum lying above $u^*$. Deduce
+    $n\Var\hat\mu^{\mathrm{st}}_n\le e^{-2rT}/(4H)$ and compare with plain sampling.
+  \item With $n\ge H$ and at least one draw in every stratum, what allocation minimises the
+    variance, and what is the minimal variance?
+  \item When is the stratified estimator exact? What does this suggest about where to put the
+    edges of the strata for a payoff with a jump?
+  \item For $K=110$, $H=10$ and $n=1000$, give the standard-error ratios to plain sampling of
+    the estimators in (a) and (b).
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Allocation with costs]\label{ex:st-costs}
+\easy Suppose that a draw in stratum $h$ costs $c_h>0$ (for instance, stratum $h$ is sampled
+by acceptance--rejection with acceptance probability $a_h$, so that $c_h$ is proportional to
+$1/a_h$), and that the budget is $C=\sum_hc_hn_h$.
+\begin{enumerate}[label=(\alph*)]
+  \item Treating the $n_h>0$ as real numbers, show that $\sum_hp_h^2\sigma_h^2/n_h$ is
+    minimised under the budget constraint by $n_h$ proportional to $p_h\sigma_h/\sqrt{c_h}$,
+    and that the minimal variance is $\big(\sum_hp_h\sigma_h\sqrt{c_h}\big)^2/C$.
+  \item A plain draw is obtained by first drawing the stratum with probabilities $p_h$ and then
+    sampling in it, so it costs $\bar c=\sum_hp_hc_h$ on average. Show that the efficiency of
+    the cost-optimal stratified estimator relative to plain sampling is at least $1$.
+  \item Take two strata with $p=(0.9,0.1)$, $\sigma_h=(1,10)$, $c_h=(1,25)$ and $\mu_1=\mu_2$.
+    Compare the products of variance and budget of plain sampling, proportional allocation,
+    the Neyman allocation of \noteref{prop:st-optimal} (which ignores costs) and the
+    cost-optimal allocation.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[One point per stratum]\label{ex:st-one-point}
+\medium Let $g:[0,1]\to\R$ and $\hat\mu_n=\frac1n\sum_{k=1}^ng\big((k-1+U_k)/n\big)$ with
+$U_1,\dots,U_n$ i.i.d.\ uniform: $n$ equiprobable strata and one point in each. You may use
+\noteref{thm:st-variance}.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $g$ be continuously differentiable on $[0,1]$. Show that
+    $n^3\Var\hat\mu_n\to\frac1{12}\int_0^1g'(u)^2\,\dd u$. \emph{Hint:} compare
+    $g((k-1+U)/n)$ with its first-order expansion around $(k-1)/n$, and use the uniform
+    continuity of $g'$.
+  \item Deduce the rate of the root-mean-square error, and compare it with plain Monte Carlo and
+    with \noteref{thm:st-variance}(v).
+  \item For the discounted test-case call as a function of the uniform,
+    $g(u)=e^{-rT}(S_T(N^{-1}(u))-K)^+$, show that $\int_0^1g'(u)^2\,\dd u=\infty$.
+  \item This part is computational. For that call, compute $n^2\Var\hat\mu_n$ and
+    $n^3\Var\hat\mu_n$ for $n=2^4,2^6,\dots,2^{16}$ (exactly, from the stratum variances, or
+    by simulation with independent replications), and describe the rate you observe. Which
+    strata dominate the variance?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Collapsed strata]\label{ex:st-collapsed}
+\medium With one draw per stratum no within-stratum variance can be estimated
+(\noteref{prop:st-error}). Let $H=2J$ equiprobable strata of a uniform $U$ receive one draw
+$Y_h$ each, so that $\hat\mu^{\mathrm{st}}=\frac1H\sum_hY_h$, and pair the strata as
+$(1,2),(3,4),\dots$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\hat v=\frac1{H^2}\sum_{j=1}^J(Y_{2j-1}-Y_{2j})^2$ satisfies
+    $\E\hat v=\Var\hat\mu^{\mathrm{st}}+\frac1{H^2}\sum_j(\mu_{2j-1}-\mu_{2j})^2$: it is a
+    conservative estimate of the variance.
+  \item Let $Y=g(U)$ with $g$ continuously differentiable on $[0,1]$. Using the expansion of
+    \exref{ex:st-one-point}(a), show that $\E\hat v/\Var\hat\mu^{\mathrm{st}}\to7$ as
+    $H\to\infty$, unless $g$ is constant.
+  \item The alternative of \noteref{prop:st-error}(iii) splits the $H$ draws into $R$
+    independent designs of $H/R$ strata each. For the same $g$, compare the variance of the
+    resulting estimator with that of the single design. Which way of obtaining an error
+    estimate do you prefer, and why?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Post-stratification is a regression]\label{ex:st-post-regression}
+\medium Let $(\xi_i,Y_i)$, $i\le n$, be i.i.d., with strata $A_1,\dots,A_H$ of known
+probabilities $p_h>0$, and let $D^h_i=\1_{A_h}(\xi_i)$ and $N_h=\sum_iD^h_i$. You may use
+\noteref{thm:cv-multiple}, \noteref{prop:cv-estimated-beta} and \noteref{prop:st-post}.
+\begin{enumerate}[label=(\alph*)]
+  \item Why can the $H$ indicators not all be used as controls together with an intercept?
+    Use the $H-1$ controls $D^1,\dots,D^{H-1}$, with known means $p_1,\dots,p_{H-1}$.
+  \item Show that, when every $N_h\ge1$, the regression estimator of
+    \noteref{thm:cv-multiple}(iii) with these controls equals the post-stratified estimator
+    $\sum_hp_h\bar Y_h$.
+  \item Compute the $R^2$ of \noteref{thm:cv-multiple} for these controls, and check that
+    $\sigma^2(1-R^2)$ is the asymptotic variance of \noteref{prop:st-post}(iv).
+  \item An estimated control coefficient usually causes a bias of order $1/n$
+    (\noteref{prop:cv-estimated-beta}). Why is the bias here exponentially small?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Neyman allocation for a deep out-of-the-money call]\label{ex:st-neyman-otm}
+\medium This is a computational exercise. Take the course's deep out-of-the-money call
+$S=100$, $K=150$, $T=1$, $r=5\%$, $y=0$, $\sigma=20\%$, with $n=10^5$ draws and $H$
+equiprobable strata of $U=N(Z)$.
+\begin{enumerate}[label=(\alph*)]
+  \item For $H=100$, how many strata have $\mu_h=\sigma_h=0$? Explain why they can be left out
+    of the simulation altogether, and write the resulting estimator.
+  \item Compute the $\sigma_h$ of the other strata and the Neyman allocation of the $n$ draws
+    among them. Give the variance factor $n\Var/\sigma^2$, and compare it with proportional
+    allocation.
+  \item Repeat for $H=10$ and $H=1000$, and explain the case $H=10$ in one line.
+  \item Confirm (b) by simulation, with $100$ repetitions as in the course.
+  \item Compare with importance sampling by a mean shift: draw $\tilde Z=Z+z^*$, with $z^*$ the
+    value of $Z$ at which $S_T=K$, and average $f(\tilde Z)e^{-z^*\tilde Z+(z^*)^2/2}$, where
+    $f(z)$ is the discounted payoff (you may use that this estimator is unbiased). Give its
+    variance factor at equal $n$, and comment.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Latin hypercube sampling can lose]\label{ex:st-lhs-interaction}
+\hard Let $V_1,\dots,V_n$ be a Latin hypercube sample (\noteref{def:st-lhs}) and
+$f\in L^2([0,1]^d)$ with variance $\sigma^2$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\Var\hat\mu^{\mathrm{LHS}}_n=\frac{\sigma^2}n+\big(1-\frac1n\big)\Cov\big(f(V_1),f(V_2)\big)$.
+  \item Let $d=2$ and $f(u)=(u_1-\frac12)(u_2-\frac12)$. Show that $\mu=0$, $\sigma^2=\frac1{144}$,
+    and $\Cov(f(V_1),f(V_2))=c_n^2$ with $c_n=\E\big[(V_{11}-\frac12)(V_{21}-\frac12)\big]$.
+    Show that $c_n=-\frac{n+1}{12n^2}$. \emph{Hint:} $V_{11}$ and $V_{21}$ lie in two distinct
+    strata of the first coordinate, chosen uniformly at random.
+  \item Deduce that $n\Var\hat\mu^{\mathrm{LHS}}_n/\sigma^2=1+(n-1)(n+1)^2/n^4>1$, so that Latin
+    hypercube sampling is worse than plain sampling for this $f$, and check the bound
+    $\sigma^2/(n-1)$ of \noteref{prop:st-lhs}(iv). How close to it is this example?
+  \item Reconcile (c) with \noteref{prop:st-lhs}(iii).
+  \item Check (c) by simulation for $n=4$ and $n=32$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Conditioning a spread option]\label{ex:st-spread}
+\medium This is a computational exercise. Under $\Q$ let
+$S^i_T=S^i\exp\big((r-y_i-\frac12\sigma_i^2)T+\sigma_i\sqrt TZ_i\big)$, $i=1,2$, where $(Z_1,Z_2)$
+is a standard normal pair with correlation $\rho\in(-1,1)$, and let
+$Y=e^{-rT}(S^1_T-S^2_T-K)^+$ with $K\ge0$. You may use the Black--Scholes formulas and
+\noteref{thm:st-conditional}.
+\begin{enumerate}[label=(\alph*)]
+  \item Writing $Z_1=\rho Z_2+\sqrt{1-\rho^2}\,Z^\perp$ with $Z^\perp$ standard normal and
+    independent of $Z_2$, show that $\E[Y\mid Z_2]$ is a Black--Scholes call price, and
+    identify its spot, strike and volatility.
+  \item Take $S^1=S^2=100$, $K=5$, $T=1$, $r=1\%$, $y_1=y_2=2\%$, $\sigma_1=20\%$,
+    $\sigma_2=30\%$, $\rho=0.5$. With $n=10^5$ draws, compare the plain and the conditional
+    estimators: estimates, standard errors and the variance ratio.
+  \item Condition instead on $Z_1$: show that $\E[Y\mid Z_1]$ is a put on $S^2_T$, and compare
+    the two conditional estimators. Explain which one removes more variance.
+  \item Stratify the conditioning variable of your better estimator into $100$ equiprobable
+    strata. Which results of the chapter predict what you observe?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Hull and White's expansion]\label{ex:st-hull-white}
+\hard Let $\rho=0$ in \noteref{prop:st-mixing}, with the Heston variance
+$\dd V_t=\kappa(\theta-V_t)\,\dd t+\xi\sqrt{V_t}\,\dd W_t$ started at $V_0=\theta$, and let
+$v=Q_T/T$ be the realised variance. Write $P(v)$ for the Black--Scholes put price as a function
+of the variance $v=\sigma^2$, the other inputs being those of the test case. You may use that
+$\Var V_s=\frac{\theta\xi^2}{2\kappa}(1-e^{-2\kappa s})$ and
+$\Cov(V_s,V_t)=e^{-\kappa(t-s)}\Var V_s$ for $s\le t$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E v=\theta$ and
+    $\Var(Q_T)=\frac{\theta\xi^2}{\kappa^2}\Big(T-\frac{1-e^{-2\kappa T}}{2\kappa}-\frac{(1-e^{-\kappa T})^2}{\kappa}\Big)$.
+  \item With $\mathcal V=Se^{-yT}N'(d_+)\sqrt T$ the Black--Scholes vega at volatility $\sqrt v$,
+    show that $P''(v)=\mathcal V\,(d_+d_--1)/(4v^{3/2})$. Deduce the approximation
+    $\E[P(v)]\approx P(\theta)+\frac12P''(\theta)\Var v$, and explain the sign of the correction
+    at the money.
+  \item Evaluate the approximation for $\kappa=2$, $\theta=0.04$, $\xi=0.3$, and compare it with
+    the Fourier price $8.1534$ and with your own conditional Monte Carlo estimate (exact variance
+    steps as in the chapter, or any scheme you trust).
+  \item Repeat (c) with $\xi=0.6$ and $\xi=0.9$, using conditional Monte Carlo as the reference.
+    Where does the expansion break down, and why?
+\end{enumerate}
+\end{exercise}

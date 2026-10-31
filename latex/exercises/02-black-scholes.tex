@@ -1,0 +1,142 @@
+% Exercises for Chapter 2 (The Black--Scholes formula three ways). Statements only: solutions are kept privately.
+Throughout, the model is the standard model of the notes, with spot $S$, strike $K$, maturity $T$, rate
+$r$, yield $y$ and volatility $\sigma$; $d_\pm$, $m=\log(F/K)$, $w=\sigma\sqrt T$ and the normalised price
+$c(m,w)$ are as in \noteref{eq:bsf-dpm} and \noteref{eq:bsf-normalised}. The test case is $S=K=100$, $T=1$,
+$r=1\%$, $y=2\%$, $\sigma=20\%$; the course's index parameters are $S=K=3900$, $T=1$, $r=3\%$, $y=1.3\%$,
+$\sigma=25\%$. You may use the results of the notes, quoting them, and the closed forms of
+\texttt{bs.py}.
+
+\begin{exercise}[Gap options]\label{ex:bsf-gap}
+\easy A \emph{gap call} with trigger $K_2>0$ and strike $K_1\ge0$ pays $(S_T-K_1)\1_{\{S_T>K_2\}}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Price it at time $0$ by direct integration, with $d_\pm$ computed at the strike $K_2$.
+  \item In the test case, with $K_2=100$, compute the price for $K_1=90,100,110,120$. Explain why a gap call
+    can have a negative price.
+  \item Show that its vega is $e^{-rT}N'(d_-)\big(K_2\sqrt T+(K_1-K_2)d_+/\sigma\big)$, and find where it is
+    negative. For $K_1=120$, $K_2=100$ and the other test-case inputs, show that the price is not monotone
+    in $\sigma$, and find two volatilities that give the price $-1$. Which part of
+    \noteref{prop:bsf-implied-vol} fails for gap options?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Strike Greeks and homogeneity]\label{ex:bsf-strike-greeks}
+\easy Write $C=C(S,K)$ for the call price at time $0$, $\Delta_S=\partial_SC$, $\Delta_K=\partial_KC$,
+$\Gamma_{SS}=\partial_{SS}C$, $\Gamma_{SK}=\partial_{SK}C$ and $\Gamma_{KK}=\partial_{KK}C$.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute the cross gamma $\Gamma_{SK}$ in closed form ($\Gamma_{KK}=\partial_{KK}C$ is in the notes).
+  \item Show that $S\Gamma_{SS}+K\Gamma_{SK}=0$ and $S\Gamma_{SK}+K\Gamma_{KK}=0$, and deduce
+    $S^2\Gamma_{SS}=K^2\Gamma_{KK}$. Interpret them: which functions of $(S,K)$ are homogeneous of degree
+    zero?
+  \item Three of the ratios $\rho_y/(S\Delta_S)$, $\rho_r/(K\Delta_K)$, $\mathcal V/(\sigma S^2\Gamma_{SS})$,
+    $\mathcal V/(\sigma SK\Gamma_{SK})$ and $\mathcal V/(\sigma K^2\Gamma_{KK})$ follow from
+    \noteref{prop:bsf-greeks}; derive the other two.
+  \item State the units of $\Delta_S$, $\Delta_K$, $\Gamma_{SS}$, $\Gamma_{SK}$, $\Gamma_{KK}$, $\rho_r$, $\rho_y$
+    and $\mathcal V$ when prices are in dollars and time in years, and compute them, and the five ratios, for
+    the one-year at-the-money call on the index.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[At-the-money rules of thumb]\label{ex:bsf-atm}
+\medium Let $D=e^{-rT}$.
+\begin{enumerate}[label=(\alph*)]
+  \item For the call struck at the forward, $K=F$, whose price is given in \noteref{rem:bsf-limits}(a), show
+    that $DFw/\sqrt{2\pi}$ overestimates it with relative error $w^2/24+O(w^4)$. Find, numerically, the total
+    volatilities $w$ at which the relative error equals $10\%$ and $1\%$, and compare with the leading term.
+  \item Show that $\partial_mc(m,w)=e^mN(d_+)$ and deduce the approximation
+    $C\approx D\big(Kw/\sqrt{2\pi}+(F-K)/2\big)$ for strikes near the forward. What is the order of its error
+    in $m$ and $w$?
+  \item For the one-year at-the-money (spot-strike) call on the index, compare the exact price with the rule
+    $0.4\,\sigma\sqrt T\,K$, with $DFw/\sqrt{2\pi}$, and with the approximation of (b). Which error dominates
+    the rule of thumb here?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Put--call parity by residues]\label{ex:bsf-residues}
+\medium Let $u_0^{\mathrm c}(\xi)=(e^\xi-1)^+$ and $u_0^{\mathrm p}(\xi)=(1-e^\xi)^+$, and let $u^{\mathrm c}$,
+$u^{\mathrm p}$ be the corresponding heat solutions $u(s,\xi)=\E[u_0(\xi+\sqrt sZ)]$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that for $\operatorname{Im}z>0$ the generalised transform $\int_\R e^{-iz\xi}u_0^{\mathrm p}(\xi)\,\dd\xi$
+    exists and equals $-1/(z(z+i))$: the same function as for the call (\noteref{eq:bsf-payoff-transform}),
+    on another half-plane.
+  \item Write $u^{\mathrm p}(s,\xi)$, for $s>0$, as an integral along a line $\operatorname{Im}z=b>0$, as in the
+    proof of \noteref{prop:bsf-pde}. Then show, with the residue theorem, that
+    $u^{\mathrm c}(s,\xi)-u^{\mathrm p}(s,\xi)=e^{\xi+s/2}-1$; justify the passage to the limit on the vertical
+    sides of the rectangle. Translate the result into a statement about prices.
+  \item Which payoff has the transform $-1/(z(z+i))$ on the strip $-1<\operatorname{Im}z<0$? Write the
+    corresponding representation of the call price along $\operatorname{Im}z=-\frac12$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Inverting the Laplace transform on the branch cut]\label{ex:bsf-bromwich}
+\hard Let $\xi\in\R$ and $s>0$, and let $\bar g(\lambda)=e^{-q|\xi|}/q$ with $q=\sqrt{2\lambda}$ (principal branch),
+the Laplace transform of the heat kernel (\noteref{prop:bsf-laplace}). Show, without using
+\noteref{eq:bsf-laplace-kernel}, that the Bromwich integral
+\[
+  \lim_{R\to\infty}\frac1{2\pi i}\int_{c-iR}^{c+iR}e^{\lambda s}\,\bar g(\lambda)\,\dd\lambda,\qquad c>0,
+\]
+equals the heat kernel $k(s,\xi)=(2\pi s)^{-1/2}e^{-\xi^2/(2s)}$, as follows.
+\begin{enumerate}[label=(\alph*)]
+  \item Close the line with two arcs of radius $R$ in the left half-plane and a keyhole around the cut
+    $(-\infty,0]$, with a small circle of radius $\varepsilon$ around $0$. Show that the integrals over the
+    arcs and over the small circle tend to $0$ as $R\to\infty$ and $\varepsilon\to0$. \emph{Hint:}
+    $|\bar g(\lambda)|\le|2\lambda|^{-1/2}$ when $\operatorname{Re}q\ge0$; for the arcs, bound
+    $\int_{\pi/2}^{\pi}e^{sR\cos\theta}\,\dd\theta$.
+  \item Show that the two sides of the cut contribute
+    $\frac1\pi\int_0^\infty e^{-\rho s}\cos\big(\sqrt{2\rho}\,|\xi|\big)(2\rho)^{-1/2}\,\dd\rho$.
+  \item Evaluate this integral. \emph{Hint:} substitute $\rho=v^2/2$ and use the characteristic function of
+    a normal variable.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Equity as a call on the firm]\label{ex:bsf-merton}
+\medium In Merton's model of a firm, the value $V$ of the firm's assets follows a geometric Brownian
+motion with volatility $\sigma_V$ and no payouts, and the firm has issued one zero-coupon bond with face value
+$N_d$ and maturity $T$. At $T$ the bondholders receive $\min(V_T,N_d)$ and the shareholders $(V_T-N_d)^+$.
+Assume that $V$ is the price of a traded asset, so that the notes apply with $S=V$ and $y=0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Give the time-$0$ values $E_0$ of the equity and $B_0$ of the debt, the risk-neutral probability of
+    default, and the credit spread $-\frac1T\log(B_0/N_d)-r$.
+  \item Show that the equity value $E_t=e(t,V_t)$ has instantaneous volatility
+    $\sigma_E=\sigma_V\,V_t\,\partial_Ve/E_t$, and that $\sigma_E>\sigma_V$. Interpret.
+  \item Compute (a) and $\sigma_E$ for $V_0=100$, $N_d=80$, $T=1$, $r=3\%$, $\sigma_V=25\%$.
+  \item Only $E_0$ and $\sigma_E$ are observed. With $E_0=30$, $\sigma_E=60\%$ and the other inputs of (c),
+    find $V_0$ and $\sigma_V$, the default probability and the spread. Describe your numerical method, prove
+    that for fixed $\sigma_V$ the equation for $V_0$ has a unique root, and check numerically that the remaining
+    equation in $\sigma_V$ has a single root on $[0.01,2]$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[How well is implied volatility determined?]\label{ex:bsf-conditioning}
+\medium
+\begin{enumerate}[label=(\alph*)]
+  \item Show that the map from a call price to its implied volatility is continuous and increasing on the
+    interval \noteref{eq:bsf-iv-bounds}, tends to $0$ and to $\infty$ at its ends, and has derivative
+    $1/\mathcal V$.
+  \item Let $\kappa(w)=c(m,w)/(w\,\partial_wc(m,w))$, the relative change in the implied volatility per
+    relative change in the price. For fixed $m<0$, show that $\kappa(w)\to0$ as $w\downarrow0$ and
+    $\kappa(w)\to\infty$ as $w\to\infty$; find the limit as $w\downarrow0$ when $m=0$. \emph{Hint:} below the
+    inflection point, combine $c\,\partial_{ww}c<(\partial_wc)^2$ from \noteref{prop:bsf-implied-vol}(iv) with the formula for
+    $\partial_{ww}c$ in part (ii) of that proposition.
+  \item Take $S=100$, $r=y=0$, $T=0.25$, $\sigma=20\%$ and $K=100,110,120,130,140$. For each strike compute
+    the price, the vega and $\kappa$, and the change in implied volatility caused by an error of half a cent
+    in the price. Which of these quotes, rounded to the cent, still determine the volatility to one
+    volatility point? Reconcile your answer with (b).
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The course's Newton experiment]\label{ex:bsf-course-newton}
+\medium This is a computational exercise. Let $\hat C=C/(Ke^{-rT})$ and $\hat F=F/K$.
+\begin{enumerate}[label=(\alph*)]
+  \item By \noteref{rem:bsf-iv-algorithm}(2) it suffices to treat calls with $\hat F\le1$ and $0<\hat C<\hat F$.
+    Show that then $\hat w_{\mathrm{imp}}\ge2N^{-1}\big((1+\hat C)/2\big)$, with equality if and only if $\hat F=1$.
+    \emph{Hint:} how does $c(m,w)$ depend on $m$?
+  \item Implement Newton's method on the price, $\hat w\leftarrow\hat w-(c(\log\hat F,\hat w)-\hat C)/N'(d_-)$,
+    started at $\hat w_0=0.9951$ and stopped when $|c-\hat C|\le10^{-8}$. On the grid
+    $\hat F\in\{0.1,0.25,0.5,0.75,1\}$, $\hat C\in\{0.01,0.1,0.5,0.9,0.99\}\times\hat F$, report the number of
+    iterations and the limit, or the failure, in each cell.
+  \item Repeat with the starting point of \noteref{prop:bsf-implied-vol}(iii), and compare. Which cells
+    explain the curious value $0.9951$?
+  \item Propose a starting function $\hat w_0(\hat C,\hat F)$ of your own that uses only elementary functions
+    and $N^{-1}$, and report the iteration counts it gives on the grid.
+\end{enumerate}
+\end{exercise}

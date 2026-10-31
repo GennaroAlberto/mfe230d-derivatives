@@ -1,0 +1,540 @@
+% Chapter 15: Asian options.
+\providecommand{\Corr}{\operatorname{Corr}}
+
+An \emph{Asian option} pays a function of the average of the underlying price over a schedule
+of \emph{fixing dates}. The average-price call on oil or on a currency pays $(A-K)^+$, where
+$A$ is the mean of daily or monthly prices. Averaging matches the exposure of a producer or an
+importer who trades at many dates, makes the payoff hard to move by trading at a single
+close, and usually makes the option cheaper than the European call with the same maturity:
+always when $r\ge y$ (\exref{ex:as-means}), but not when the yield exceeds the rate and the
+strike is low (in the test case, $39.068$ against $38.647$ at $K=60$).
+
+The arithmetic average of lognormal prices is not lognormal, and its call has no closed
+form. The \emph{geometric} average is lognormal, and this chapter uses it three ways: as an
+exact price (\cref{sec:as-geometric}), as a control variate (\cref{sec:as-mc}), and as a
+variable to condition on (\cref{sec:as-curran}), which yields lower bounds and very accurate
+approximations. Moment matching (\cref{sec:as-moments}) is the other classical route.
+\Cref{sec:as-reference} computes the course's monthly example to nine digits and compares
+everything with it. Averages observed continuously, and the pricing equation they satisfy,
+are treated in the IEOR 222 notes; here the averages are discrete, as in traded contracts.
+
+\section{Average-price options}\label{sec:as-payoffs}
+
+Under $\Q$ the stock follows the model \eqref{eq:ps-gbm-ts} of \cref{sec:ps-exact},
+$\dd S_t/S_t=(r(t)-y(t))\,\dd t+\sigma(t)\,\dd W_t$, with bounded Borel functions $r$, $y$ and
+$\sigma\ge0$. A contract fixes dates $0\le t_1<\dots<t_m\le T$, a payment date $T$ and
+weights $w_j>0$ with $\sum_jw_j=1$ (equal weights $1/m$ unless stated), and defines
+\[
+  A=\sum_{j=1}^mw_jS_{t_j},\quad G=\prod_{j=1}^mS_{t_j}^{w_j},\quad
+  C=D\,\EQ\big[(A-K)^+\big],\quad C^G=D\,\EQ\big[(G-K)^+\big],\quad D=e^{-\int_0^Tr}.
+\]
+$C$ is the arithmetic average-price call and $C^G$ its geometric twin; $P$ denotes the
+arithmetic put, paying $(K-A)^+$. A fixing at $t_1=0$ is allowed: it fixes the known price
+$S_0=S$. Write $F_j=\EQ[S_{t_j}]=S\,e^{\int_0^{t_j}(r-y)}$ for the forwards and
+$\Theta(t)=\int_0^t\sigma^2$ for the variance clock. By \cref{prop:ps-gbm-exact}(i),
+$\log S_t=\log S+\int_0^t(r-y-\frac12\sigma^2)+M_t$ with $M_t=\int_0^t\sigma\,\dd W$, a
+centred Gaussian process with $\Cov(M_s,M_t)=\Theta(s\wedge t)$ (\cref{rem:ps-time-change}).
+Hence the vector $(\log S_{t_1},\dots,\log S_{t_m})$ is Gaussian, with
+\begin{equation}\label{eq:as-law}
+  \E\log S_{t_j}=\log F_j-\tfrac12\Theta(t_j),\qquad
+  \Cov(\log S_{t_i},\log S_{t_j})=C_{ij}:=\Theta(t_i\wedge t_j).
+\end{equation}
+We use one Gaussian identity repeatedly: if $(U,V)$ is a Gaussian vector, then
+\begin{equation}\label{eq:as-tilt}
+  \E\big[e^U\1_{\{V>x\}}\big]=\E\big[e^U\big]\,\Prob\big(V+\Cov(U,V)>x\big),\qquad x\in\R .
+\end{equation}
+Indeed, under the probability with density $e^U/\E e^U$, the Gaussian moment generating
+function at the complex argument $(1,i\lambda)$ gives the characteristic function of $V$,
+\[
+  \E\big[e^{U+i\lambda V}\big]/\E\big[e^U\big]=\exp\big(i\lambda(\E V+\Cov(U,V))-\tfrac12\lambda^2\Var V\big),
+\]
+so $V$ is normal with its mean shifted by $\Cov(U,V)$ and the same variance.
+
+\begin{proposition}[Parity, bounds and degenerate cases]\label{prop:as-basic}
+\begin{enumerate}[label=(\roman*)]
+  \item $C-P=D\big(\sum_jw_jF_j-K\big)$.
+  \item $G\le A$, and
+    $D\big(\sum_jw_jF_j-K\big)^+\le C\le D\sum_jw_j\EQ\big[(S_{t_j}-K)^+\big]$ and
+    $C^G\le C\le C^G+D\,\EQ[A-G]$.
+  \item If $K\le0$, then $C=D(\sum_jw_jF_j-K)$. If $\sigma=0$ almost everywhere on
+    $[0,t_m]$, then $C=D(\sum_jw_jF_j-K)^+$. If $m=1$, then $C=e^{-\int_{t_1}^Tr}$ times the
+    Black--Scholes price of a call with maturity $t_1$ and the term parameters
+    $r_{0,t_1},y_{0,t_1},\sigma_{0,t_1}$ (\cref{prop:ps-gbm-exact}(iii)).
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $x^+-(-x)^+=x$ with $x=A-K$. (ii) $\log$ is concave, so Jensen's inequality for the
+weights gives $\log A\ge\sum_jw_j\log S_{t_j}=\log G$. The map $x\mapsto(x-K)^+$ is convex,
+nondecreasing and $1$-Lipschitz. Convexity gives $(\E A-K)^+\le\E(A-K)^+$ and
+$(A-K)^+\le\sum_jw_j(S_{t_j}-K)^+$; monotonicity and the Lipschitz property give
+$0\le(A-K)^+-(G-K)^+\le A-G$. Take expectations. (iii) If $K\le0$, $A-K>0$. If $\sigma=0$ on
+$[0,t_m]$, $\Theta(t_j)=0$ and $A=\sum_jw_jF_j$ is deterministic. If $m=1$, $A=S_{t_1}$.
+\end{proof}
+
+The upper bound in (ii) is the \emph{strip}: $w_j$ calls maturing at $t_j$, each with its
+payment deferred to $T$. \emph{Seasoned options.} Once some fixings are known, say
+$s_j$ for $j$ in a set $\mathcal P$, write $A=a+WA'$ with $a=\sum_{\mathcal P}w_js_j$,
+$W=\sum_{j\notin\mathcal P}w_j$ and $A'$ the average of the remaining fixings with weights
+$w_j/W$. Then $(A-K)^+=W(A'-K')^+$ with $K'=(K-a)/W$: the option is $W$ fresh Asian
+options on the remaining dates with the shifted strike $K'$, valued by restarting the model
+at the valuation date. If $K'\le0$ the call will be exercised for sure and, by (iii), it is
+a forward on the average: linear in the spot, with no gamma. A fixing at $t_1=0$ is the
+case of a known first fixing.
+
+\section{The geometric average}\label{sec:as-geometric}
+
+\begin{proposition}[The geometric average with term structures]\label{prop:as-geometric}
+Let $t_0=0$, $\Delta\Theta_k=\Theta(t_k)-\Theta(t_{k-1})$ and $W_k=\sum_{j\ge k}w_j$.
+\begin{enumerate}[label=(\roman*)]
+  \item $\log G\sim\mathcal N(\mu_G,v_G)$ with
+    \[
+      \mu_G=\sum_{j=1}^mw_j\big(\log F_j-\tfrac12\Theta(t_j)\big),\qquad
+      v_G=\sum_{i,j=1}^mw_iw_j\,\Theta(t_i\wedge t_j)=\sum_{k=1}^mW_k^2\,\Delta\Theta_k .
+    \]
+  \item Let $F_G=\EQ[G]=e^{\mu_G+v_G/2}$. If $v_G>0$ and $K>0$,
+    \[
+      C^G=D\big(F_G\,N(d_+)-K\,N(d_-)\big),\quad d_\pm=\frac{\log(F_G/K)\pm\frac12v_G}{\sqrt{v_G}},
+      \quad\frac{\partial C^G}{\partial S}=\frac{D\,F_G\,N(d_+)}{S}.
+    \]
+    If $v_G=0$, $C^G=D(F_G-K)^+$; if $K\le0$, $C^G=D(F_G-K)$.
+  \item With equal weights, constant $r,y,\sigma$ and $t_j=jT/m$:
+    $\mu_G=\log S+\nu T\frac{m+1}{2m}$ and $v_G=\sigma^2T\frac{(m+1)(2m+1)}{6m^2}$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\log G=\sum_jw_j\log S_{t_j}$ is a linear function of the Gaussian vector
+\eqref{eq:as-law}. For the second form of $v_G$, write
+$\Theta(t_i\wedge t_j)=\sum_{k\le i\wedge j}\Delta\Theta_k$ and exchange the sums:
+$\sum_{i,j}w_iw_j\sum_k\Delta\Theta_k\1_{\{k\le i\}}\1_{\{k\le j\}}$ equals
+$\sum_k\Delta\Theta_kW_k^2$.
+(ii) If $v_G=0$, $G=F_G$; if $K\le0$, $(G-K)^+=G-K$. Otherwise $\{G>K\}=\{\log G>\log K\}$
+has probability $N(d_-)$, and \eqref{eq:as-tilt} with $U=V=\log G$ gives
+$\E[G\1_{\{G>K\}}]=F_G\,\Prob(\log G+v_G>\log K)=F_GN(d_+)$. For the delta, $F_G$ is
+proportional to $S$ and $D$, $v_G$ do not depend on $S$; the derivative of
+$F\mapsto FN(d_+)-KN(d_-)$ is $N(d_+)+\big(FN'(d_+)-KN'(d_-)\big)\partial_Fd_+=N(d_+)$, since
+$FN'(d_+)=KN'(d_-)$. (iii) The mean of the dates is $T(m+1)/(2m)$, and
+$\sum_{i,j=1}^m\min(i,j)=\sum_{k=1}^m(m-k+1)^2=m(m+1)(2m+1)/6$.
+\end{proof}
+
+So the geometric call is the Black--Scholes call with maturity $T$, rate $r_{0,T}$,
+volatility $\sigma_G=\sqrt{v_G/T}$ and the yield $y_G$ defined by
+$Se^{(r_{0,T}-y_G)T}=F_G$; for $m=1$ it is the Black--Scholes call itself. As $m\to\infty$
+in (iii), $v_G\to\sigma^2T/3$: the continuous geometric average of the IEOR 222 notes. The
+course's rule of thumb, that an arithmetic Asian option behaves like an option with
+volatility $\sigma/\sqrt3$, transfers this limit to the arithmetic average; it is a heuristic,
+with no error bound behind it.
+
+\begin{example}[The course's monthly Asian]\label{exa:as-geometric}
+In the test case with $t_j=j/12$, (iii) gives $\sigma_G=0.2\sqrt{13\cdot25/864}=12.27\%$ and
+$C^G=4.40286$, the course's value. The delta is $0.486882$ and the vega, the derivative under
+a parallel shift $\sigma(\cdot)+\varepsilon$ of the volatility curve (so that
+$\partial_\varepsilon\Theta(t)=2\int_0^t\sigma$), is $22.4010$: the closed forms against
+which \cref{ch:13-mc-greeks} checks its pathwise estimators. Term structures enter only
+through $F_j$ and $\Theta(t_j)$. With the curves of \cref{exa:ps-term} ($y=0$, $r(t)=0.02t$,
+$\sigma=20\%$ on $[0,\frac12)$ and $10\%$ after) and $S=K=100$, $C^G=4.67732$, and the
+arithmetic call is worth $4.78053$ (\cref{sec:as-reference}). A flat volatility equal to the
+one-year term volatility, $15.81\%$, with the same rates, gives $4.02796$, $16\%$ too little:
+by (i) the variance of month $k$ enters with the weight $W_k^2$, which is largest for the early
+months, where this curve is most volatile.
+\end{example}
+
+\section{Monte Carlo with the geometric control}\label{sec:as-mc}
+
+Prices at the fixing dates are sampled exactly by \cref{prop:ps-gbm-exact}, with one normal
+per interval between dates (none for a fixing at $0$), so the only error is statistical.
+Three payoffs with known means serve as controls: the geometric call
+$X^{\mathrm g}=D(G-K)^+$ (\cref{prop:as-geometric}), the vanilla call
+$X^{\mathrm v}=D(S_{t_m}-K)^+$ and the strip $X^{\mathrm s}=D\sum_jw_j(S_{t_j}-K)^+$, whose
+means are Black--Scholes prices with term parameters. \textcite{kemna-vorst} introduced the
+geometric control.
+
+\begin{proposition}[The geometric control variate]\label{prop:as-control}
+Let $K>0$, $v_G>0$, $Y=D(A-K)^+$, and $c_j=\sum_iw_iC_{ij}=\Cov(\log S_{t_j},\log G)$.
+\begin{enumerate}[label=(\roman*)]
+  \item $0\le Y-X^{\mathrm g}\le D(A-G)$ on every path, and
+    \[
+      \Var(Y-X^{\mathrm g})\le D^2\E\big[(A-G)^2\big]
+      =D^2\Big(\sum_{i,j}w_iw_jF_iF_je^{C_{ij}}-2F_G\sum_jw_jF_je^{c_j}+F_G^2e^{v_G}\Big).
+    \]
+  \item With $\rho=\Corr(Y,X^{\mathrm g})$ and the optimal coefficient
+    $\beta^*=\Cov(Y,X^{\mathrm g})/\Var X^{\mathrm g}$, the control-variate estimator has variance
+    $(1-\rho^2)\Var Y/n$ (\cref{thm:cv-optimal}), and
+    $1-\rho^2\le D^2\E[(A-G)^2]/\Var Y$.
+  \item If $(X^{\mathrm g},X^{\mathrm v},X^{\mathrm s})$ has an invertible covariance matrix,
+    the optimal combination of the three controls has variance factor $1-R^2\le1-\rho^2$, and
+    the regression estimator, with estimated coefficients, attains it as $n\to\infty$
+    (\cref{thm:cv-multiple}).
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) The pathwise inequality is \cref{prop:as-basic}(ii), and
+$\Var(Y-X^{\mathrm g})\le\E[(Y-X^{\mathrm g})^2]$. For the moments, $\E[S_{t_i}S_{t_j}]=F_iF_je^{C_{ij}}$
+and $\E[G^2]=F_G^2e^{v_G}$ by \eqref{eq:as-law}; and $\log S_{t_j}+\log G$ is normal with
+variance $C_{jj}+2c_j+v_G$, so $\E[S_{t_j}G]=F_jF_Ge^{c_j}$. (ii) $\Var X^{\mathrm g}>0$
+because $G$ is lognormal with $v_G>0$, so it charges both sides of $K$. By
+\cref{thm:cv-optimal}(ii) the optimal variance is the minimum over $\beta$ of
+$\Var(Y-\beta X^{\mathrm g})$, which is at most its value at $\beta=1$; combine with (i).
+(iii) is \cref{thm:cv-multiple}: parts (i)--(ii) for the optimal combination and part (iii) for
+the regression estimator.
+\end{proof}
+
+The bound (i) does not depend on the strike: it measures how far apart the two averages are,
+which depends only on how dispersed the fixings are, and in the test case it keeps the residual
+variance below $0.197$ at every strike. Relative to $\Var Y$, which vanishes out of the money,
+the gain degrades: the ratio $D^2\E[(A-G)^2]/\Var Y$ is $3.5\times10^{-3}$, $0.042$, $1.26$ and $59$
+at $K=100$, $120$, $140$ and $160$ (vacuous for the last two), while $1-\rho^2$ is
+$6.9\times10^{-4}$, $4.3\times10^{-3}$, $0.027$ and $0.097$. It also degrades as volatility or
+maturity grows (\cref{fig:as-control}). The hypothesis in (iii) fails for $m=1$, where
+$X^{\mathrm g}=X^{\mathrm v}=X^{\mathrm s}=Y$, and for $m=2$ with $t_1=0$, where
+$X^{\mathrm s}=\frac D2(S-K)^++\frac12X^{\mathrm v}$.
+
+\begin{example}[The course's control-variate experiment]\label{exa:as-control}
+In the test case with $m=12$ and $K=100$, $\Var Y=56.040$, $\rho=0.999656$ and
+$\beta^*=1.02940$, to the digits shown (\cref{rem:as-exact-moments}); the course estimated
+$0.999655$ and $1.02941$ from $10^8$ paths. Before any simulation, (i) gives
+$D^2\E[(A-G)^2]=0.1971$, so $1-\rho^2\le3.5\times10^{-3}$; the actual value is
+$6.88\times10^{-4}$, and $\Var(Y-X^{\mathrm g})$ is $0.0842$ at $\beta=1$ and $0.0386$ at
+$\beta^*$. The standard error shrinks by $\sqrt{1-\rho^2}=0.0262$. Our implementation, with
+$2^{20}$ paths (\texttt{default\_rng}, seed $2026$), gives $4.5567\pm0.0073$ plain,
+$4.56146\pm0.00019$ with the geometric control and an in-sample coefficient, and
+$4.56137\pm0.00014$ with the three controls, whose $R^2=0.99962$ and coefficients
+$(0.9286,0.0107,0.0856)$ agree with the course's $0.999616$ and $(0.928489,0.010793,0.085712)$.
+The two extra controls remove only $44\%$ of the variance left by the first.
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch15-control}
+  \caption{Control variates for the monthly arithmetic Asian call (test case, $m=12$).
+    (a) Standard deviation per path against the strike: plain, with the geometric control and
+    with the three controls (in-sample coefficients). (b) At $K=100$, against $\sigma$: the
+    variance of the payoff $Y$, the bound $D^2\E(A-G)^2$ of \cref{prop:as-control}(i), and the
+    variances of $Y-X^{\mathrm g}$ and of the optimal residual. Simulated quantities use the same
+    $2^{16}$ paths (seed $15$) at every point.}
+  \label{fig:as-control}
+\end{figure}
+
+The geometric average also tells us how to integrate part of the path out exactly: everything
+but its own direction.
+
+\begin{proposition}[Integrating out the geometric direction]\label{prop:as-rest}
+Let $v_G>0$ and $\xi=(\log G-\mu_G)/\sqrt{v_G}$. There are a standard normal vector
+$Z'\in\R^{m-1}$ independent of $\xi$ and an $m\times(m-1)$ matrix $M$ with
+$\log S_{t_j}=\E\log S_{t_j}+b_j\xi+(MZ')_j$, where $b_j=c_j/\sqrt{v_G}\ge0$. Given $Z'$,
+$A=\sum_ja_je^{b_j\xi}$ with $a_j=w_j\exp\big(\E\log S_{t_j}+(MZ')_j\big)$, and
+\[
+  \E\big[(A-K)^+\mid Z'\big]=\sum_ja_je^{b_j^2/2}N(b_j-\xi^*)-K\,N(-\xi^*),
+\]
+where $\xi^*$ solves $\sum_ja_je^{b_j\xi^*}=K$ ($\xi^*=-\infty$ if
+$\sum_{\{j:b_j=0\}}a_j\ge K$). This conditional value is an unbiased estimator of $C/D$ with
+no larger variance than $(A-K)^+$ (\cref{thm:st-conditional}).
+\end{proposition}
+
+\begin{proof}
+By \eqref{eq:as-law} and \cref{lem:ps-wiener}, $\log S_{t_j}-\E\log S_{t_j}=(BZ)_j$ with
+$Z\sim\mathcal N(0,I_m)$ and $B_{jk}=\sqrt{\Delta\Theta_k}\1_{\{k\le j\}}$, so that $BB^\top=(C_{ij})$.
+Then $\log G-\mu_G=u\cdot Z$ with $u=B^\top w$ and $|u|^2=w^\top BB^\top w=v_G$. Let $e=u/|u|$
+and let the columns of $Q$ be an orthonormal basis of $e^\perp$. The orthogonal map
+$Z\mapsto(e\cdot Z,Q^\top Z)$ makes $\xi=e\cdot Z$ and $Z'=Q^\top Z$ independent standard
+normals, and $Z=e\xi+QZ'$; so $M=BQ$ and $b=Be=BB^\top w/\sqrt{v_G}=c/\sqrt{v_G}$, with
+$c_j\ge0$ because $C_{ij}\ge0$. Given $Z'$, $A$ is a nondecreasing continuous function of
+$\xi$, so $(A-K)^+=(A-K)\1_{\{\xi>\xi^*\}}$, and $\E[e^{b\xi}\1_{\{\xi>x\}}]=e^{b^2/2}N(b-x)$ by
+\eqref{eq:as-tilt}.
+\end{proof}
+
+In the test case the conditional value has standard deviation $0.1082$ per draw (from its
+second moment, by randomised QMC), against
+$0.196$ for the optimal geometric control and $7.49$ for the payoff. It is also a smooth
+function of $Z'$ (by the implicit function theorem, $\xi^*$ is smooth where it is finite),
+which is what randomised QMC needs (\cref{prop:qmc-rqmc}); \cref{sec:as-reference} uses it.
+This is conditioning in the opposite direction to Curran's (\cref{sec:as-curran}): there we
+condition on $G$ and must approximate; here we condition on everything but $G$ and integrate
+exactly.
+
+\begin{remark}[Exact correlations]\label{rem:as-exact-moments}
+Given $Z'$, $(A-K)^{+2}=(A-K)^2\1_{\{\xi>\xi^*\}}$ and, since $G\le A$,
+$(A-K)^+(G-K)^+=(A-K)(G-K)\1_{\{\xi>\xi_G\}}$ with $\xi_G=(\log K-\mu_G)/\sqrt{v_G}\ge\xi^*$.
+Both are sums of terms $e^{\beta\xi}$ restricted to a half-line, so their conditional
+expectations are closed forms like the one in \cref{prop:as-rest}. Averaging them by randomised
+QMC gives $\Var Y$, $\Cov(Y,X^{\mathrm g})$, $\rho$ and $\beta^*$ to six or more digits, as
+quoted in \cref{exa:as-control}.
+\end{remark}
+
+\section{Moment matching}\label{sec:as-moments}
+
+The oldest approximations replace the law of $A$ by a tractable law with the same first
+moments, which are known in closed form.
+
+\begin{proposition}[Moment matching]\label{prop:as-moment-matching}
+Let $\Var A>0$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{(Moments.)} $\E[A^p]=\sum_{j_1,\dots,j_p}\prod_{a}w_{j_a}F_{j_a}\,
+    \exp\big(\sum_{a<b}C_{j_aj_b}\big)$. Equivalently, let $R_k=S_{t_k}/S_{t_{k-1}}$ with
+    $S_{t_0}=S$, and $\Gamma_m=w_m$, $\Gamma_k=w_k+R_{k+1}\Gamma_{k+1}$. Then $A=SR_1\Gamma_1$,
+    $R_{k+1}$ is independent of $\Gamma_{k+1}$, and
+    \[
+      \E[\Gamma_k^p]=\sum_{q=0}^p\binom pq\,w_k^{p-q}\,\E[R_{k+1}^q]\,\E[\Gamma_{k+1}^q],\qquad
+      \E[R_k^q]=(F_k/F_{k-1})^q\,e^{q(q-1)\Delta\Theta_k/2},
+    \]
+    with $F_0=S$: all moments up to order $p$ cost $O(mp^2)$ operations.
+  \item \emph{(Two moments.)} The lognormal law with the mean and variance of $A$ has
+    log-variance $v_2=\log\big(\E[A^2]/(\E A)^2\big)$. Replacing $A$ by it gives
+    $C_2=D\big(\E A\,N(d_+)-K\,N(d_-)\big)$, $d_\pm$ as in \cref{prop:as-geometric}(ii)
+    with $(\E A,v_2)$ in place of $(F_G,v_G)$.
+  \item \emph{(Three moments.)} The third central moment $\mu_3$ of $A$ is positive, and the
+    equation $\zeta^3+3\zeta=\gamma:=\mu_3/(\Var A)^{3/2}$ has exactly one real root, $\zeta>0$.
+    With $b^2=\log(1+\zeta^2)$, $\lambda=\sqrt{\Var A}/\zeta$, $\tau=\E A-\lambda$ and
+    $J=\lambda e^{b\epsilon-b^2/2}$, $\epsilon\sim\mathcal N(0,1)$, the shifted lognormal variable
+    $\tau+J$ has the first three moments of $A$. Replacing $A$ by it gives
+    $C_3=D\big(\lambda N(d_+)-(K-\tau)N(d_-)\big)$, with $d_\pm$ computed from
+    $(\lambda,K-\tau,b^2)$, if $K>\tau$, and $C_3=D(\E A-K)$ otherwise.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Expand the product. For fixed $j_1,\dots,j_p$, $\sum_a\log S_{t_{j_a}}$ is normal with
+variance $\sum_aC_{j_aj_a}+2\sum_{a<b}C_{j_aj_b}$, so $\E\prod_aS_{t_{j_a}}=\prod_aF_{j_a}
+\exp(\sum_{a<b}C_{j_aj_b})$. For the recursion,
+$A=S(w_1R_1+w_2R_1R_2+\dots)=SR_1\Gamma_1$ by induction. $\Gamma_{k+1}$ is a function of
+$R_{k+2},\dots,R_m$, which are independent of $R_{k+1}$ because the $\log R_k$ are increments
+over disjoint intervals (\cref{lem:ps-wiener}); expand $(w_k+R_{k+1}\Gamma_{k+1})^p$
+binomially. Finally
+$\log R_k\sim\mathcal N(\log(F_k/F_{k-1})-\frac12\Delta\Theta_k,\Delta\Theta_k)$.
+(ii) A lognormal variable with log-variance $v$ has second moment $e^v$ times its squared mean; the price is
+\cref{prop:as-geometric}(ii) for that law. (iii) For lognormal $S_i,S_j,S_k$ with
+$\alpha=e^{C_{ij}}$, $\beta=e^{C_{ik}}$, $\gamma'=e^{C_{jk}}$, all $\ge1$, the joint third cumulant is
+\[
+  \E[S_iS_jS_k]-\sum\E[S_iS_j]\E[S_k]+2\E S_i\E S_j\E S_k
+  =F_iF_jF_k(\alpha\beta\gamma'-\alpha-\beta-\gamma'+2)\ge0,
+\]
+because $\alpha\beta\gamma'-\alpha-\beta-\gamma'+2=(\alpha-1)(\beta-1)(\gamma'-1)+(\alpha-1)(\beta-1)+(\alpha-1)(\gamma'-1)+(\beta-1)(\gamma'-1)$.
+Hence $\mu_3=\sum_{i,j,k}w_iw_jw_k\kappa_3(S_i,S_j,S_k)$ is at least its diagonal part, which is
+positive when some $\Theta(t_i)>0$, that is, when $\Var A>0$. With $u=e^{b^2}$,
+$\Var J=\lambda^2(u-1)$ and $\E(J-\lambda)^3=\lambda^3(u-1)^2(u+2)$, so the skewness of $J$ is
+$\zeta(\zeta^2+3)$ with $\zeta=\sqrt{u-1}$. The map $\zeta\mapsto\zeta^3+3\zeta$ has a positive
+derivative and increases from $0$ to $\infty$ on $[0,\infty)$, so $\zeta^3+3\zeta=\gamma$ has
+exactly one real root; with $\lambda$ chosen to match the variance and $\tau$ the mean, the shift
+leaves central moments unchanged. The price is (ii) with the strike $K-\tau$; if $K\le\tau$ the
+payoff is $\tau+J-K>0$.
+\end{proof}
+
+For $m=1$, $A$ is lognormal, so $C_2=C$, and $C_3=C$ because $\gamma$ is then the lognormal
+skewness and $\tau=0$. Neither is a bound: in the test case $C_2-C$ and $C_3-C$ each take both
+signs as $K$ varies (\cref{tab:as-approx}).
+
+The two-moment approximation (ii) is \textcite{levy-1992}'s. \textcite{turnbull-wakeman}
+compute the moments by the backward recursion of (i), and use the lognormal of (ii) as the
+leading term of an Edgeworth series. The root of $\zeta^3+3\zeta=\gamma$ is Cardano's
+$\zeta=\sqrt[3]{\gamma/2+\sqrt{\gamma^2/4+1}}+\sqrt[3]{\gamma/2-\sqrt{\gamma^2/4+1}}$.
+The next terms of the series, in the third and fourth cumulants $\kappa_3,\kappa_4$ of $A$, take
+the form of \textcite{jarrow-rudd}: two integrations by parts against the corrected density
+$\ell-\frac{\kappa_3-\kappa_3^\ell}{3!}\ell'''+\frac{\kappa_4-\kappa_4^\ell}{4!}\ell''''$ give
+\begin{equation}\label{eq:as-edgeworth}
+  C_{\mathrm{TW}}=C_2+D\Big(-\frac{\kappa_3-\kappa_3^\ell}{3!}\,\ell'(K)+\frac{\kappa_4-\kappa_4^\ell}{4!}\,\ell''(K)\Big),
+\end{equation}
+where $\ell$ is the matched lognormal density and $\kappa_n^\ell$ its cumulants. The corrected
+function integrates to one and has the first four moments of $A$, but it need not be a density:
+in the test case it stays above $0.81\,\ell$, while at $\sigma=40\%$ it is negative near $x=52$
+(down to $-1.3\times10^{-3}$). The correction reduces the error of $C_2$ near the money, but it
+is worse than $C_2$ at low strikes ($K\le72.5$ in \cref{fig:as-approx}(a)), and at $\sigma=40\%$
+at most strikes ($-0.238$ against $+0.141$ at $K=80$); in \cref{tab:as-approx} it beats $C_3$ in
+only three of the six columns.
+
+\section{Conditioning on the geometric average}\label{sec:as-curran}
+
+\textcite{curran} split the call according to the value of $G$. Because $A\ge G$, the part
+where $G>K$ is a linear payoff, priced in closed form; only the part where $G\le K$ needs the
+conditional law of $A$ given $G$, and that is where all approximations live.
+
+\begin{lemma}[The conditional law given $G$]\label{lem:as-conditional}
+Let $v_G>0$ and $\Lambda=\log G$. Given $\Lambda=x$, the vector \eqref{eq:as-law} is Gaussian
+with means $\E\log S_{t_j}+c_j(x-\mu_G)/v_G$ and covariances $C_{ij}-c_ic_j/v_G$. Hence
+\begin{gather*}
+  h(x):=\E[A\mid\Lambda=x]=\sum_jh_j(x),\qquad h_j(x)=w_jF_j\,e^{c_j(x-\mu_G)/v_G-c_j^2/(2v_G)},\\
+  \varsigma^2(x):=\Var(A\mid\Lambda=x)=\sum_{i,j}h_i(x)h_j(x)\big(e^{C_{ij}-c_ic_j/v_G}-1\big),
+\end{gather*}
+and $h$ is continuous and strictly increasing, with $h(+\infty)=\infty$ and
+$h(-\infty)=\sum_{\{j:c_j=0\}}w_jF_j$.
+\end{lemma}
+
+\begin{proof}
+For a Gaussian vector $(U,V)$ with $\Var V>0$, the conditional law of $U$ given $V=x$ is
+normal with mean $\E U+\Cov(U,V)(x-\E V)/\Var V$ and variance $\Var U-\Cov(U,V)^2/\Var V$
+(regress $U$ on $V$; the residual is uncorrelated with $V$, hence independent of it). Apply this to the linear
+combinations of the $\log S_{t_j}$, with $\Cov(\log S_{t_j},\Lambda)=c_j$, and take lognormal
+means of $S_{t_j}$ and of $S_{t_i}S_{t_j}$. Each $h_j$ is nondecreasing since $c_j\ge0$, and the
+last one is strictly increasing and unbounded because its coefficient is positive: $c_j$ is
+nondecreasing in $j$ and $\sum_jw_jc_j=v_G>0$.
+\end{proof}
+
+\begin{proposition}[Conditioning on the geometric average]\label{prop:as-curran}
+Let $K>0$, $v_G>0$, $\Lambda=\log G$, and $L(x)=D\,\E\big[(A-K)\1_{\{\Lambda>x\}}\big]$ for
+$x\in[-\infty,\infty)$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{(Curran's decomposition.)} $C=L(\log K)+D\,\E\big[(A-K)^+\1_{\{G\le K\}}\big]$, and
+    for finite $x$
+    \[
+      L(x)=D\Big(\sum_jw_jF_j\,N\Big(\frac{\mu_G+c_j-x}{\sqrt{v_G}}\Big)-K\,N\Big(\frac{\mu_G-x}{\sqrt{v_G}}\Big)\Big),
+    \]
+    and $L(-\infty)=D\big(\sum_jw_jF_j-K\big)$.
+  \item \emph{(Lower bounds.)} $L(x)\le C$ for every $x$. Let $x^*$ be the root of
+    $h(x)=K$ if $h(-\infty)<K$, and $x^*=-\infty$ otherwise. Then, for every $x$,
+    \[
+      L(x)\le L(x^*)=D\,\E\big[(\E[A\mid G]-K)^+\big]\le C .
+    \]
+  \item \emph{(Error bound.)} $0\le C-L(x^*)\le\frac D2\,\E\big[\varsigma(\Lambda)\1_{\{G<K\}}\big]$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) On $\{G>K\}$, $A\ge G>K$, so $(A-K)^+=A-K$ there. For the closed form,
+\eqref{eq:as-tilt} with $U=\log S_{t_j}$ and $V=\Lambda$ gives
+$\E[S_{t_j}\1_{\{\Lambda>x\}}]=F_j\Prob(\Lambda+c_j>x)$; and
+$\Prob(\Lambda>x)=N((\mu_G-x)/\sqrt{v_G})$.
+
+(ii) $(A-K)\1_{\{\Lambda>x\}}\le(A-K)^+$ gives $L(x)\le C$. By the tower property,
+$L(x)=D\,\E[(h(\Lambda)-K)\1_{\{\Lambda>x\}}]$. By \cref{lem:as-conditional}, $h(\Lambda)-K<0$ on
+$\{\Lambda<x^*\}$ and $h(\Lambda)-K\ge0$ on $\{\Lambda\ge x^*\}$, so
+$(h(\Lambda)-K)\1_{\{\Lambda>x\}}\le(h(\Lambda)-K)^+$, with equality almost surely when $x=x^*$,
+because $\Prob(\Lambda=x^*)=0$. Hence $L(x)\le D\,\E[(h(\Lambda)-K)^+]=L(x^*)$. Finally
+$(h(\Lambda)-K)^+\le\E[(A-K)^+\mid\Lambda]$ by the conditional Jensen inequality.
+
+(iii) Let $H=\E[(A-K)^+\mid\Lambda]-(h(\Lambda)-K)^+\ge0$, so that $C-L(x^*)=D\,\E H$. For any
+integrable $U$, $u^+=\frac12(u+|u|)$ gives
+$\E U^+-(\E U)^+=\frac12(\E|U|-|\E U|)\le\frac12\E|U-\E U|\le\frac12\sqrt{\Var U}$.
+Applied to the conditional law of $U=A-K$ given $\Lambda=x$ (explicit by \cref{lem:as-conditional}),
+this gives $H\le\frac12\varsigma(\Lambda)$. On $\{G\ge K\}$, $A-K\ge0$, so $H=0$ there.
+\end{proof}
+
+The second term in (i) depends on the conditional law of $A$ given $G$, which is neither
+lognormal nor known in closed form; a formula that replaces it is an approximation, unless it
+is proved to be a bound, as in (ii).
+
+The first term $L(\log K)$ is the part of Curran's decomposition that is exact; his
+published formula uses a cheap threshold, examined in \exref{ex:as-threshold}.
+$L(x^*)$, obtained by moving the positive part outside the conditional expectation, is what the
+course calls Curran's \emph{naive} approximation; it is in fact a lower bound, the largest of the
+family $L(x)$. \textcite{rogers-shi} derived the analogous lower bound for continuous averaging,
+conditioning on the integral of the Brownian path, together with an error bound of the type
+(iii). The bound (iii) is a guarantee, not a measurement: in the test case it allows
+$0.060$, while the actual gap is $4.5\times10^{-4}$.
+
+The course's \emph{refined} version keeps $L(\log K)$ exact and approximates the second term
+by assuming that, given $G=g<K$, $A-G$ is lognormal with its conditional mean $h(\log g)-g$
+and variance $\varsigma^2(\log g)$ from \cref{lem:as-conditional} (the course freezes both at
+$g=K$).
+The conditional term is then a Black formula with strike $K-g$, integrated against the normal
+density of $\log G$ by quadrature. It is not a bound; it is remarkably accurate
+(\cref{fig:as-approx}).
+
+\section{Accuracy and a reference price}\label{sec:as-reference}
+
+To judge the approximations we need prices accurate to much better than $10^{-6}$. The
+recursion of \cref{prop:as-moment-matching}(i) provides them. Since $R_{k+1}$ is independent of
+$\Gamma_{k+1}$,
+\begin{equation}\label{eq:as-recursion}
+  \Prob(\log\Gamma_k\le u)=\E\big[\Prob\big(\log\Gamma_{k+1}\le\log(e^u-w_k)-\log R_{k+1}\,\big|\,R_{k+1}\big)\big],
+  \qquad u>\log w_k,
+\end{equation}
+a one-dimensional Gaussian integral for each $u$, starting from $\Gamma_m=w_m$. At the end,
+$C=D\,\E[c(\Gamma_1)]$, where $c(z)=\E[(SR_1z-K)^+]$ is a Black formula (or, if $t_1=0$,
+$c(z)=(Sz-K)^+$). We store each distribution function on a grid of $4001$ points with cubic
+interpolation and use a $64$-point Gauss--Hermite rule for \eqref{eq:as-recursion}; the
+recursion is exact, so the only errors are those of the grid and the quadrature, and a grid four
+times finer with a rule twice as long changes the test-case price by $2\times10^{-11}$. Recursions of this type, with fast Fourier
+transforms for the convolutions, go back to \textcite{carverhill-clewlow}; our implementation
+reproduces the benchmark prices of \textcite{cerny-kyriakou}, Table~4 (thirteen fixings
+including $t=0$), to all seven decimals.
+
+\begin{example}[A reference value for the monthly Asian]\label{exa:as-reference}
+In the test case with $m=12$, the recursion gives $C=4.5612893$. Independently,
+\cref{prop:as-rest} with $2^{14}$ scrambled Sobol' points and $32$ independent scrambles
+(\texttt{SeedSequence(99)}) gives $4.5612897\pm0.0000026$. The estimates in these notes and in the
+course agree with it within about two standard errors: the course's $10^8$ plain paths,
+$4.56058\pm0.00075$, are $0.9$ standard errors low; its control-variate estimates $4.56133$ and
+$4.56132\pm0.000015$ are about $2$ high; the two runs of \cref{exa:st-asian}, $4.56122$ and
+$4.56127$, each $\pm0.00003$, are $2.0$ and $0.6$ low; and the randomised QMC value
+$4.56133\pm0.00011$ of \cref{exa:qmc-asian} is $0.4$ high. Deviations of two standard errors
+are unremarkable among a dozen estimates; the reference settles the fifth decimal.
+\end{example}
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lrrrrrr@{}}
+    \toprule
+    & \multicolumn{5}{c}{$\sigma=20\%$} & $\sigma=40\%$\\
+    \cmidrule(lr){2-6}\cmidrule(l){7-7}
+    $K$ & $80$ & $90$ & $100$ & $110$ & $120$ & $100$\\
+    \midrule
+    reference $C$ & $19.414851$ & $10.679692$ & $4.561289$ & $1.492200$ & $0.383703$ & $9.354588$\\
+    two moments $C_2$ & $164.6$ & $315.8$ & $67.5$ & $-216.1$ & $-210.0$ & $660.3$\\
+    three moments $C_3$ & $-10.0$ & $-1.5$ & $16.3$ & $8.4$ & $-3.4$ & $109.0$\\
+    Edgeworth \eqref{eq:as-edgeworth} & $4.8$ & $-98.4$ & $1.9$ & $66.1$ & $17.3$ & $86.3$\\
+    first term $L(\log K)$ & $-16.7$ & $-17.2$ & $-11.8$ & $-14.4$ & $-16.1$ & $-94.4$\\
+    lower bound $L(x^*)$ & $-4.6$ & $-6.5$ & $-4.5$ & $-5.3$ & $-5.2$ & $-36.0$\\
+    conditional lognormal & $-0.03$ & $0.03$ & $0.01$ & $-0.02$ & $-0.01$ & $0.16$\\
+    \bottomrule
+  \end{tabular}
+  \caption{The monthly Asian call ($m=12$, $S=100$, $T=1$, $r=1\%$, $y=2\%$): reference prices from
+    the recursion \eqref{eq:as-recursion}, and the errors of the approximations, in units of
+    $10^{-4}$.}
+  \label{tab:as-approx}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch15-approx}
+  \caption{Errors of the approximations for the monthly Asian call against the strike (test case,
+    $m=12$), relative to the recursion \eqref{eq:as-recursion}. (a) Price minus reference for the
+    two-moment, three-moment and Edgeworth approximations. (b) Absolute error of the first term
+    $L(\log K)$, of the lower bound $L(x^*)$ and of the conditional lognormal approximation.}
+  \label{fig:as-approx}
+\end{figure}
+
+The ranking in \cref{tab:as-approx} and \cref{fig:as-approx} is the course's. Over the strikes
+of \cref{fig:as-approx}, from $60$ to $160$, two moments miss by up to $0.032$, with both signs,
+and three moments by up to $0.0017$; the Edgeworth correction lies in between (up to
+$0.0098$). The first term of Curran's decomposition alone is no better than three moments
+($0.0019$; at $\sigma=40\%$, $0.0147$ against $0.0130$); the bound $L(x^*)$, within
+$6.7\times10^{-4}$, is about $2.5$ times better; and only the conditional lognormal, within
+$4\times10^{-6}$, is better by orders of magnitude. All errors grow with
+$\sigma\sqrt T$, as the last column shows: the dispersion of the fixings, which the bound of
+\cref{prop:as-control}(i) measures, is what every method must account for.
+
+\demo{15-asian.ipynb}{arithmetic, geometric and European calls for any number of fixings and
+volatility; the control variates of \cref{fig:as-control}; and the errors of every
+approximation against the reference, with sliders for $\sigma$, $T$ and $m$.}
+
+\begin{incode}
+\coderef{code/src/mfe230d/asian.py}: \texttt{fixing\_law} returns $F_j$ and $C_{ij}$ for any
+fixing dates and term structures (\texttt{paths.PiecewiseConstant}); \texttt{geometric\_price}
+and \texttt{geometric\_greeks} implement \cref{prop:as-geometric}; \texttt{mc\_price} and
+\texttt{cv\_laboratory} the control variates, through \texttt{variance.control\_variate} and
+\texttt{variance.regression\_control\_variates}; \texttt{conditional\_samples} and
+\texttt{rqmc\_reference} \cref{prop:as-rest}; \texttt{arithmetic\_moments},
+\texttt{lognormal\_price}, \texttt{shifted\_lognormal\_price} and \texttt{edgeworth\_price}
+\cref{sec:as-moments}; \texttt{threshold\_bound}, \texttt{conditioning\_lower\_bound},
+\texttt{conditional\_upper\_bound} and \texttt{curran\_refined} \cref{prop:as-curran};
+\texttt{recursion\_price} \eqref{eq:as-recursion}; \texttt{seasoned\_strike} the strike shift.
+\end{incode}
+
+\paragraph{Course examples reproduced.} The geometric Asian call $4.40286$; the correlation
+$0.999655$ and coefficient $1.02941$ of the geometric control, now exact; the three-control
+regression ($R^2=0.999616$, coefficients $0.928$, $0.011$, $0.086$, standard error
+$1.5\times10^{-5}$ at $10^8$ paths, which our $2^{20}$-path run implies); the course's
+estimates of the arithmetic price, all within about two standard errors of the reference; and
+the ranking and size of the errors of the two-moment, three-moment and Curran approximations
+plotted in the course.
+
+\furtherreading
+\textcite{glasserman-mc} treats control variates in Section~4.1, and multiple controls, as in
+\cref{prop:as-control}(iii), in Section~4.1.2. \textcite{kemna-vorst} price the
+geometric average and propose it as a control; \textcite{turnbull-wakeman} and
+\textcite{levy-1992} give the moment approximations, \textcite{curran} the decomposition,
+and \textcite{rogers-shi} the conditioning bounds for continuous averaging, where they also
+reduce the price to a parabolic equation in two variables. \textcite{cerny-kyriakou} improve the
+convolution method for discrete averages and give benchmark prices.

@@ -1,0 +1,131 @@
+% Exercises for Chapter 14 (American options by simulation). Statements only: solutions are kept privately.
+% Notation as in the notes: exercise dates 0 = t_0 < ... < t_m = T, discounted payoffs Z_k,
+% Snell envelope U, continuation values C_k, stopping times T_k, risk-neutral expectations E.
+
+\begin{exercise}[Stopping a sequence of uniforms]\label{ex:am-secretary}
+\easy Let $Z_1,\dots,Z_m$ be independent and uniform on $[0,1]$, $Z_0=0$,
+$\F_k=\sigma(Z_1,\dots,Z_k)$, and no discounting. You may use \noteref{thm:am-dp}.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that every continuation value is a constant, $C_k=v_{k+1}$, where $v_m=\frac12$ and
+    $v_k=\frac12(1+v_{k+1}^2)$ for $1\le k<m$, and that $U_0=v_1$. Describe the optimal rule
+    and compute $U_0$ for $m=2$ and $m=5$.
+  \item Compute the perfect-foresight bound $\E[\max_kZ_k]$ and its gap for $m=2$ and $m=5$.
+  \item Write down the martingale $M^*$ of \noteref{thm:am-dp}(v) and check directly, without
+    \noteref{thm:am-duality}, that $\max_k(Z_k-M^*_k)=U_0$ for every outcome.
+  \item Let $e_k=1-v_k$. Show that $e_k=e_{k+1}-\frac12e_{k+1}^2$ and deduce
+    $1-U_0\le2/(m+3)$. Show that the perfect-foresight gap is at most $1/m$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Bounds, and exercise at $t_0$]\label{ex:am-exercise-now}
+\easy Consider a Bermudan put on the Black--Scholes stock, $Z_k=e^{-rt_k}(K-S_{t_k})^+$.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $r\ge0$ and let $U_0(s)$ be the Bermudan price as a function of $S_0=s$, the
+    dates being fixed. Show that $\max\big(K-s,P(0,s)\big)\le U_0(s)\le K$, where $P$ is the
+    European put price, and that $U_0$ is convex and nonincreasing in $s$.
+  \item Let $r>0$. Show that $C_0\le e^{-rt_1}K$, so that immediate exercise is optimal
+    whenever $S_0\le K(1-e^{-rt_1})$. Evaluate this bound for the put of
+    \noteref{tab:am-ls} with $\sigma=20\%$ and $T=1$, and compare it with the critical price
+    at $t_0$, which you may compute with \texttt{bermudan\_grid}.
+  \item The in-sample LSM estimate is $\max(Z_0,\hat c_0)$, where $\hat c_0$ is a mean of $N$
+    cash flows. Suppose that the cash flows follow the optimal rule from $t_1$ on, so that
+    $\E[\hat c_0]=C_0$. Show that $\E[\max(Z_0,\hat c_0)]\ge U_0$. If $Z_0=C_0$ and $\hat c_0$
+    is normal with standard deviation $s$, compute the bias.
+  \item How does the out-of-sample estimator of the notes treat $t_0$, and why is it not
+    biased upwards there?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Two exercise dates in closed form]\label{ex:am-two-dates}
+\hard Let a put be exercisable at $t_0=0$, $t_1=T/2$ and $t_2=T$, with $r>0$, $y\ge0$, and
+let $P(\theta,s)$ be the Black--Scholes European put price with time to maturity $\theta$.
+Write $N_2(a,b;\rho)$ for the distribution function of a standard bivariate normal vector
+with correlation $\rho$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\varphi(s)=(K-s)-P(T/2,s)$ is strictly decreasing on $(0,\infty)$, with
+    $\varphi(0+)>0>\varphi(K)$. Deduce that there is a unique $s^*\in(0,K)$ such that
+    exercise at $t_1$ is optimal if and only if $S_{t_1}\le s^*$.
+  \item Show that
+    \[
+      U_0=\max\Big(Z_0,\ e^{-rT/2}\E\big[(K-S_{T/2})\1_{\{S_{T/2}\le s^*\}}\big]
+      +e^{-rT}\E\big[(K-S_T)^+\1_{\{S_{T/2}>s^*\}}\big]\Big),
+    \]
+    and write the two expectations with $N$ and $N_2(\cdot,\cdot;\rho)$, $\rho=\sqrt{1/2}$.
+  \item Compute $s^*$ and $U_0$ for $S_0=K=40$, $r=6\%$, $y=0$, $\sigma=20\%$, $T=1$, and
+    compare with \texttt{bermudan\_grid} with $m=2$ and with an out-of-sample LSM estimate.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A better control]\label{ex:am-stopped-control}
+\medium Let $P(t,s)$ be the Black--Scholes price at $t$ of the European put with maturity
+$T$ ($P(T,s)=(K-s)^+$) and $X_k=e^{-rt_k}P(t_k,S_{t_k})$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E[X_\tau]=P(0,S_0)$ for every $\tau\in\mathcal T_0$.
+  \item In the out-of-sample LSM estimator, use $X_{\hat\tau}$ as a control variate, with a
+    coefficient estimated on the training paths. Show that the controlled estimator is
+    still conditionally unbiased for the value of the policy.
+  \item Implement it and compare its variance with that of the terminal control
+    $e^{-rT}(K-S_T)^+$ of \noteref{exa:am-test-case}, on the put with $S_0=36$, $\sigma=20\%$,
+    $T=1$ of \noteref{tab:am-ls} and on the test case. Explain the difference.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The European price as a basis function]\label{ex:am-european-basis}
+\medium On the test case, \noteref{exa:am-test-case} found an LSM policy that exercises a third
+of the paths although early exercise is worth almost nothing.
+\begin{enumerate}[label=(\alph*)]
+  \item What is the continuation value $c_k$ when early exercise is never optimal after
+    $t_k$? Deduce a natural extra basis function at date $k$.
+  \item Add $s\mapsto P(t_k,s)$ (notation of \exref{ex:am-stopped-control}) to the four
+    Laguerre functions at each date, and redo the experiment: out-of-sample estimate, value of
+    the policy, fraction of paths exercised before maturity.
+  \item Does the extra function help for the put with $S_0=36$, $\sigma=20\%$, $T=1$ of
+    \noteref{tab:am-ls}?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Optimising a martingale]\label{ex:am-rogers}
+\medium Let $M^E$ be the European put martingale of \noteref{sec:am-duality} and
+$H(\lambda)=\E[\max_k(Z_k-\lambda M^E_k)]$ for $\lambda\in\R$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $H$ is convex and that $H(\lambda)\ge U_0$ for every $\lambda$.
+  \item For the put with $S_0=36$, $\sigma=20\%$, $T=1$ of \noteref{tab:am-ls}, estimate $H$ on a
+    grid of $\lambda\in[0,1.5]$ from $2000$ paths and locate its minimum.
+  \item Let $\hat H_n(\lambda)$ be the sample mean from $n$ paths. Show that
+    $\E[\min_\lambda\hat H_n(\lambda)]\le\min_\lambda H(\lambda)$. Propose a procedure that
+    uses the minimising $\lambda$ and still gives a valid upper confidence bound for $U_0$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The gap of a value-function martingale]\label{ex:am-hk-gap}
+\medium Let $\hat V_k$ be functions with $\E[\hat V_k(S_{t_k})^2]<\infty$, set
+$\hat U_k=e^{-rt_k}\hat V_k(S_{t_k})$, and define $M_0=0$ and
+$M_{k+1}-M_k=\hat U_{k+1}-\E[\hat U_{k+1}\mid\F_k]$, as Haugh and Kogan (2004) do with an
+approximate value function. Assume $\E[Z_k^2]<\infty$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $M$ is a square-integrable martingale.
+  \item Show that
+    $\E[\max_k(Z_k-M_k)]-U_0\le2\big(\sum_{k=1}^m\E[(\hat U_k-U_k)^2]\big)^{1/2}$.
+  \item The bound involves the error of $\hat V_k$ everywhere, also far from the exercise
+    boundary. Compare with \noteref{prop:am-andersen-broadie}(ii). Which errors of $\hat V_k$
+    do not affect $M$ at all?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A call on the maximum of two assets]\label{ex:am-max-call}
+\hard Let $S^1,S^2$ be independent Black--Scholes stocks with $S^1_0=S^2_0=S_0$,
+$\sigma=20\%$ and $y=10\%$, let $r=5\%$, $K=100$, $T=3$, and consider the Bermudan call on
+the maximum, with payoff $(\max(S^1,S^2)-K)^+$ and exercise dates $t_k=k/3$, $k=0,\dots,9$.
+\begin{enumerate}[label=(\alph*)]
+  \item Implement LSM for this option. Choose a basis (for instance polynomials of degree two
+    in $S^1/K$ and $S^2/K$, with or without the payoff itself) and justify the choice.
+  \item Compute out-of-sample lower bounds for $S_0=90,100,110$ with $10^5$ paths.
+  \item Compute Andersen--Broadie upper bounds by nested simulation, with sizes your computer
+    allows, and the confidence interval of \noteref{prop:am-andersen-broadie}(iv).
+  \item Andersen and Broadie (2004) report the $95\%$ intervals $[8.053,8.082]$,
+    $[13.892,13.934]$ and $[21.316,21.359]$ for these three cases. Compute the price itself
+    on a two-dimensional grid (the transition factorises over the two independent assets).
+    Are your intervals consistent with it? Which half of your interval, below or above the
+    price, is wider, and why?
+\end{enumerate}
+\end{exercise}

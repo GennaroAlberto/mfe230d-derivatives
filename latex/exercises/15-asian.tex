@@ -1,0 +1,115 @@
+% Exercises for Chapter 15 (Asian options). Statements only: solutions are kept privately.
+% Unless stated otherwise: the test case S = K = 100, T = 1, r = 1%, y = 2%, sigma = 20%,
+% constant parameters, fixing dates t_1 < ... < t_m with equal weights 1/m, payment at T.
+
+\begin{exercise}[Means]\label{ex:as-means}
+\easy Let $a_1,\dots,a_m>0$ and weights $w_j>0$ with $\sum_jw_j=1$, and let
+$H=\big(\sum_jw_j/a_j\big)^{-1}$, $G=\prod_ja_j^{w_j}$ and $A=\sum_jw_ja_j$ be the harmonic,
+geometric and arithmetic means.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\min_ja_j\le H\le G\le A\le\max_ja_j$, and that $H=G$, or $G=A$, holds if and
+    only if all the $a_j$ are equal.
+  \item Order the prices of the calls, and of the puts, with strike $K$ on the harmonic, geometric
+    and arithmetic averages of the same fixings.
+  \item Let $A$ be the arithmetic average of the fixings $S_{t_j}$, $t_j\le T$, and suppose that
+    $\int_t^T(r-y)\ge0$ for every fixing date $t$ (for instance $r\ge y$). Show that the
+    average-price call is worth at most the European call with maturity $T$ and the same
+    strike. In the test case, where $y>r$, compare the two calls for $m=12$ at $K=60$ and $K=100$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Two fixings]\label{ex:as-two-fixings}
+\easy Take $m=2$ fixings at $t_1=0$ and $t_2=T$, with equal weights, so that $A=\frac12(S+S_T)$
+and $G=\sqrt{SS_T}$. You may use \noteref{prop:as-geometric}, \noteref{prop:as-moment-matching}
+and \noteref{prop:as-curran}.
+\begin{enumerate}[label=(\alph*)]
+  \item Express the arithmetic call through a European call when $2K>S$, and give its price when
+    $2K\le S$. Evaluate both in the test case, for $K=100$ and $K=40$.
+  \item Compute $\mu_G$ and $v_G$ from \noteref{prop:as-geometric}(i), once with the double sum
+    and once with the tail sums, and price the geometric call for $K=100$.
+  \item Show that the three-moment approximation $C_3$ is exact here, and that the lower bound
+    $L(x^*)$ equals $C$ for every $K>0$. For which $K$ is the first term $L(\log K)$ exact? Is
+    the two-moment approximation exact?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A seasoned option]\label{ex:as-seasoned}
+\medium A monthly Asian call on the test case ($t_j=j/12$, $K=100$) is valued at $t=\frac12$,
+after six fixings, with $S_t=105$. Constant parameters are as in the test case. You may use the
+code of the chapter for numerical values.
+\begin{enumerate}[label=(\alph*)]
+  \item The six known fixings have arithmetic mean $98$. Write the value at $t$ as a multiple of
+    the price of an Asian call on the six remaining fixings, valued at $t$, with a shifted strike,
+    and compute it.
+  \item For the geometric call, the six known fixings have geometric mean $98$. Show that its value
+    at $t$ is a Black formula, give its parameters, and compute it.
+  \item Now value the arithmetic call at $t=\frac{11}{12}$, just before the last fixing, with
+    $S_t=105$ and eleven known fixings of arithmetic mean $100$. Show that it is a multiple of a
+    European call, and give its value and delta. Which approximations of the chapter are exact
+    in this situation?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Thresholds]\label{ex:as-threshold}
+\medium Use the notation of \noteref{lem:as-conditional} and \noteref{prop:as-curran}, with
+$K>0$ and $v_G>0$, and let $\phi_G$ be the density of $\Lambda=\log G$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $L$ is differentiable with $L'(x)=-D\big(h(x)-K\big)\phi_G(x)$, and deduce
+    again that $x^*$ maximises $L$. Why does an error $\delta$ in a finite threshold change $L$
+    only by $O(\delta^2)$?
+  \item A cheap threshold replaces $h(\log g)$ by $h(\log K)+(g-K)$, its first-order expansion
+    around $g=K$ with slope one. Show that the resulting threshold is
+    $\hat K=2K-h(\log K)$, and that $L(\log\hat K)\le L(x^*)\le C$ when $\hat K>0$. What lower
+    bound remains when $\hat K\le0$? ($L(\log\hat K)$ is the formula published by Curran.)
+  \item In the monthly test case ($m=12$, $K=100$) compute $h(\log K)$, $\hat K$, $e^{x^*}$,
+    $L(\log K)$, $L(\log\hat K)$ and $L(x^*)$. Repeat for $\sigma=80\%$ and compare with the
+    reference price.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[How good is the geometric control?]\label{ex:as-cv-lab}
+\medium This is a computational exercise. Take $K=100$, $T=1$ and equally spaced fixings.
+\begin{enumerate}[label=(\alph*)]
+  \item For $m\in\{4,12,52\}$ and $\sigma\in\{10\%,20\%,40\%\}$, estimate $1-\rho^2$ for the
+    geometric control with $2^{16}$ paths, and compare it with the bound
+    $D^2\E[(A-G)^2]/\Var Y$ of \noteref{prop:as-control}, with $\Var Y$ estimated from the same
+    paths.
+  \item How does $1-\rho^2$ depend on $\sigma$, and how on $m$? Give a heuristic reason for the
+    dependence on $\sigma$.
+  \item Time the simulation of the paths and the two payoffs, and estimate the efficiency of the
+    geometric control relative to plain Monte Carlo for $m=12$, $\sigma=20\%$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[An Australian option]\label{ex:as-oz}
+\hard An Australian variable-purchase option pays $(A/S_T-k)^+$ at $T$, where $A$ is the average
+of the monthly fixings $t_j=jT/12$, $j=1,\dots,12$ (so $t_{12}=T$); constant parameters.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $X_u=S_{T-u}/S_T$ for $0\le u\le T$. Show that $(X_u)_{0\le u\le T}$ has the law of
+    a geometric Brownian motion started at $1$ with volatility $\sigma$ and log-drift $-\nu$, where
+    $\nu=r-y-\frac12\sigma^2$. \emph{Hint:} $B_u=W_T-W_{T-u}$ is a Brownian motion.
+  \item Deduce that the option is worth an average-price call on $X$ with strike $k$, rate $r$,
+    yield $y'=2r-y-\sigma^2$, volatility $\sigma$, fixings at $u_j=T-t_j$ (one of them at $0$)
+    and payment at $T$.
+  \item For the test case with $k=1$, compute the geometric lower bound, the strip upper bound,
+    $C_2$, $C_3$, $L(x^*)$, the conditional lognormal approximation and a reference price, and
+    check the reference by simulating $(A/S_T-k)^+$ directly.
+  \item A published solution of this exercise uses the yield $2r+y-\sigma^2$. Which price does it
+    give, and how would a simulation detect the error?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A weekly two-year Asian]\label{ex:as-weekly}
+\medium This is a computational exercise. Take weekly fixings $t_j=j/52$, $j=1,\dots,104$,
+$T=2$, $\sigma=30\%$, and the other parameters of the test case.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute a reference price with the recursion \noteref{eq:as-recursion}, and check its
+    convergence in the grid size.
+  \item Tabulate the errors of $C^G$, $C_2$, $C_3$, the Edgeworth approximation, $L(\log K)$,
+    $L(x^*)$ and the conditional lognormal approximation, and compare with
+    \noteref{tab:as-approx}.
+  \item With $2^{16}$ paths, compare plain Monte Carlo, the geometric control, the three controls
+    and the conditional estimator of \noteref{prop:as-rest}: standard deviations per path and
+    estimates with their standard errors.
+\end{enumerate}
+\end{exercise}

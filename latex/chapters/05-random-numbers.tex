@@ -1,4 +1,706 @@
-\begin{planned}
-  \item pseudo-random number generators and how to test them
-  \item the inverse-CDF method, Box--Muller and the polar method, rejection sampling
-\end{planned}
+% Chapter 5: Random numbers.
+
+Every Monte Carlo estimator in this part of the notes averages functions of independent
+random variables. A computer produces none of these: it produces a deterministic sequence in
+$(0,1)$ designed to pass for an independent uniform sample, and every other law is obtained by
+transforming it. \Cref{sec:rng-uniform,sec:rng-testing} show how uniform pseudo-random
+numbers are made and tested, and why their defects are geometric.
+\Cref{sec:rng-inversion,sec:rng-rejection,sec:rng-normal} turn uniforms into other laws by
+inversion, by acceptance--rejection and, for the normal law, by the Box--Muller transform.
+\Cref{sec:rng-gaussian-vectors} builds Gaussian vectors with a given covariance.
+\Cref{ch:06-monte-carlo} turns these draws into estimators. Throughout, $\mathcal U(0,1)$ is
+the uniform law on $(0,1)$, $U,U_1,U_2,\dots$ are independent with this law, and $N$, $N'$
+are the standard normal distribution function and density.
+
+\section{Pseudo-random numbers}\label{sec:rng-uniform}
+
+A \emph{pseudo-random number generator} consists of a finite set $\mathcal S$ of states, a
+transition map $f:\mathcal S\to\mathcal S$, an output map $g:\mathcal S\to[0,1)$ and a seed
+$s_0\in\mathcal S$; it produces $s_{i+1}=f(s_i)$ and outputs $u_i=g(s_i)$. Determinism is a
+feature: the same seed reproduces a simulation exactly, which makes debugging possible and
+is what common random numbers exploit in \cref{ch:08-antithetic-control}. Finiteness has a
+price: as soon as $s_i=s_j$ with $i<j$, $s_{i+k}=s_{j+k}$ for all $k\ge0$, so the sequence is
+eventually periodic, with period at most $|\mathcal S|$.
+
+\subsection{Linear congruential generators}
+
+\begin{definition}[Linear congruential generator]\label{def:rng-lcg}
+Fix integers $m\ge2$ (the \emph{modulus}), $a\in\{1,\dots,m-1\}$ (the \emph{multiplier}),
+$c\in\{0,\dots,m-1\}$ (the \emph{increment}) and a seed $x_0\in\{0,\dots,m-1\}$. The
+\emph{linear congruential generator} (LCG) is
+\[
+  x_{i+1}=(a\,x_i+c)\bmod m,\qquad u_i=x_i/m,\qquad i\ge0 .
+\]
+It is \emph{multiplicative} if $c=0$. It has \emph{full period} if $x_0,\dots,x_{m-1}$ are
+the $m$ residues $0,\dots,m-1$ in some order.
+\end{definition}
+
+The outputs lie in the grid $\{0,\frac1m,\dots,\frac{m-1}m\}$, the period is at most $m$,
+and a full-period generator visits every residue once per period, whatever the seed. The
+value $u_i=0$ can occur and must be removed or shifted before computing $\log u_i$ or
+$N^{-1}(u_i)$.
+
+\begin{example}[The course's generator]\label{exm:rng-course-lcg}
+Take $m=16$, $a=9$, $c=5$ and $x_0=0$. Then $x_1=5$, $x_2=50\bmod16=2$, and the sequence
+is
+\[
+  0,\ 5,\ 2,\ 7,\ 4,\ 9,\ 6,\ 11,\ 8,\ 13,\ 10,\ 15,\ 12,\ 1,\ 14,\ 3,\ 0,\ \dots
+\]
+Each residue appears once before the sequence returns to $0$: the period is full. Yet the
+sequence is visibly not random. Since $a^2=81\equiv1$, we have
+$x_{i+2}\equiv a^2x_i+c(a+1)\equiv x_i+2\pmod{16}$: the terms of even index climb
+$0,2,4,\dots$ and those of odd index $5,7,9,\dots$. Small moduli exaggerate, but every
+defect in this section has this form: a linear relation among a few consecutive terms.
+\end{example}
+
+When does an LCG have full period? For $c\ne0$ the answer is arithmetic.
+
+\begin{theorem}[Hull and Dobell]\label{thm:rng-hull-dobell}
+An LCG with modulus $m$, multiplier $a$ and increment $c$ has full period if and only if
+\begin{enumerate}[label=(\roman*)]
+  \item $c$ and $m$ are coprime;
+  \item every prime that divides $m$ divides $a-1$;
+  \item if $4$ divides $m$, then $4$ divides $a-1$.
+\end{enumerate}
+\end{theorem}
+
+This is Theorem~1 of \textcite{hull-dobell}; a proof is in \textcite{knuth-taocp2},
+Section~3.2.1.2, Theorem~A. The necessity of the three conditions is elementary
+(\exref{ex:rng-hull-dobell}); the sufficiency takes more number theory. In
+\cref{exm:rng-course-lcg}, $c=5$ is odd, $2$ is the only prime factor of $16$, and $a-1=8$ is
+divisible by $4$. The theorem also shows how weak a guarantee a full period is: $a=1$,
+$c=1$ satisfies all three conditions and produces $x_i=x_0+i\bmod m$.
+
+\begin{remark}[Multiplicative generators]\label{rem:rng-multiplicative}
+If $c=0$, the residue $0$ is fixed and the period is at most $m-1$. If $a$ and the seed are
+coprime to $m$, then $x_k=a^kx_0\equiv x_0$ if and only if $a^k\equiv1$, so the period is the
+multiplicative order of $a$. For a prime $m$ it is $m-1$ exactly when $a$ is a primitive root:
+$a^{(m-1)/q}\not\equiv1\pmod m$ for every prime $q\mid m-1$ (\textcite{knuth-taocp2},
+Section~3.2.1.2, Theorems~B and~C). The ``minimal standard'' MINSTD of \textcite{park-miller}
+has $m=2^{31}-1$ and the primitive root $a=7^5=16807$, hence period $2^{31}-2$. For $m=2^e$,
+$e\ge4$, the period is at most $2^{e-2}$ (same reference); IBM's RANDU, $m=2^{31}$ and
+$a=2^{16}+3=65539$, attains $2^{29}$ from odd seeds.
+\end{remark}
+
+\begin{remark}[Period and resolution]\label{rem:rng-resolution}
+The period (draws before the sequence repeats) and the resolution (gap between
+neighbouring possible outputs) are different measures of coarseness. For an LCG with
+$u_i=x_i/m$ they are at most $m$ and $1/m$; NumPy's default generator has period $2^{128}$
+but returns multiples of $2^{-53}$ in $[0,1)$. A long period does not make the outputs finer:
+$32$-bit uniforms repeat values long before the period ends (\exref{ex:rng-birthday}), and
+the resolution limits how far into the tails a transformation can reach
+(\cref{rem:rng-tails}).
+\end{remark}
+
+\subsection{The lattice structure}\label{sec:rng-lattice}
+
+A Monte Carlo simulation of a $d$-dimensional quantity uses the outputs $d$ at a time. For
+an LCG, the $d$-tuples of consecutive outputs are far from uniformly scattered in the cube.
+
+\begin{proposition}[Marsaglia's lattice]\label{prop:rng-lattice}
+Let $(x_i)$ be an LCG with modulus $m$, multiplier $a$ and increment $c$, let $u_i=x_i/m$,
+fix $d\ge2$, and set $P_i=(u_i,u_{i+1},\dots,u_{i+d-1})\in[0,1)^d$ and
+$v=(1,a,a^2,\dots,a^{d-1})$.
+\begin{enumerate}[label=(\roman*)]
+  \item There is $b\in\R^d$, depending only on $m$, $a$, $c$ and $d$, such that every $P_i$
+    lies in $b+\Lambda$, where $\Lambda=\{(kv+mz)/m:\ k\in\Z,\ z\in\Z^d\}$ is a lattice.
+  \item Let $h=(h_0,\dots,h_{d-1})\in\Z^d\setminus\{0\}$ satisfy $h\cdot v\equiv0\pmod m$.
+    Then all the points $P_i$ lie on at most $\|h\|_1=\sum_j|h_j|$ of the parallel
+    hyperplanes $\{x:h\cdot x=\kappa\}$, and consecutive hyperplanes of this family are
+    $1/\|h\|_2$ apart.
+  \item There is such an $h$ with $\max_j|h_j|\le m^{1/d}$. Hence the $d$-tuples of
+    every LCG with modulus $m$ lie on at most $d\,m^{1/d}$ parallel hyperplanes.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By induction on $j$, $x_{i+j}\equiv a^jx_i+c\,s_j\pmod m$ with
+$s_j=1+a+\dots+a^{j-1}$ ($s_0=0$): the step from $j$ to $j+1$ is
+$a(a^jx_i+cs_j)+c=a^{j+1}x_i+cs_{j+1}$. With $s=(s_0,\dots,s_{d-1})$, this says
+$mP_i=x_iv+cs+mz_i$ for some $z_i\in\Z^d$, so $P_i\in cs/m+\Lambda$. The set $\Lambda$ is
+a subgroup of $\frac1m\Z^d$ that contains $\Z^d$, hence a lattice.
+
+(ii) For $y=(kv+mz)/m\in\Lambda$, $h\cdot y=k\,(h\cdot v)/m+h\cdot z$ is an integer. Hence
+$h\cdot P_i\in h\cdot b+\Z$ for every $i$: the points lie on the hyperplanes
+$h\cdot x=h\cdot b+n$, $n\in\Z$, and two consecutive ones are at distance $1/\|h\|_2$. For
+$x\in[0,1)^d$, each $h_jx_j$ ranges over $[0,h_j)$ or $(h_j,0]$, so $h\cdot x$ ranges over
+an interval of length $\|h\|_1$ that contains at most one of its endpoints. Such an
+interval contains at most $\|h\|_1$ points of the set $h\cdot b+\Z$.
+
+(iii) Let $K=\lfloor m^{1/d}\rfloor$, so that $(K+1)^d>m$. The $(K+1)^d$ vectors
+$g\in\{0,\dots,K\}^d$ give at most $m$ distinct residues $g\cdot v\bmod m$, so by the
+pigeonhole principle two different ones, $g$ and $g'$, give the same residue. Then
+$h=g-g'\ne0$ satisfies $h\cdot v\equiv0$ and $|h_j|\le K$, so $\|h\|_1\le dK\le dm^{1/d}$.
+\end{proof}
+
+Minkowski's convex body theorem, applied to the region $\{\|h\|_1\le R\}$ instead of a cube,
+sharpens (iii) to $\|h\|_1\le(d!\,m)^{1/d}$; this is the theorem of \textcite{marsaglia-planes}.
+For $m=2^{32}$ and $d=10$ it gives about $41.6$: the $10$-tuples of any LCG modulo $2^{32}$
+lie on at most $41$ parallel hyperplanes. The hyperplanes of (ii) are furthest apart for the
+shortest admissible $h$. The \emph{spectral test} (\textcite{knuth-taocp2}, Section~3.3.4)
+computes
+\[
+  \nu_d=\min\big\{\|h\|_2:\ h\in\Z^d\setminus\{0\},\ h\cdot v\equiv0\pmod m\big\}
+\]
+and reports the spacing $1/\nu_d$: the open slab between two adjacent hyperplanes of that
+family contains no point. Good multipliers make $1/\nu_d$ small in several dimensions at once
+(\textcite{glasserman-mc}, Section~2.1.4). A generator that does not visit all residues, such as
+a multiplicative one modulo $2^e$, fills only part of the lattice, and the test is then run with
+a reduced modulus (\textcite{knuth-taocp2}, Section~3.3.4).
+
+\begin{example}[RANDU]\label{exm:rng-randu}
+For RANDU, $a=2^{16}+3$ and $m=2^{31}$, so $a^2=2^{32}+6\cdot2^{16}+9\equiv6a-9\pmod{2^{31}}$
+and $x_{i+2}\equiv6x_{i+1}-9x_i$. Thus $h=(9,-6,1)$ is admissible in
+\cref{prop:rng-lattice}(ii): the number $9u_i-6u_{i+1}+u_{i+2}$ is an integer in the open
+interval $(-6,10)$, so it takes at most $15$ values, and all triples of consecutive outputs
+lie on $15$ parallel planes, $1/\sqrt{118}\approx0.092$ apart (\cref{fig:rng-lattice}(d)).
+An exhaustive search in the code confirms $\nu_3=\sqrt{118}$, also with the reduced modulus
+$2^{30}$ that accounts for the odd states. In two dimensions RANDU is unremarkable: with the
+reduced modulus, its pairs lie on lines $4.3\times10^{-5}$ apart. A defect can hide in a
+dimension nobody checked. In miniature, $m=2^{12}$ and $a=2^6+1$ give $(a-1)^2\equiv0$, so
+$h=(1,-2,1)$ is admissible: the pairs fill the square evenly ($\nu_2=63.0$; the best
+full-period multiplier for this modulus reaches $67.5$), but the triples lie on at most four planes (\cref{fig:rng-lattice}(b,c)).
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch05-lattice}
+  \caption{(a) The $16$ pairs $(u_i,u_{i+1})$ of \cref{exm:rng-course-lcg} lie on $4$
+    lines, as \cref{prop:rng-lattice}(ii) predicts for $h=(2,-2)$. (b) The pairs of the
+    generator $m=2^{12}$, $a=65$, $c=1$ fill the square evenly, but (c) its triples, seen
+    edge-on along $h=(1,-2,1)$, lie on three planes. (d) $10^4$ consecutive (overlapping) triples of RANDU seen along
+    $h=(9,-6,1)$: $15$ planes.}
+  \label{fig:rng-lattice}
+\end{figure}
+
+\demo{05-random-numbers.ipynb}{choose $m$, $a$ and $c$, check the Hull--Dobell conditions and
+the period, and look at the pairs and at the triples seen edge-on.}
+
+\subsection{Generators in use}
+
+Generators in current use have far larger states than these examples, and better-mixed
+outputs. The \emph{Mersenne Twister} MT19937 \citep{matsumoto-nishimura}, the default of
+Python's \texttt{random} module, is a linear recursion over the two-element field on $19937$
+bits, with period $2^{19937}-1$ and equidistribution in up to $623$ dimensions at $32$-bit
+resolution; being linear, it fails the linear-complexity tests of the TestU01 batteries
+\citep{lecuyer-simard}. \emph{MRG32k3a} \citep{lecuyer-mrg} combines two recursions of
+order three modulo primes close to $2^{32}$, has period about $2^{191}$, and is discussed in
+detail by \textcite{glasserman-mc}, Section~2.1.5. \emph{PCG} \citep{oneill-pcg} is an LCG
+modulo $2^{64}$ or $2^{128}$ whose output is a permuted, truncated function of the state ($32$
+bits out of $64$ in PCG32: a shift-and-xor and a rotation driven by the leading bits) that hides the weak low-order bits
+(\exref{ex:rng-low-bits}) and the lattice;
+NumPy's default generator is PCG64. The \emph{xoshiro} family \citep{blackman-vigna}
+consists of scrambled linear generators that are among the fastest available.
+Parallel simulations need non-overlapping streams. For an LCG, $k$ steps compose to the
+affine map $x_{i+k}\equiv A_kx_i+C_k$, $A_k=a^k$, $C_k=c(1+a+\dots+a^{k-1})$ modulo $m$, which
+repeated squaring computes in $O(\log k)$ operations: jumping ahead $2^{64}$ draws is cheap.
+
+\begin{incode}
+\coderef{code/src/mfe230d/rng.py} implements LCGs (vectorised by jump-ahead), the
+spectral test and PCG32; NumPy's PCG64 is the reference generator.
+\begin{lstlisting}
+from mfe230d.rng import lcg_sequence, spectral_test, PCG32, uniforms
+lcg_sequence(17, m=16, a=9, c=5, x0=0)    # 0 5 2 7 4 9 6 11 8 13 10 15 12 1 14 3 0
+spectral_test(a=65539, m=2**31, d=3)      # (array([ 9, -6,  1]), 10.86...) = sqrt(118)
+PCG32(initstate=42, initseq=54).random_raw(2)   # 0xa15c02b7, 0x7b47f409 (reference)
+u = uniforms(10**6, "pcg64", seed=1)       # NumPy's PCG64, mapped into (0, 1)
+\end{lstlisting}
+\end{incode}
+
+\section{Testing a generator}\label{sec:rng-testing}
+
+A generator cannot be proved random; it can only fail to look random. A statistical test
+fixes a statistic $T$ of $u_1,\dots,u_n$ whose law under the null hypothesis
+\[
+  H_0:\ u_1,\dots,u_n \text{ are independent with law } \mathcal U(0,1)
+\]
+is known, and reports the $p$-value $p=\Prob_{H_0}(T\ge t)$ at the observed value $t$. If
+the law of $T$ under $H_0$ is continuous, $p$ is uniform on $(0,1)$ under $H_0$
+(\cref{prop:rng-inversion}(iii) below), so a perfect generator gives $p<0.01$ once in a
+hundred tests. A defect shows as a $p$-value too extreme to be credible, or as $p$-values that
+are not uniform over repetitions (\textcite{knuth-taocp2}, Section~3.3.1).
+
+\paragraph{Moments.} Under $H_0$, $u_i$ has mean $\frac12$ and variance $\frac1{12}$, so by the
+central limit theorem $Z=\sqrt{12n}\,(\bar u_n-\frac12)$ is approximately $\mathcal N(0,1)$
+(\exref{ex:rng-moment-tests} treats the higher moments).
+
+\paragraph{Chi-square tests.} Split $[0,1)$ into $k$ cells of width $1/k$ and let $O_j$ be the
+number of $u_i$ in cell $j$. Pearson's statistic
+\[
+  X^2=\sum_{j=1}^{k}\frac{(O_j-n/k)^2}{n/k}
+\]
+converges in law under $H_0$ to the $\chi^2$ law with $k-1$ degrees of freedom
+(\textcite{knuth-taocp2}, Section~3.3.1.A); the approximation is adequate when $n/k\ge5$ or
+so. The \emph{serial test} applies it to the non-overlapping $d$-tuples
+$(u_{d(i-1)+1},\dots,u_{di})$ in the $k^d$ cells of $[0,1)^d$, with $k^d-1$ degrees of freedom
+(overlapping tuples are dependent and need another limit; \textcite{knuth-taocp2},
+Section~3.3.2.B). It is the test that sees a lattice.
+
+\paragraph{Kolmogorov--Smirnov.} With $F_n$ the empirical distribution function and
+$u_{(1)}\le\dots\le u_{(n)}$ the order statistics,
+\[
+  D_n=\sup_{x\in[0,1]}|F_n(x)-x|=\max_{1\le i\le n}\max\Big(\frac in-u_{(i)},\ u_{(i)}-\frac{i-1}n\Big).
+\]
+Under $H_0$, $\sqrt n\,D_n$ converges in law to a variable $K$ with
+$\Prob(K>t)=2\sum_{j\ge1}(-1)^{j-1}e^{-2j^2t^2}$ (Kolmogorov; see \textcite{knuth-taocp2},
+Section~3.3.1.B). By \cref{prop:rng-inversion}(iii) it applies to any continuous $F$ after the
+map $x\mapsto F(x)$. It sees one-dimensional marginals only.
+
+\paragraph{Serial correlation.} The sample autocorrelation at lag $k$ is
+$r_k=\sum_{i=1}^{n-k}(u_i-\bar u_n)(u_{i+k}-\bar u_n)\big/\sum_{i=1}^{n}(u_i-\bar u_n)^2$.
+For an \iid sequence with finite variance, $\sqrt n\,(r_1,\dots,r_K)$ converges in law to
+$\mathcal N(0,I_K)$ (Bartlett's formula; \textcite{brockwell-davis}, Theorem~7.2.2).
+About one lag in twenty falls outside the band $\pm1.96/\sqrt n$ by chance.
+
+\paragraph{Histograms with error bars.} If $z_1,\dots,z_n$ are independent with a continuous
+law $F$, the count $O_j$ in a bin $[e_{j-1},e_j)$ is binomial with $n$ trials and success
+probability $p_j=F(e_j)-F(e_{j-1})$: mean $np_j$, standard deviation
+$\sigma_j=\sqrt{np_j(1-p_j)}$. About $4.6\%$ of the standardised counts
+$(O_j-np_j)/\sigma_j$ should exceed $2$ in absolute value (\cref{fig:rng-diagnostics}).
+
+\begin{table}[ht]
+  \centering\small
+  \begin{tabular}{@{}lccccccc@{}}
+    \toprule
+    generator & period & $\sqrt{12n}(\bar u-\frac12)$ & KS & $\chi^2$, $k=10^3$ & $\sqrt n\,r_1$ & serial $d=2$ & serial $d=3$\\
+    \midrule
+    RANDU  & $2^{29}$     & $-0.71$ & $0.54$ & $0.46$ & $\phantom{-}0.91$ & $0.32$ & $<10^{-300}$\\
+    MINSTD & $2^{31}-2$   & $-1.37$ & $0.28$ & $0.08$ & $-0.64$ & $0.28$ & $0.09$\\
+    LCG $2^{32}$ & $2^{32}$ & $\phantom{-}0.97$ & $0.41$ & $0.49$ & $\phantom{-}0.90$ & $0.74$ & $0.89$\\
+    PCG32  & $2^{64}$     & $-0.17$ & $0.86$ & $0.86$ & $-0.67$ & $0.52$ & $0.32$\\
+    PCG64  & $2^{128}$    & $-0.08$ & $0.77$ & $0.73$ & $-0.88$ & $0.35$ & $0.12$\\
+    \bottomrule
+  \end{tabular}
+  \caption{Tests on $n=10^6$ uniforms from five generators: two $z$-scores, and $p$-values
+    for Kolmogorov--Smirnov and the chi-square tests ($100^2$ cells in $d=2$, $20^3$ cells in
+    $d=3$). ``LCG $2^{32}$'' is the full-period generator with $a=1664525$,
+    $c=1013904223$. RANDU fails only the three-dimensional test, with $X^2=247{,}846$ on
+    $7{,}999$ degrees of freedom.}
+  \label{tab:rng-tests}
+\end{table}
+
+In \cref{tab:rng-tests} every generator passes the one-dimensional tests and the test on
+pairs, and RANDU fails the test on triples beyond doubt, as \cref{exm:rng-randu} predicts: its
+planes are $0.092$ apart and the cells $0.05$ wide, so $2000$ of the $8000$ cells are empty
+while others hold up to $129$ triples, against $41.7$ expected. The spectral test sees the
+defect without sampling: $1/\nu_3$ is $0.092$ for RANDU, $1.6\times10^{-3}$ for MINSTD and
+$6.6\times10^{-4}$ for the LCG modulo $2^{32}$, too fine for these cells. Batteries such as
+TestU01 \citep{lecuyer-simard} run many such tests on far longer sequences. Passing them is
+necessary, not sufficient: what matters is whether a generator's defects interact with the
+problem at hand (\textcite{glasserman-mc}, Section~2.1.1).
+
+\section{Inversion}\label{sec:rng-inversion}
+
+From now on we assume a source of independent $\mathcal U(0,1)$ variables. The most
+direct way to obtain any other law on $\R$ is to invert its distribution function.
+
+\begin{proposition}[Inversion]\label{prop:rng-inversion}
+Let $F$ be a distribution function on $\R$ and define its generalized inverse
+$F^{-1}(u)=\inf\{x\in\R:\ F(x)\ge u\}$ for $u\in(0,1)$.
+\begin{enumerate}[label=(\roman*)]
+  \item $F^{-1}(u)$ is a real number, $F^{-1}$ is nondecreasing, and for all $u\in(0,1)$
+    and $x\in\R$,
+    \begin{equation}\label{eq:rng-galois}
+      F^{-1}(u)\le x\iff u\le F(x).
+    \end{equation}
+  \item If $U\sim\mathcal U(0,1)$, then $X=F^{-1}(U)$ has distribution function $F$.
+  \item If $F$ is continuous and $X$ has distribution function $F$, then $F(X)\sim\mathcal U(0,1)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Let $u\in(0,1)$ and $A_u=\{x:F(x)\ge u\}$. Since $F(x)\to1$ as $x\to\infty$ and
+$u<1$, $A_u$ is not empty; since $F(x)\to0$ as $x\to-\infty$ and $u>0$, it is bounded
+below. So $F^{-1}(u)=\inf A_u$ is real. Because $F$ is nondecreasing, $A_u$ is a half-line
+that contains every point to the right of any of its points, and because $F$ is
+right-continuous, it contains its infimum: $A_u=[F^{-1}(u),\infty)$. This is
+\eqref{eq:rng-galois}. If $u\le u'$ then $A_{u'}\subseteq A_u$, so $F^{-1}(u)\le F^{-1}(u')$.
+
+(ii) By \eqref{eq:rng-galois}, $\Prob(F^{-1}(U)\le x)=\Prob(U\le F(x))=F(x)$ for every
+$x\in\R$.
+
+(iii) Fix $u\in(0,1)$ and let $x_u=F^{-1}(u)$. By \eqref{eq:rng-galois},
+$\{F(X)\ge u\}=\{X\ge x_u\}$, so $\Prob(F(X)\ge u)=1-F(x_u-)$, where $F(x_u-)$ is the left
+limit. Now $F(x_u)\ge u$ by (i), and $F(x)<u$ for $x<x_u$, so $F(x_u-)\le u$; by continuity
+$F(x_u-)=F(x_u)$, hence $F(x_u)=u$ and $\Prob(F(X)\ge u)=1-u$ for all $u\in(0,1)$. This is
+the uniform law.
+\end{proof}
+
+Continuity in (iii) cannot be dropped (if $X$ is Bernoulli, $F(X)$ takes two values), but
+(ii) needs no assumption: atoms of $F$ become flat stretches of $F^{-1}$. Inversion uses one
+uniform per variate and is monotone in it, so $F^{-1}(U)$ and $G^{-1}(U)$ are comonotone and $F^{-1}(U)$ and
+$F^{-1}(1-U)$ are antithetic. Antithetic variates, common random numbers, stratification and
+quasi-Monte Carlo all rely on this (\cref{prop:cv-antithetic,prop:cv-crn},
+\cref{ch:10-stratification,ch:11-quasi-monte-carlo}). For the exponential law,
+$F^{-1}(u)=-\log(1-u)/\lambda$, and since $1-U$ is uniform, $-\log(U)/\lambda$ is exponential
+with rate $\lambda$. For a discrete law on $y_1<y_2<\cdots$ with $F_k=\Prob(X\le y_k)$,
+$F^{-1}(u)=y_k$ for $F_{k-1}<u\le F_k$: inversion is a table search
+(\exref{ex:rng-inversion-examples}).
+
+\subsection{Inversion by Newton's method: the semicircle law}
+
+When $F$ can be evaluated but not inverted, $F(x)=u$ is solved numerically, and the starting
+point decides whether the iteration is safe. The course's example is the semicircle law,
+\[
+  f(x)=\frac2\pi\sqrt{1-x^2},\qquad F(x)=\frac12+\frac1\pi\Big(x\sqrt{1-x^2}+\arcsin x\Big),
+\]
+with the guess $x_0=2u-1$ that inverts $F(x)\approx\frac{1+x}2$. The density vanishes at
+$\pm1$, where Newton's method could fail; from this start it does not.
+
+\begin{proposition}[Newton's method for the semicircle law]\label{prop:rng-semicircle-newton}
+Let $u\in(\frac12,1)$, $x^*=F^{-1}(u)\in(0,1)$, and
+$x_{k+1}=x_k-\big(F(x_k)-u\big)/f(x_k)$ with $x_0=2u-1$. Then $x_0\ge x^*$,
+\[
+  0\le x_1\le x_2\le\dots\le x^*,\qquad x_k\to x^*,\qquad
+  |x_{k+1}-x^*|\le\frac{x^*}{2(1-x^{*2})}\,|x_k-x^*|^2\quad(k\ge1).
+\]
+By the symmetry $F(-x)=1-F(x)$, the case $u\in(0,\frac12)$ is the mirror image, and $u=\frac12$
+gives $x_0=x^*=0$.
+\end{proposition}
+
+\begin{proof}
+On $[0,1]$, $f$ is decreasing, so $F$ is concave: it lies above its chord,
+$F(x)\ge\frac{1+x}2$, and below its tangents, $F(y)\le F(x)+f(x)(y-x)$ for $x\in[0,1)$,
+$y\in[0,1]$.
+
+Since $u=\frac{1+x_0}2$, the chord bound gives $F(x_0)\ge u$, so $x_0\ge x^*$. Next,
+$x_1=h(x_0)/f(x_0)$ with $h(x)=xf(x)-F(x)+\frac{1+x}2$. Now $h(0)=h(1)=0$ and
+$h'(x)=\frac12+xf'(x)=\frac12-\frac2\pi\frac{x^2}{\sqrt{1-x^2}}$ is decreasing, so $h$
+increases and then decreases on $[0,1]$, and $h\ge0$ there; thus $x_1\ge0$.
+
+Now argue by induction. Let $x_k\in[0,1)$, which holds for $k=0$. The tangent
+$T_k(y)=F(x_k)+f(x_k)(y-x_k)$ is increasing and $T_k(x_{k+1})=u<1=F(1)\le T_k(1)$, so
+$x_{k+1}<1$. Also $x_{k+1}\ge0$: for $k=0$ by the bound on $h$; for $k\ge1$, if
+$x_k\le x^*$, then $F(x_k)\le u$ and $x_{k+1}=x_k+(u-F(x_k))/f(x_k)\ge x_k\ge0$. The
+tangent bound then gives $F(x_{k+1})\le T_k(x_{k+1})=u$, that is, $x_{k+1}\le x^*$. Hence
+$0\le x_1\le x_2\le\dots\le x^*$. The limit $\ell\le x^*<1$ satisfies
+$\ell=\ell-(F(\ell)-u)/f(\ell)$ by continuity, so $F(\ell)=u$ and $\ell=x^*$.
+
+For the rate, Taylor's formula gives $F(x^*)=F(x_k)+f(x_k)(x^*-x_k)+\frac12f'(\xi)(x^*-x_k)^2$
+for some $\xi\in[x_k,x^*]$, so $x_{k+1}-x^*=\frac{f'(\xi)}{2f(x_k)}(x_k-x^*)^2$. On $[0,1)$,
+$f$ is decreasing and $|f'(x)|=\frac2\pi\frac{x}{\sqrt{1-x^2}}$ is increasing, so
+$|f'(\xi)|\le|f'(x^*)|$ and $f(x_k)\ge f(x^*)$, and $|f'(x^*)|/(2f(x^*))=x^*/(2(1-x^{*2}))$.
+\end{proof}
+
+The constant blows up as $x^*\to1$: near the edges, where $f$ is small, the quadratic regime
+starts late (\cref{fig:rng-inversion}(a)). On a grid of $u\in[10^{-4},1-10^{-4}]$, the residual
+$|F(x_k)-u|$ is at most $2.6\times10^{-4}$ after two steps and $3.4\times10^{-6}$ after
+three, with medians $1.1\times10^{-6}$ and $5\times10^{-13}$. Halley's method, which also uses
+$f'$, iterates $x_{k+1}=x_k-2g f/(2f^2-g f')$ with $g=F(x_k)-u$ and everything evaluated at
+$x_k$; two Halley steps reach a median residual of $6\times10^{-12}$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch05-inversion}
+  \caption{(a) Residual $|F(x_k)-u|$ of Newton's and Halley's iterations for the semicircle
+    law from $x_0=2u-1$, against $u$; convergence is slowest near $u=0$ and $u=1$, as
+    \cref{prop:rng-semicircle-newton} predicts. (b) Absolute errors of two approximations
+    of $N^{-1}$ and of Acklam's after one Halley step, against $x=N^{-1}(u)$. Both panels
+    plot block maxima over blocks of $15$ grid points.}
+  \label{fig:rng-inversion}
+\end{figure}
+
+\subsection{Inverting the normal distribution function}
+
+$N^{-1}$ has no closed form, and it is the inversion that finance uses most. Practical
+algorithms use a rational function of $u-\frac12$ in the centre and of a variable that
+straightens the tail, such as $\sqrt{-2\log u}$ or $\log(-\log u)$, for small $u$; the upper
+tail follows from $N^{-1}(1-u)=-N^{-1}(u)$. The \emph{Beasley--Springer--Moro} algorithm
+combines the central approximation of \textcite{beasley-springer} ($|u-\frac12|<0.42$) with
+the tail polynomial in $\log(-\log u)$ of \textcite{moro-full-monte};
+\textcite{glasserman-mc}, Section~2.3.2, prints the coefficients and reports a maximum
+absolute error of $3\times10^{-9}$ for $|x|\le7$ (we measure $3.0\times10^{-9}$, near $|x|=1.4$
+where the two pieces meet).
+\emph{Acklam's algorithm} \citep{acklam} uses $qP_5(q^2)/Q_5(q^2)$ with $q=u-\frac12$ for
+$0.02425\le u\le0.97575$ and $P_5(s)/Q_4(s)$ with $s=\sqrt{-2\log u}$ in the lower tail
+($P_k$, $Q_k$ polynomials of degree $k$), with relative error below $1.15\times10^{-9}$ (we
+measure $1.13\times10^{-9}$). AS~241 \citep{wichura} reaches about $10^{-16}$, and
+\textcite{giles-erfinv} approximates the related $\operatorname{erfinv}$ (with
+$N^{-1}(u)=\sqrt2\operatorname{erfinv}(2u-1)$) in single precision for GPUs, with a branch
+that threads rarely take differently. A cheap
+approximation can be polished. Since $N''(x)=-xN'(x)$, one step of Halley's method
+on $N(x)=u$ reads
+\begin{equation}\label{eq:rng-halley}
+  x\leftarrow x-\frac{t}{1+xt/2},\qquad t=\frac{N(x)-u}{N'(x)} .
+\end{equation}
+It needs an accurate $N$, evaluated in the lower half ($u\le\frac12$) where small
+probabilities keep their relative precision. One step from Acklam's value brings the error
+below $4\times10^{-15}$ for $|x|\le8.2$ (\cref{fig:rng-inversion}(b)). An error of $10^{-9}$
+is invisible next to a statistical error of $10^{-3}$, but not to a finite-difference Greek
+computed with common random numbers.
+
+\section{Acceptance--rejection}\label{sec:rng-rejection}
+
+When $F$ cannot be inverted cheaply, a density can still be sampled by proposing from an
+easier density and keeping each proposal with a suitable probability \citep{von-neumann}.
+
+\begin{proposition}[Acceptance--rejection]\label{prop:rng-rejection}
+Let $f$ and $g$ be probability densities on $\R^d$ with $f\le c\,g$ for a constant $c$.
+Let $(Y_k,U_k)_{k\ge1}$ be independent pairs, $Y_k$ with density $g$ and $U_k\sim\mathcal U(0,1)$
+independent of $Y_k$, and call trial $k$ \emph{accepted} if $c\,U_kg(Y_k)\le f(Y_k)$. Let
+$\tau$ be the first accepted trial.
+\begin{enumerate}[label=(\roman*)]
+  \item Each trial is accepted with probability $1/c$; in particular $c\ge1$.
+  \item $\tau$ is geometric, $\Prob(\tau=k)=(1-\frac1c)^{k-1}\frac1c$, with
+    $\E[\tau]=c$ and $\Var(\tau)=c(c-1)$.
+  \item $Y_\tau$ has density $f$ and is independent of $\tau$. More generally, the values at
+    the successive accepted trials are independent with density $f$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Since $f\le cg$, $f$ vanishes where $g$ does, and $Y_k$ falls in $\{g=0\}$ with probability
+zero; there we set $f/(cg)=0$. For a Borel set $B$, conditioning on $Y_k$ (Fubini),
+\[
+  \Prob(Y_k\in B,\ \text{trial }k\text{ accepted})
+  =\int_B g(y)\,\Prob\Big(U\le\frac{f(y)}{c\,g(y)}\Big)\dd y=\int_B g(y)\frac{f(y)}{c\,g(y)}\dd y
+  =\frac1c\int_Bf(y)\,\dd y,
+\]
+using $f/(cg)\le1$. With $B=\R^d$ this is (i), and $1/c\le1$ because a probability is at
+most one. The trials are independent, so
+\[
+  \Prob(\tau=k,\ Y_\tau\in B)=\Big(1-\frac1c\Big)^{k-1}\frac1c\int_Bf(y)\,\dd y .
+\]
+The right side factorises: summing over $k$ shows that $Y_\tau$ has density $f$, $B=\R^d$
+gives the geometric law of $\tau$ (mean $c$, variance $(1-\frac1c)c^2$), and the product form
+is the independence. The successive accepted trials $\tau_1<\tau_2<\cdots$ cut the trials
+into blocks of independent pairs, and the same computation, block by block, gives a product
+of such factors for $(\tau_1,Y_{\tau_1},\dots,\tau_j-\tau_{j-1},Y_{\tau_j})$.
+\end{proof}
+
+Geometrically, $(Y_k,c\,U_kg(Y_k))$ is uniform under the graph of $cg$ and is kept if it falls
+under the graph of $f$; the acceptance probability is the ratio of the areas. The test only
+involves $f/(cg)$, so $f$ is needed only up to a constant: if $\tilde f=Zf\le\chi$ with
+$A=\int\chi<\infty$, sampling from $\chi/A$ and accepting with probability $\tilde f/\chi$ has
+acceptance probability $Z/A$. The best constant is $c=\sup f/g$; it is finite only if the
+proposal has tails at least as heavy as the target (a normal proposal cannot serve a Cauchy
+target). Each accepted draw costs $c$ proposals on average.
+
+\begin{example}[Envelopes for the semicircle law]\label{exm:rng-envelopes}
+The flat envelope $\chi=2/\pi$ on $[-1,1]$ has area $4/\pi$, so the acceptance probability
+is $\pi/4\approx0.785$ (proposal $X=2U_1-1$, accepted if $U_2\le\sqrt{1-X^2}$). Since $f$ is
+concave, its tangents lie above it. The tangent at $\pm\sin\vartheta$, for
+$\vartheta\in(0,\frac\pi2)$, is $\frac2\pi(1\mp x\sin\vartheta)/\cos\vartheta$, and it
+crosses the level $2/\pi$ at $\pm t$ with $t=(1-\cos\vartheta)/\sin\vartheta=\tan\frac\vartheta2$.
+The envelope $\chi_\vartheta(x)=\frac2\pi\min\big(1,(1-|x|\sin\vartheta)/\cos\vartheta\big)$ is
+piecewise linear (sampled by inverting a piecewise quadratic), with area
+\[
+  \int_{-1}^1\chi_\vartheta=\frac4\pi\Big(t+\frac{(1-t)-\frac12(1-t^2)\sin\vartheta}{\cos\vartheta}\Big)
+  =\frac4\pi\,\frac{1+t^2}{1+t},
+\]
+using $\sin\vartheta=2t/(1+t^2)$ and $\cos\vartheta=(1-t^2)/(1+t^2)$. The acceptance
+probability is therefore
+\begin{equation}\label{eq:rng-envelope-acceptance}
+  p(\vartheta)=\frac{\pi}{4}\,\frac{1+t}{1+t^2},\qquad t=\tan\frac\vartheta2 .
+\end{equation}
+Tangents at $\pm\frac12$ ($\vartheta=\frac\pi6$, $t=2-\sqrt3$) give
+$p=(3+\sqrt3)\pi/16\approx0.929$. The derivative of $(1+t)/(1+t^2)$ vanishes where
+$t^2+2t-1=0$, so the best tangent point is $t=\sqrt2-1$, that is $\vartheta=\frac\pi4$ and
+tangents at $\pm\frac{\sqrt2}2$, with $p=(1+\sqrt2)\pi/8\approx0.948$. These are the course's
+two envelopes (\cref{fig:rng-rejection}).
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch05-rejection}
+  \caption{(a) The semicircle density with three envelopes and their acceptance
+    probabilities. (b) The acceptance probability \eqref{eq:rng-envelope-acceptance}
+    against the tangent angle, with rates estimated from $10^5$ accepted draws each.}
+  \label{fig:rng-rejection}
+\end{figure}
+
+\demo{05-random-numbers.ipynb}{move the tangent point of the envelope and compare the
+acceptance probability \eqref{eq:rng-envelope-acceptance} with simulation.}
+
+\section{Normal variates}\label{sec:rng-normal}
+
+For the normal law there are faster routes than a numerical $N^{-1}$. Both rest on the
+polar coordinates that compute $\int e^{-x^2/2}\dd x=\sqrt{2\pi}$.
+
+\begin{proposition}[Box--Muller and the polar method]\label{prop:rng-box-muller}
+\begin{enumerate}[label=(\roman*)]
+  \item Let $U_1,U_2$ be independent $\mathcal U(0,1)$, $R=\sqrt{-2\log U_1}$ and
+    $\Theta=2\pi U_2$. Then $Z_1=R\cos\Theta$ and $Z_2=R\sin\Theta$ are independent
+    $\mathcal N(0,1)$ \citep{box-muller}.
+  \item Let $(V_1,V_2)$ be uniform on the punctured disc $\{0<v_1^2+v_2^2<1\}$ and
+    $S=V_1^2+V_2^2$. Then $Z_i=V_i\sqrt{-2\log(S)/S}$, $i=1,2$, are independent
+    $\mathcal N(0,1)$ \citep{marsaglia-bray}. Such a pair is obtained by rejection: take
+    $V_i=2U_i-1$ and accept if $0<S<1$, which happens with probability $\pi/4$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $R^2=-2\log U_1$ has $\Prob(R^2>s)=\Prob(U_1<e^{-s/2})=e^{-s/2}$ for $s\ge0$, so $R$ has
+density $re^{-r^2/2}$ on $(0,\infty)$, and $\Theta$ is uniform on $(0,2\pi)$ and independent
+of $R$. The map $\phi(r,\theta)=(r\cos\theta,r\sin\theta)$ is a continuously differentiable
+bijection from $(0,\infty)\times(0,2\pi)$ onto the plane minus the half-line
+$\{(x,0):x\ge0\}$, a null set, with Jacobian determinant $r$. By the change-of-variables
+formula, $(Z_1,Z_2)=\phi(R,\Theta)$ has density, at $z=\phi(r,\theta)$,
+\[
+  \frac{1}{r}\cdot\frac{1}{2\pi}\,re^{-r^2/2}=\frac{1}{2\pi}e^{-(z_1^2+z_2^2)/2}
+  =N'(z_1)\,N'(z_2),
+\]
+the product of two standard normal densities.
+
+(ii) Write $V=(\sqrt S\cos\Theta,\sqrt S\sin\Theta)$ with $\Theta\in(0,2\pi)$ (unique outside
+a null set). The disc has density $1/\pi$ and, in polar coordinates with $r=\sqrt s$, area
+element $r\,\dd r\,\dd\theta=\frac12\dd s\,\dd\theta$, so $(S,\Theta)$ has density $\frac1{2\pi}$
+on $(0,1)\times(0,2\pi)$: $S$ and $\Theta/(2\pi)$ are independent $\mathcal U(0,1)$. Since
+$V_i/\sqrt S$ are $\cos\Theta$ and $\sin\Theta$, $(Z_1,Z_2)$ is the Box--Muller pair built from
+$U_1=S$, $U_2=\Theta/(2\pi)$. Finally, $(2U_1-1,2U_2-1)$ is uniform on $(-1,1)^2$, and given
+that it falls in the punctured disc, an event of probability $\pi/4$, it is uniform there
+(\cref{prop:rng-rejection} with $f$ uniform on the disc and $g$ on the square).
+\end{proof}
+
+The polar method avoids the sine and cosine at the price of rejecting $21\%$ of the pairs:
+it consumes on average $4/\pi\approx1.27$ uniforms per normal, against one for Box--Muller
+and for inversion. It consumes a random number of uniforms, which breaks the structure of the
+low-discrepancy points of \cref{ch:11-quasi-monte-carlo}. Both methods are exact; with
+pseudo-random inputs their quality is that of the pairs $(u_{2i},u_{2i+1})$. Two more exact
+samplers of the normal law, by rejection, are in \exref{ex:rng-laplace} and \exref{ex:rng-ratio-uniforms}.
+
+\begin{remark}[Tails and lattices]\label{rem:rng-tails}
+The resolution of the uniforms caps the normals: if $u_1\ge\delta$, then
+$|z_i|\le R\le\sqrt{-2\log\delta}$. For $32$-bit uniforms, $\delta\approx2^{-32}$ and
+$|z|\le6.66$, a level that a true normal exceeds with probability $2.7\times10^{-11}$; for
+$53$-bit uniforms the cap is $8.57$. More seriously, Box--Muller transforms the lattice of
+pairs of an LCG into spirals: a line $u_2=\alpha u_1+\beta$ in the square becomes the curve
+$r=\sqrt{-2\log u_1}$, $\theta=2\pi(\alpha u_1+\beta)$. \textcite{neave} showed that with
+multiplicative generators this distorts the tails: if $u_2=au_1\bmod1$, then $u_2=au_1$
+whenever $u_1<1/a$, so the largest radii, which come from the smallest $u_1$, come with angles
+$2\pi au_1$ close to $0$. \Cref{fig:rng-normals}(b) shows the effect for a full-period LCG
+with $m=2^{12}$: all the normals lie on a few spiral arms inside the circle of radius
+$\sqrt{2\log(2m)}$.
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch05-normals}
+  \caption{(a) The polar method: $3000$ uniform pairs on $(-1,1)^2$; those inside the
+    disc (cobalt) are kept. (b) Box--Muller applied to the $2048$ consecutive pairs of the
+    full-period LCG $m=2^{12}$, $a=1229$, $c=1$ (uniforms $(x_i+\frac12)/m$); the dashed
+    circle is the largest attainable radius. (c) Box--Muller applied to $2048$ pairs from
+    PCG64.}
+  \label{fig:rng-normals}
+\end{figure}
+
+\paragraph{Checking normal variates.} \Cref{fig:rng-diagnostics} runs the diagnostics of the
+course's homework on Box--Muller normals. With $n=10^5$, one bin in $80$ lies outside $\pm2$
+binomial standard deviations (about $3.6$ expected), one lag in $20$ falls outside the band
+for each of $z_i$ and $z_i^2$, and $3$ and $4$ values fall below $-4$ and above $4$ (about
+$3.2$ expected on each side). The squares matter because variates can be uncorrelated but
+dependent, for instance with clustered magnitudes; the lag-one pairs mapped back by $N$
+should fill the square uniformly (\cref{prop:rng-inversion}(iii)).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch05-diagnostics}
+  \caption{Diagnostics of $n=10^5$ Box--Muller normals built from PCG32 uniforms: (a)
+    histogram with bins of width $0.1$ and the binomial intervals $np_j\pm2\sigma_j$; (b)
+    standardised counts $(O_j-np_j)/\sigma_j$; (c) autocorrelations of $z_i$ and $z_i^2$ at
+    lags $1$ to $20$; (d) the first $4000$ lag-one pairs mapped back by $N$.}
+  \label{fig:rng-diagnostics}
+\end{figure}
+
+\demo{05-random-numbers.ipynb}{feed Box--Muller with an LCG of your choice and watch the
+spirals; run the histogram and autocorrelation diagnostics for several generators.}
+
+\section{Correlated Gaussian vectors}\label{sec:rng-gaussian-vectors}
+
+A multi-asset model or a discretised path needs a Gaussian vector $X\sim\mathcal N(\mu,\Sigma)$
+with a given covariance matrix $\Sigma$, symmetric and positive semidefinite. Independent
+standard normals and a square root of $\Sigma$ suffice.
+
+\begin{proposition}[Cholesky and principal components]\label{prop:rng-cholesky}
+Let $\Sigma$ be a symmetric positive semidefinite $d\times d$ matrix and $\mu\in\R^d$.
+\begin{enumerate}[label=(\roman*)]
+  \item If $A$ is a $d\times k$ matrix with $AA^\top=\Sigma$ and $Z\sim\mathcal N(0,I_k)$,
+    then $\mu+AZ\sim\mathcal N(\mu,\Sigma)$.
+  \item \emph{(Cholesky.)} If $\Sigma$ is positive definite, there is exactly one lower
+    triangular $L$ with positive diagonal and $LL^\top=\Sigma$. Column by column, for
+    $j=1,\dots,d$ and $i>j$,
+    \begin{equation}\label{eq:rng-cholesky}
+      L_{jj}=\Big(\Sigma_{jj}-\sum_{k<j}L_{jk}^2\Big)^{1/2},\qquad
+      L_{ij}=\frac{1}{L_{jj}}\Big(\Sigma_{ij}-\sum_{k<j}L_{ik}L_{jk}\Big),
+    \end{equation}
+    and every quantity under the square root is positive.
+  \item \emph{(Principal components.)} Let $\Sigma=V\Lambda V^\top$ with $V$ orthogonal,
+    columns $v_1,\dots,v_d$, and $\Lambda=\mathrm{diag}(\lambda_1,\dots,\lambda_d)$,
+    $\lambda_1\ge\dots\ge\lambda_d\ge0$. Then $A=V\Lambda^{1/2}$ satisfies $AA^\top=\Sigma$,
+    so $X=\mu+\sum_{j=1}^{d}\sqrt{\lambda_j}\,Z_jv_j$ is $\mathcal N(\mu,\Sigma)$. Its
+    truncation $X_r=\mu+\sum_{j\le r}\sqrt{\lambda_j}Z_jv_j$ has
+    $\E|X-X_r|^2=\sum_{j>r}\lambda_j$, and no random vector $Y$ with values in an affine
+    subspace of dimension $r$ does better: $\E|X-Y|^2\ge\sum_{j>r}\lambda_j$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\mu+AZ$ is an affine image of a Gaussian vector, hence Gaussian, with mean $\mu$ and
+covariance $A\,I_k\,A^\top=\Sigma$; a Gaussian law is determined by its mean and covariance
+(its characteristic function is $e^{i\xi\cdot\mu-\frac12\xi^\top\Sigma\xi}$).
+
+(ii) Induction on $d$; the case $d=1$ is $L_{11}=\sqrt{\Sigma_{11}}$. Write
+$\Sigma=\begin{pmatrix}\Sigma_{11}&\sigma\\\sigma^\top&s\end{pmatrix}$ with $\Sigma_{11}$ of
+size $d-1$, positive definite, and look for $L=\begin{pmatrix}L_{11}&0\\\ell^\top&\lambda\end{pmatrix}$.
+Then $LL^\top=\Sigma$ if and only if $L_{11}L_{11}^\top=\Sigma_{11}$, $L_{11}\ell=\sigma$ and
+$\ell^\top\ell+\lambda^2=s$. By induction the first equation has exactly one solution with
+positive diagonal; $L_{11}$ is then invertible, so $\ell=L_{11}^{-1}\sigma$ is unique, and
+$\lambda^2=s-\sigma^\top\Sigma_{11}^{-1}\sigma$. This is positive: it equals $w^\top\Sigma w$
+for $w=(-\Sigma_{11}^{-1}\sigma,1)\ne0$. So $\lambda>0$ exists and is unique. Solving
+$L_{11}\ell=\sigma$ by forward substitution and writing out $\lambda^2$ gives
+\eqref{eq:rng-cholesky} for the last row; the other rows come from the induction.
+
+(iii) $AA^\top=V\Lambda V^\top=\Sigma$, and (i) applies. Next,
+$X-X_r=\sum_{j>r}\sqrt{\lambda_j}Z_jv_j$ with orthonormal $v_j$, so
+$\E|X-X_r|^2=\sum_{j>r}\lambda_j\E Z_j^2=\sum_{j>r}\lambda_j$. Let $Y$ take values in
+$a+\mathcal V$, $\mathcal V$ a subspace of dimension $r$, and let $P$ be the orthogonal
+projection onto $\mathcal V$. For $y\in a+\mathcal V$, Pythagoras gives
+$|x-y|^2\ge|(I-P)(x-a)|^2$, so
+\[
+  \E|X-Y|^2\ge\E|(I-P)(X-a)|^2\ge\E|(I-P)(X-\mu)|^2=\operatorname{tr}\big((I-P)\Sigma\big)
+  =\sum_j\lambda_j-\operatorname{tr}(P\Sigma),
+\]
+where the middle step drops $|(I-P)(\mu-a)|^2$ (the cross term has mean zero). Take an orthonormal basis
+$q_1,\dots,q_r$ of $\mathcal V$; then $\operatorname{tr}(P\Sigma)=\sum_kq_k^\top\Sigma q_k=\sum_j\lambda_jw_j$
+with $w_j=\sum_k(v_j\cdot q_k)^2$. Each $w_j\in[0,1]$ by Bessel's inequality, and
+$\sum_jw_j=\sum_k|q_k|^2=r$. Since $\lambda_j\ge\lambda_r$ for $j\le r$ and $\lambda_j\le\lambda_r$ for $j>r$,
+\[
+  \sum_j\lambda_jw_j-\sum_{j\le r}\lambda_j=\sum_{j\le r}\lambda_j(w_j-1)+\sum_{j>r}\lambda_jw_j
+  \le\lambda_r\Big(\sum_jw_j-r\Big)=0 .
+\]
+Hence $\operatorname{tr}(P\Sigma)\le\sum_{j\le r}\lambda_j$ and $\E|X-Y|^2\ge\sum_{j>r}\lambda_j$.
+\end{proof}
+
+The Cholesky factor costs about $d^3/3$ operations once and $d^2/2$ per vector, and its
+$j$-th component uses only $Z_1,\dots,Z_j$; for a Brownian path on a grid it is the sum of
+independent increments (\exref{ex:rng-cholesky}). The principal-components factor puts as
+much variance as possible into the first $Z_j$, which matters for quasi-Monte Carlo and
+stratification (\cref{rem:qmc-effective-dimension}, \cref{ch:07-path-simulation}). If
+$\Sigma$ is not positive definite, the recursion \eqref{eq:rng-cholesky} meets a nonpositive
+pivot (otherwise it would produce a factor). A zero pivot means that a leading principal
+submatrix is singular: $\Sigma$ may be singular and positive semidefinite (two perfectly
+correlated assets; the principal-components factor exists) or not positive semidefinite at all,
+which the eigenvalues decide. A negative pivot makes a leading principal minor negative, so it
+certifies a ``correlation matrix'' that no random vector can have.
+
+\begin{example}[Three assets]\label{exm:rng-three-assets}
+For the correlation matrix with $\rho_{12}=0.5$, $\rho_{13}=0.3$, $\rho_{23}=0.6$,
+\eqref{eq:rng-cholesky} gives $L_{21}=0.5$, $L_{22}=\sqrt{0.75}\approx0.866$, $L_{31}=0.3$,
+$L_{32}=(0.6-0.15)/\sqrt{0.75}\approx0.520$ and $L_{33}=\sqrt{1-0.09-0.27}=0.8$. Thus
+$X_3=0.3Z_1+0.520Z_2+0.8Z_3$. The eigenvalues are $1.944$, $0.707$ and $0.349$: the first
+principal component carries $65\%$ of the total variance $3$, and the first two carry $88\%$.
+In the code, \texttt{cholesky} runs \eqref{eq:rng-cholesky} and raises an error on a
+nonpositive pivot, and \texttt{pca\_factor} returns $V\Lambda^{1/2}$.
+\end{example}
+
+\demo{05-random-numbers.ipynb}{choose three correlations, compare the Cholesky and
+principal-components factors, and see what happens when the matrix is not positive
+semidefinite.}
+
+\furtherreading
+\textcite{glasserman-mc}, Chapter~2, covers the same ground, with more on implementing
+LCGs and combined generators (Sections~2.1.3--2.1.5) and on normal variates (Section~2.3).
+\textcite{knuth-taocp2}, Chapter~3, is the classic account of uniform generators and their
+tests. \textcite{devroye} is the encyclopaedic reference for non-uniform variates (inversion
+and rejection: Chapter~II, Sections~2 and~3). \textcite{lecuyer-simard} describe modern
+testing, and \textcite{oneill-pcg} explains what makes a generator fast and sound.

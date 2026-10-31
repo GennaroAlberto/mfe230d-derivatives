@@ -1,0 +1,186 @@
+% Exercises for Chapter 12 (Multilevel Monte Carlo). Statements only: solutions are kept privately.
+% Throughout, levels have steps h_l = T 2^-l unless stated otherwise, Y_l are the coupled
+% corrections of the notes, V_l = Var(Y_l), tau_l is the cost of one sample of Y_l in time steps,
+% and the test case is S_0 = K = 100, T = 1, r = 1%, y = 2%, sigma = 20%, mu = r - y.
+
+\begin{exercise}[Uncoupled levels]\label{ex:ml-uncoupled}
+\easy Suppose that the fine and coarse members of every correction are computed from
+\emph{independent} Brownian paths, so that $V_\ell=\Var(P_\ell)+\Var(P_{\ell-1})$ for $\ell\ge1$.
+Take $\Var(P_\ell)=v$ for every $\ell$ (nearly true for the test-case call, \noteref{fig:ml-levels}),
+$\tau_0=1$ and $\tau_\ell=3\cdot2^{\ell-1}$ for $\ell\ge1$.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute $S_L=\sum_{\ell=0}^L\sqrt{V_\ell\tau_\ell}$ in closed form, and the cost
+    $2\varepsilon^{-2}S_L^2$ of the multilevel estimator with variance $\varepsilon^2/2$ and the
+    sample sizes of \noteref{prop:ml-telescoping} (ignore the integer ceilings).
+  \item Plain Monte Carlo on level $L$ reaches the same variance at the cost
+    $2\varepsilon^{-2}v\,2^L$. Show that the ratio of the two costs increases to $6(1+\sqrt2)^2$ as
+    $L\to\infty$, and evaluate it for $L=6$.
+  \item Explain with \noteref{prop:cv-crn} and \noteref{thm:cv-optimal} why the coupled corrections
+    of \noteref{sec:ml-coupling} behave so differently.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Reading a multilevel run]\label{ex:ml-reading}
+\easy A multilevel run for the discounted at-the-money digital $e^{-rT}\1_{\{S_T>K\}}$ of the test
+case with the Euler scheme ($\tau_0=1$, $\tau_\ell=3\cdot2^{\ell-1}$) produced the following sample
+means $\hat m_\ell$ of $Y_\ell$ and variance estimates $\hat V_\ell$, and $\Var(P_\ell)\approx0.242$
+on every level.
+\begin{center}
+\begin{tabular}{lccccccc}
+\toprule
+$\ell$ & $0$ & $1$ & $2$ & $3$ & $4$ & $5$ & $6$\\
+\midrule
+$\hat m_\ell$ & $0.4758$ & $-0.01957$ & $-0.01011$ & $-0.00502$ & $-0.002202$ & $-0.001442$ & $-0.0004178$\\
+$\hat V_\ell$ & $0.2447$ & $0.01899$ & $0.01794$ & $0.01389$ & $0.01064$ & $0.007714$ & $0.005428$\\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{enumerate}[label=(\alph*)]
+  \item Estimate $\beta$ from the ratios $\hat V_\ell/\hat V_{\ell+1}$, $\ell=3,4,5$, and $\alpha$
+    from the ratios $\hat m_\ell/\hat m_{\ell+1}$, $\ell=1,2,3$.
+  \item Let $\varepsilon=0.005$. Apply the bias test of step~3 of the algorithm of
+    \noteref{sec:ml-algorithm}, with $\alpha=1$, for $L=3$ and for $L=4$. What is the smallest
+    admissible finest level?
+  \item For that level, compute the sample sizes of \noteref{eq:ml-nl} with $v=\varepsilon^2/2$ and
+    the total cost. Compare with plain Monte Carlo on the same level with variance $\varepsilon^2/2$.
+  \item Repeat (b) and (c) for $\varepsilon=0.0025$ with the same table. By which factors have the
+    two costs grown? Compare with the factors predicted by \noteref{thm:ml-complexity} and
+    \noteref{prop:mc-mse} for a halving of $\varepsilon$, and conclude.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The refinement factor]\label{ex:ml-refinement}
+\medium Let the level-$\ell$ step be $h_\ell=TM^{-\ell}$ for an integer $M\ge2$, the coarse increments
+being sums of $M$ consecutive fine ones, and let a sample of $Y_\ell$, $\ell\ge1$, cost
+$M^\ell+M^{\ell-1}$ steps.
+\begin{enumerate}[label=(\alph*)]
+  \item For the Euler scheme for GBM and $P=DS_T$, adapt the computation of
+    \noteref{exa:ml-gbm-exact} to show that $V_\ell=\frac12\sigma^4T\,\E[P^2]\,(M-1)\,h_\ell+O(h_\ell^2)$.
+    You may use the expansion of the powers made there. \emph{Hint:} over one coarse step, the
+    product of the $M$ fine factors minus the coarse factor is
+    $\sigma^2\sum_{i<j}\Delta W_i\Delta W_j$ plus terms of higher order.
+  \item Suppose more generally that $V_\ell=\kappa(M-1)h_\ell$ for $\ell\ge1$, that the finest level is
+    the smallest $L$ with $c\,h_L\le\varepsilon/\sqrt2$, and that the variance is $\varepsilon^2/2$.
+    Show that, as $\varepsilon\to0$, the cost $2\varepsilon^{-2}S_L^2$ is asymptotic to
+    $2\kappa T\varepsilon^{-2}(\log\varepsilon)^2g(M)$ with $g(M)=(M-M^{-1})/(\log M)^2$.
+  \item Tabulate $g(M)$ for $M=2,\dots,8$. Which $M$ is best, and what do $M=2$ and $M=4$ cost in
+    comparison?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Two levels: statistical Romberg]\label{ex:ml-kebaier}
+\medium Kebaier's two-level estimator uses the Euler scheme with a fine step $T/n$ and a coarse step
+$T/m$, with $m$ dividing $n$ and coupled paths:
+$\hat\theta=\frac1{n_0}\sum_{i=1}^{n_0}P_m^{(i)}+\frac1{n_1}\sum_{j=1}^{n_1}(P_n-P_m)^{(j)}$, the
+two sums independent. Assume $\Var(P_m)=v$, $\Var(P_n-P_m)=v_1T/m$, $\E[P_n]-\theta=c_bT/n$, and
+costs $m$ and $n$ steps per sample of the two sums.
+\begin{enumerate}[label=(\alph*)]
+  \item For fixed $n$ and $m$, find the $n_0,n_1$ (real) that minimise the cost subject to the
+    variance $\varepsilon^2/2$, and the minimal cost.
+  \item Minimise over real $m$: show that $m^*=\sqrt{v_1Tn/v}$ and that the cost is then
+    $8\varepsilon^{-2}\sqrt{vv_1Tn}$.
+  \item Choose $n$ so that the bias is $\varepsilon/\sqrt2$ and deduce the growth of the cost as
+    $\varepsilon\to0$. Compare with plain Monte Carlo and with \noteref{thm:ml-complexity} for the
+    Euler scheme.
+  \item For the test-case call, take $v=158$, $v_1=4.7$, $T=1$ and $n=256$. Compute $m^*$, the
+    quantity $\sqrt{vm}+\sqrt{v_1Tn/m}$ for $m=2$ and $m=4$, the corresponding quantity
+    $\sqrt{vn}$ for plain Monte Carlo, and compare both with the multilevel value
+    $\sum_{\ell=0}^8\sqrt{V_\ell\tau_\ell}\approx31.5$ obtained from the Euler call levels of
+    \noteref{fig:ml-levels}. What do these numbers say about costs?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Milstein's level variance, exactly]\label{ex:ml-milstein-exact}
+\hard Take the Milstein scheme for GBM and $P=DS_T$, with $D=e^{-rT}$. Over one coarse step of
+length $2h$, let $d_1,d_2$ be the two fine increments, $f_i=1+\mu h+\sigma d_i+\frac12\sigma^2(d_i^2-h)$
+the fine factors, $F=1+2\mu h+\sigma(d_1+d_2)+\frac12\sigma^2\big((d_1+d_2)^2-2h\big)$ the coarse
+factor, and $\Delta=f_1f_2-F$. You may use the moments of $\mathcal N(0,h)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that
+    $\Delta=\mu^2h^2+\mu\sigma h(d_1+d_2)+\frac12\sigma^3\big[d_1(d_2^2-h)+d_2(d_1^2-h)\big]
+    +\frac12\mu\sigma^2h\big[(d_1^2-h)+(d_2^2-h)\big]+\frac14\sigma^4(d_1^2-h)(d_2^2-h)$, and that
+    $e=\E[\Delta F]=(\mu^2+2\mu\sigma^2)h^2+O(h^3)$ and $q=\E[\Delta^2]=(2\mu^2\sigma^2+\sigma^6)h^3+O(h^4)$.
+  \item With $v=\E[F^2]$ and $n=2^{\ell-1}$ coarse steps, show that
+    $\E[Y_\ell^2]=D^2S_0^2\big[(v+2e+q)^n-2(v+e)^n+v^n\big]$, and deduce
+    \[
+      V_\ell=h_\ell^2\Big[\E[P^2]\Big(\tfrac T2(\sigma^6+2\mu^2\sigma^2)+\tfrac{T^2}4(\mu^2+2\mu\sigma^2)^2\Big)
+      -\tfrac{T^2}4\mu^4\,\E[P]^2\Big]+O(h_\ell^3).
+    \]
+    Which term has no counterpart in the Euler computation of \noteref{exa:ml-gbm-exact}, and why
+    does it appear here?
+  \item Evaluate the constant for the test case and compare with $V_\ell/h_\ell^2$ computed from the
+    exact formula (\texttt{multilevel.gbm\_level\_exact}) at $\ell=10$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The best randomisation]\label{ex:ml-randomisation}
+\hard In the setting of \noteref{prop:ml-unbiased}, suppose that every $m_j=\E[Y_j^2]$ is positive,
+$\inf_j\tau_j>0$ and $\sum_j\sqrt{m_j\tau_j}<\infty$.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $m_j=m\,2^{-\beta j}$ and $\tau_j=\tau\,2^{\gamma j}$ exactly, for all $j\ge0$, with
+    $\beta>\gamma$, and let $p_j=(1-2^{-r})2^{-rj}$ with $\gamma<r<\beta$. Compute $\E[Z^2]$ and
+    $\E[\tau_J]$ in closed form, find the rate $r^*$ that minimises their product, and show that
+    the minimum equals the lower bound of \noteref{prop:ml-unbiased}(iv): for exactly geometric
+    moments and costs, the best geometric law cannot be beaten.
+  \item For the test-case call with Milstein, a run gave the following second moments $m_j$ and
+    variances $V_j$ of the corrections, with $\tau_0=1$ and $\tau_j=3\cdot2^{j-1}$:
+    \begin{center}
+    \begin{tabular}{lcccccc}
+    \toprule
+    $j$ & $0$ & $1$ & $2$ & $3$ & $4$ & $5$\\
+    \midrule
+    $m_j$ & $214.8$ & $0.04692$ & $0.01247$ & $0.003193$ & $0.0008149$ & $0.0002072$\\
+    $V_j$ & $158.9$ & $0.04101$ & $0.01164$ & $0.00305$ & $0.0007869$ & $0.0002007$\\
+    \bottomrule
+    \end{tabular}
+    \end{center}
+    For $j\ge6$ take $m_j=m_54^{-(j-5)}$ and $V_j=V_54^{-(j-5)}$. With $\theta=7.36429$, compute
+    $p_0$, $\E[\tau_J]$ and $\Var(Z)\,\E[\tau_J]$ for the law $p_j\propto\sqrt{m_j/\tau_j}$, which
+    attains the bound of \noteref{prop:ml-unbiased}(iv);
+    compare with the geometric choice $p_j=(1-2^{-1.5})2^{-1.5j}$ and with the work-normalised
+    variance $\big(\sum_j\sqrt{V_j\tau_j}\big)^2$ of multilevel Monte Carlo with all levels. Why
+    is the geometric choice so far from optimal here?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Smoothing a digital]\label{ex:ml-smoothing}
+\medium This is a computational exercise on the test-case digital $D\1_{\{S_T>K\}}$, $D=e^{-rT}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Let the last step of a path with step $h$ be an Euler step,
+    $S_T=S_{T-h}(1+\mu h+\sigma\Delta W)$. Show that
+    $\Q(S_T>K\mid\F_{T-h})=N\big((S_{T-h}(1+\mu h)-K)/(\sigma S_{T-h}\sqrt h)\big)$ on
+    $\{S_{T-h}>0\}$, and find it on $\{S_{T-h}\le0\}$.
+  \item At level $\ell$, with $h=h_\ell$ and $n=2^{\ell-1}$ coarse steps, use (a) for the fine path.
+    For the coarse path, whose last step has length $2h$ and increment
+    $\Delta W_{2n-1}+\Delta W_{2n}$ (the last two fine increments), condition on the coarse path up to $T-2h$
+    \emph{and} on the fine increment $\Delta W_{2n-1}$. Write the resulting coarse member and show
+    that it has the mean of the level-$(\ell-1)$ smoothed payoff, so that the corrections satisfy
+    \noteref{def:ml-coupled} although the coarse member no longer has the law of $P_{\ell-1}$.
+  \item Implement this with Euler steps throughout, and with Milstein steps except for the last
+    (Euler) step. Estimate $V_\ell$ for $\ell\le8$ and $\beta$ in both cases, and compare with
+    \noteref{fig:ml-levels}. What happens at level $0$?
+  \item Explain why smoothing lowers $V_\ell$ but not its rate with Euler, while it raises the rate
+    with Milstein. \emph{Hint:} compare the difference between the fine and coarse conditional means
+    with the conditional standard deviation $\sigma S\sqrt h$.
+  \item Run the adaptive algorithm at $\varepsilon=0.001$ for both versions and compare their costs
+    with the unsmoothed Euler run reported in \noteref{sec:ml-algorithm}.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A discretely monitored barrier]\label{ex:ml-barrier}
+\medium This is a computational exercise. The course priced a down-and-out call on the test case
+with barrier $B=95$ monitored at the twelve monthly dates $t_j=j/12$, $j=1,\dots,12$: the price is
+$5.32979$. Let level $\ell$ use $12\cdot2^\ell$ uniform steps, so that the monitoring dates are grid
+points at every level.
+\begin{enumerate}[label=(\alph*)]
+  \item Explain why computing the payoff from the scheme values at the monitoring dates gives coupled
+    corrections, and why there is no monitoring bias. What bias order $\alpha$ do you expect?
+  \item Implement the Euler and Milstein couplings. With $2\times10^5$ samples per level, estimate
+    $V_\ell$, the mean of $Y_\ell$, the kurtosis of $Y_\ell$, and the number of samples in which
+    exactly one of the two paths is knocked out, for $\ell=0,\dots,5$. Where can you estimate $\beta$?
+  \item Price the option with the adaptive algorithm and the Euler scheme to $\varepsilon=0.01$, and
+    compare with $5.32979$.
+  \item Adapt the argument of \noteref{prop:ml-variance-decay}(ii) to predict $\beta$ for the two
+    schemes, and relate the kurtosis to \noteref{rem:ml-kurtosis}.
+\end{enumerate}
+\end{exercise}

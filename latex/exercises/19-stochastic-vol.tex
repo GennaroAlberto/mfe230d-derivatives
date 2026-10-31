@@ -1,0 +1,127 @@
+% Exercises for Chapter 19 (Stochastic volatility). Statements only: solutions are kept privately.
+% Unless stated otherwise: the Heston model of the notes under Q, the test case S = K = 100, T = 1,
+% r = 1%, y = 2%, and V_0 = theta = 0.04, kappa = 2, xi = 0.3.
+
+\begin{exercise}[One option is enough]\label{ex:sv-risk-premium}
+\easy Under $\Prob$ let $\dd S=\mu S\,\dd t+S\sqrt V\,\dd B^S$ and $\dd V=\kappa^{\Prob}(\theta^{\Prob}-V)\,\dd t+\xi\sqrt V\,\dd B$,
+with $\dd\langle B^S,B\rangle_t=\rho\,\dd t$, $|\rho|<1$, and a dividend yield $y$. Let $C(t,S,V)$ and $C_1(t,S,V)$ be
+smooth prices of two options, with $\partial_VC_1\ne0$, and let $\mathcal L^{\Prob}$ be the generator of $(S,V)$
+under $\Prob$ (first and second derivatives, no time derivative).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that a self-financing portfolio long one $C$, short $\Delta_1$ units of $C_1$ and short $\Delta_S$
+    shares (dividends reinvested in cash) is locally riskless for suitable $\Delta_1$ and $\Delta_S$, and deduce that
+    \[
+      \frac{\partial_tC+\mathcal L^{\Prob}C-(\mu+y-r)S\,\partial_SC-rC}{\xi\sqrt V\,\partial_VC}
+    \]
+    takes the same value $\lambda(t,S,V)$ for every option. (No-arbitrage: a riskless portfolio earns $r$.)
+  \item With $\lambda=\kappa_V\sqrt V$ for a constant $\kappa_V$, show that every option price solves
+    \noteref{eq:sv-pde} with the parameters $\kappa=\kappa^{\Prob}+\xi\kappa_V$ and $\theta=\kappa^{\Prob}\theta^{\Prob}/\kappa$.
+    Can Feller's condition hold under $\Prob$ and fail under $\Q$?
+  \item Why would hedging with the stock and \emph{two} options, as in the course's notes, be redundant?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Degenerate cases]\label{ex:sv-degenerate}
+\easy You may use \noteref{thm:sv-cf} and \noteref{prop:st-mixing}.
+\begin{enumerate}[label=(\alph*)]
+  \item Solve \noteref{eq:sv-riccati} for $\xi=0$ and show that the price of any European payoff is its
+    Black--Scholes price with total variance $w=\theta T+(V_0-\theta)(1-e^{-\kappa T})/\kappa$. Price the put for
+    $V_0=0.09$, $\kappa=1.5$, $\theta=0.04$ (and the test case $S$, $K$, $T$, $r$, $y$). Does $\rho$ matter?
+  \item Let $\rho=-1$. Write $S_T$ as an explicit function of $(V_T,Q_T)$. Use it to estimate the at-the-money
+    put by Monte Carlo from exact variance paths (you may use \texttt{stratified.cir\_exact} on $64$ steps and the
+    trapezoidal rule for $Q_T$), and compare with the Fourier price.
+  \item Let $\rho=0$. Show that $\varphi(u)=e^{iu(\ln S+(r-y)T)}\,\E\big[e^{-\frac12(u^2+iu)Q_T}\big]$, and that for
+    $\rho=0$ the Riccati equation \noteref{eq:sv-riccati} is the equation of the Laplace transform
+    $\E[e^{-\lambda Q_T}]$ with $\lambda=\frac12(u^2+iu)$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The law of the variance]\label{ex:sv-variance-law}
+\medium Let $\lambda\ge0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Look for $\E[e^{-\lambda V_t}]=\exp(A(t)+B(t)V_0)$, write the equations for $A$ and $B$, and solve them:
+    \[
+      \E[e^{-\lambda V_t}]=(1+2\lambda c_t)^{-2\kappa\theta/\xi^2}\exp\Big(-\frac{\lambda e^{-\kappa t}V_0}{1+2\lambda c_t}\Big),\qquad
+      c_t=\frac{\xi^2(1-e^{-\kappa t})}{4\kappa}.
+    \]
+    Justify that the guess is the Laplace transform (the local martingale you build is bounded).
+  \item Deduce that $V_t$ converges in law, as $t\to\infty$, to the gamma law with shape $2\kappa\theta/\xi^2$ and
+    scale $\xi^2/(2\kappa)$, and give its mean and variance.
+  \item How does the stationary density behave near $0$? Relate this to Feller's condition. Compute the stationary
+    probability that $V<0.01$ in the test case and for $\kappa=0.5$, $\theta=0.04$, $\xi=1$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Moment explosions]\label{ex:sv-explosion}
+\medium Use the notation of \noteref{thm:sv-cf}(iv).
+\begin{enumerate}[label=(\alph*)]
+  \item For $a(a-1)>0$, solve the real Riccati equation $\partial_\tau D=\frac12\xi^2D^2-\kappa_aD+\frac12a(a-1)$,
+    $D(0)=0$, and find its blow-up time in each case of \noteref{eq:sv-explosion}.
+  \item Let $\kappa=0.5$, $\xi=1.2$, $\rho=0.6$. Compute $T^*(2)$ by hand. For $T=2$, what does this imply for the
+    variance of the plain Monte Carlo estimator of a call, and for the damping in Carr and Madan's formula?
+  \item For $\kappa=0.5$, $\xi=1$, $\rho=-0.9$, and for the Eurostoxx parameters of the notes, compute
+    $a_+(T)=\sup\{a\ge1:\E[S_T^a]<\infty\}$ at $T=1$ and $T=10$, the admissible range of the damping $\alpha$, and
+    Carr and Madan's choice of a quarter of its upper end.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Digitals and the skew]\label{ex:sv-digitals}
+\medium A cash-or-nothing call pays $\1_{\{S_T>K\}}$; a gap call with trigger $K_1$ and strike $K_2$ pays
+$(S_T-K_2)\1_{\{S_T>K_1\}}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Price the gap call through $P_1$ and $P_2$ of \noteref{prop:sv-fourier} at the strike $K_1$, show that it is a
+    call struck at $K_1$ plus $K_1-K_2$ cash-or-nothing calls, and evaluate it for $K_1=100$, $K_2=95$, $\rho=-0.7$.
+  \item Compute the cash-or-nothing call at $K=100$ for $\rho=-0.7$ and $\rho=0$, and compare it with the
+    Black--Scholes digital evaluated at the at-the-money implied volatility.
+  \item Explain the difference with \noteref{prop:sk-binary-smile}, and check it numerically with a finite
+    difference of implied volatilities.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Fixing Euler's scheme]\label{ex:sv-fixes}
+\medium This is a computational exercise. Implement the four fixes of the notes (absorption, reflection,
+partial and full truncation) with the log-Euler step for $S$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that, with the log-Euler step, every fix reproduces the forward exactly, and that the conditional
+    estimator of \noteref{prop:sv-full-truncation}(ii) applies to every fix.
+  \item Estimate the bias of the at-the-money put for $h=\frac14$ and $h=\frac1{16}$, in the test case with
+    $\rho=-0.7$ and for $V_0=\theta=0.04$, $\kappa=0.5$, $\xi=1$, $\rho=-0.9$, against the Fourier prices
+    $7.948022$ and $4.576954$. Report standard errors and seeds.
+  \item Rank the fixes. Can you explain the ranking by comparing the drift that each fix applies when
+    $\tilde V<0$?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Calibrating to a synthetic smile]\label{ex:sv-calibration}
+\hard This is a computational exercise. You may use \texttt{scipy.optimize.least\_squares} and the pricers of the
+chapter.
+\begin{enumerate}[label=(\alph*)]
+  \item Generate implied volatilities of out-of-the-money options from the test case with $\rho=-0.7$ for
+    $K\in\{80,90,95,100,105,110,120\}$ and $T\in\{0.25,0.5,1,2\}$, and add independent normal noise with standard
+    deviation $0.1\%$ (in volatility points), with a fixed seed.
+  \item Calibrate $(V_0,\kappa,\theta,\xi,\rho)$ by least squares on implied volatilities from a start far from
+    the truth. Report the estimates, the root-mean-square error, and approximate standard errors from the
+    Jacobian. Which parameter is least well determined?
+  \item Now use only the slice $T=1$, fix $\kappa\in\{0.5,2,8\}$ in turn and calibrate the other four. Compare the
+    fits and the parameters, and the Feller ratio of each fit. What do you conclude about identifying the model
+    from one maturity?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A formula without damping]\label{ex:sv-lewis}
+\hard Let $k=\ln K$ and $\varphi$ as in the notes.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\int_\R e^{ivz}(v^2+\frac14)^{-1}\,\dd v=2\pi e^{-|z|/2}$ for real $z$, and deduce that
+    $\min(S_T,K)=\frac{\sqrt{S_TK}}{2\pi}\int_\R e^{iv(X_T-k)}(v^2+\frac14)^{-1}\,\dd v$.
+  \item Deduce Lewis's (2001) formula
+    \[
+      C=Se^{-yT}-\frac{\sqrt K\,e^{-rT}}{\pi}\int_0^\infty\frac{\operatorname{Re}\big(e^{-ivk}\varphi(v-\frac i2)\big)}{v^2+\frac14}\,\dd v,
+    \]
+    and explain why, unlike Carr and Madan's, it needs no condition on the moments of $S_T$ beyond those that
+    always hold.
+  \item Obtain the same formula by moving the line of integration of Carr and Madan's \noteref{eq:sv-cm} from
+    $\operatorname{Im}=-(1+\alpha)$ to $\operatorname{Im}=-\frac12$, and identify the residue you cross.
+  \item Implement it with the midpoint rule on $[0,125]$ and check the put $7.948021924422$ of the notes
+    ($\rho=-0.7$). How small must the step be, and why is it smaller than for Gil-Pelaez's formula?
+\end{enumerate}
+\end{exercise}

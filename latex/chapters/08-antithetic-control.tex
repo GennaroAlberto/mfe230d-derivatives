@@ -1,0 +1,775 @@
+% Chapter 8: Antithetic variates, moment matching and control variates.
+\providecommand{\Corr}{\operatorname{Corr}}
+
+The plain Monte Carlo estimator of \cref{ch:06-monte-carlo} has standard error
+$\sigma/\sqrt n$: one more correct digit costs a hundred times more samples. Independent
+sampling cannot beat the rate $n^{-1/2}$, but it can beat the constant. This chapter is
+about making $\sigma^2$, or rather the product of $\sigma^2$ and the cost per sample,
+smaller by using what we know about the problem.
+
+Four ideas, each simple to state. \emph{Antithetic variates} use the symmetry of the
+normal law: pair every draw $Z$ with $-Z$. \emph{Moment matching} forces the sample to
+have the moments of the model. \emph{Common random numbers} correlate the estimators of
+two related prices, so that their difference is accurate even when each price is not.
+\emph{Control variates} subtract a correlated quantity whose mean is known exactly, and
+include, as limiting cases, regression on several such quantities and hedging. Each comes
+with an exact variance formula, a condition under which it helps, and examples in which it
+does not. They combine, but not multiplicatively; \cref{sec:cv-lab} measures all of them
+on the course's test case.
+
+\section{Setting and running examples}\label{sec:cv-setting}
+
+We estimate $\mu=\E[f(Z)]$, where $Z$ is a standard normal vector in $\R^d$ (one
+coordinate per time step or per asset) and $f(Z)\in L^2$ with $\sigma^2=\Var f(Z)>0$. The
+plain estimator $\hat\mu_n=\frac1n\sum_{i=1}^nf(Z_i)$ of \cref{def:mc-estimator} has
+variance $\sigma^2/n$. Every method below produces another unbiased (or asymptotically
+unbiased) estimator. We report its \emph{standard-error ratio} to $\hat\mu_n$ at equal
+$n$, $\varrho=\sigma_2/\sigma$, and, if one of its samples costs $c$ times a plain one, its
+efficiency relative to plain Monte Carlo (\cref{def:mc-efficiency})
+\begin{equation}\label{eq:cv-efficiency}
+  \mathcal E_{2,1}=\frac{\sigma^2\tau_1}{\sigma_2^2\tau_2}=\frac{1}{c\,\varrho^2}.
+\end{equation}
+Following the course, we take the conservative value $c=2$ for every method when a cost
+must be assumed; the notebook measures it.
+
+Throughout, the test case is $S=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, and
+\[
+  S_T=S\exp\big(\nu T+s Z\big),\qquad \nu=r-y-\tfrac{\sigma^2}{2}=-0.03,\qquad s=\sigma\sqrt T=0.2,
+\]
+with $Z\sim\mathcal N(0,1)$ (\cref{prop:ps-gbm-exact}). The running examples are
+\begin{enumerate}[label=(\alph*)]
+  \item the \emph{stock}, $f(Z)=e^{-rT}S_T$, with $\mu=Se^{-yT}=98.0199$: trivial to
+    price, and therefore a good test;
+  \item the \emph{call}, $f(Z)=e^{-rT}(S_T-K)^+$, with $\mu=7.36429$ and
+    $\sigma^2=158.006$ (for the undiscounted payoff, $161.198$), so $\sigma=12.570$;
+  \item the \emph{square-root call} of \cref{eg:cv-sqrt}.
+\end{enumerate}
+
+\section{Antithetic variates}\label{sec:cv-antithetic}
+
+If $Z\sim\mathcal N(0,I_d)$ then $-Z$ has the same law. Draw $Z_1,\dots,Z_n$ independently
+and use each draw twice:
+\begin{equation}\label{eq:cv-antithetic}
+  \hat\mu^{\mathrm a}_n=\frac1n\sum_{i=1}^n\frac{f(Z_i)+f(-Z_i)}{2}.
+\end{equation}
+For a path driven by the increments $Z=(Z_1,\dots,Z_m)$, the antithetic path is driven by
+$-Z$: it is the original path reflected in its drift. With uniforms, $U$ is paired with
+$1-U$, which under inversion (\cref{prop:rng-inversion}) is the same as $Z$ with $-Z$. The
+estimator averages $n$ i.i.d.\ \emph{pair averages}, so its standard error comes from the
+$n$ pair averages, never from the $2n$ individual payoffs, which are dependent.
+
+When does pairing help? The answer rests on an inequality that goes back to Chebyshev in
+one dimension, and in several dimensions is the simplest case of \emph{association}
+\citep{esary-proschan-walkup}.
+
+\begin{lemma}[Monotone functions are positively correlated]\label{lem:cv-association}
+Let $Z=(Z_1,\dots,Z_d)$ have independent components, and let $g,h:\R^d\to\R$ be Borel
+functions, nondecreasing in each coordinate, with $g(Z),h(Z)\in L^2$. Then $\Cov(g(Z),h(Z))\ge0$.
+\end{lemma}
+
+\begin{proof}
+Assume first that $g$ and $h$ are bounded, and argue by induction on $d$. For $d=1$, let
+$Z'$ be an independent copy of $Z$. Since $g$ and $h$ are nondecreasing, $g(Z)-g(Z')$ and
+$h(Z)-h(Z')$ have the same sign, so $(g(Z)-g(Z'))(h(Z)-h(Z'))\ge0$; taking expectations,
+$2\E[g(Z)h(Z)]-2\E[g(Z)]\E[h(Z)]\ge0$.
+
+For $d\ge2$, write $Z=(W,Z_d)$ with $W=(Z_1,\dots,Z_{d-1})$ and, for $w\in\R^{d-1}$,
+\[
+  G(w)=\E[g(w,Z_d)],\qquad H(w)=\E[h(w,Z_d)],\qquad Q(w)=\E[g(w,Z_d)h(w,Z_d)] .
+\]
+These are bounded and measurable (Fubini), and $G$, $H$ are nondecreasing in each
+coordinate of $w$ (integrate the pointwise inequalities). For fixed $w$, the functions
+$t\mapsto g(w,t)$ and $t\mapsto h(w,t)$ are nondecreasing, so the case $d=1$ gives
+$Q(w)\ge G(w)H(w)$. Since $W$ and $Z_d$ are independent, Fubini's theorem gives
+$\E[g(Z)h(Z)]=\E[Q(W)]$, $\E[g(Z)]=\E[G(W)]$ and $\E[h(Z)]=\E[H(W)]$. Hence, by the
+induction hypothesis applied to $G$ and $H$,
+\[
+  \E[g(Z)h(Z)]=\E[Q(W)]\ge\E[G(W)H(W)]\ge\E[G(W)]\,\E[H(W)]=\E[g(Z)]\,\E[h(Z)] .
+\]
+For general $g,h$, the truncations $g_k=\max(\min(g,k),-k)$ and $h_k$ are bounded and
+still nondecreasing, so $\Cov(g_k(Z),h_k(Z))\ge0$; as $k\to\infty$, dominated convergence
+($|g_kh_k|\le|gh|$, $|g_k|\le|g|$) gives the claim.
+\end{proof}
+
+\begin{proposition}[Antithetic variates]\label{prop:cv-antithetic}
+Let $Z\eqd-Z$, $f(Z)\in L^2$ with $\sigma^2=\Var f(Z)>0$, and
+$\rho=\Corr\big(f(Z),f(-Z)\big)$. Write $f=f_{\mathrm e}+f_{\mathrm o}$ with the even and
+odd parts $f_{\mathrm e}(z)=\frac12(f(z)+f(-z))$ and $f_{\mathrm o}(z)=\frac12(f(z)-f(-z))$.
+\begin{enumerate}[label=(\roman*)]
+  \item $f_{\mathrm e}(Z)$ and $f_{\mathrm o}(Z)$ are uncorrelated, so
+    $\sigma^2=\Var f_{\mathrm e}(Z)+\Var f_{\mathrm o}(Z)$, and
+    \[
+      \rho=\frac{\Var f_{\mathrm e}(Z)-\Var f_{\mathrm o}(Z)}{\Var f_{\mathrm e}(Z)+\Var f_{\mathrm o}(Z)} .
+    \]
+  \item $\hat\mu^{\mathrm a}_n$ is unbiased and
+    \begin{equation}\label{eq:cv-antithetic-var}
+      \Var\big(\hat\mu^{\mathrm a}_n\big)=\frac{\Var f_{\mathrm e}(Z)}{n}=\frac{\sigma^2}{n}\,\frac{1+\rho}{2} .
+    \end{equation}
+  \item If the components of $Z$ are independent and $f$ is monotone in each coordinate
+    (nondecreasing in some, nonincreasing in the others), then $\rho\le0$: $n$ antithetic
+    pairs have at most the variance of $2n$ independent draws.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Since $f(-Z)\eqd f(Z)$, $\E f_{\mathrm o}(Z)=0$ and
+$\E[f_{\mathrm e}(Z)f_{\mathrm o}(Z)]=\frac14\E\big[f(Z)^2-f(-Z)^2\big]=0$. So
+$\sigma^2=\Var(f_{\mathrm e}+f_{\mathrm o})(Z)$ splits into the two variances, and
+$\Cov(f(Z),f(-Z))=\Cov\big((f_{\mathrm e}+f_{\mathrm o})(Z),(f_{\mathrm e}-f_{\mathrm o})(Z)\big)
+=\Var f_{\mathrm e}(Z)-\Var f_{\mathrm o}(Z)$. Divide by $\sigma^2=\Var f(-Z)$.
+
+(ii) The pair averages $f_{\mathrm e}(Z_i)$ are i.i.d.\ with mean $\mu$. By (i),
+$\Var f_{\mathrm e}+\Var f_{\mathrm o}=\sigma^2$ and $\Var f_{\mathrm e}-\Var f_{\mathrm o}=\rho\sigma^2$, so
+$\Var f_{\mathrm e}(Z)=\sigma^2(1+\rho)/2$.
+
+(iii) Choose signs $\varepsilon_j\in\{\pm1\}$ such that
+$\tilde f(v)=f(\varepsilon_1v_1,\dots,\varepsilon_dv_d)$ is nondecreasing in every coordinate, and
+let $V=(\varepsilon_jZ_j)_j$, which again has independent components. Then $f(Z)=\tilde f(V)$
+and $f(-Z)=\tilde f(-V)$. Both $\tilde f$ and $v\mapsto-\tilde f(-v)$ are nondecreasing in every
+coordinate, so \cref{lem:cv-association} gives $\Cov(\tilde f(V),-\tilde f(-V))\ge0$, that is
+$\rho\le0$.
+\end{proof}
+
+The even--odd split says exactly what antithetic sampling does: it integrates the odd part
+of $f$ with no error at all, and samples the even part as before. It helps when $f$ is
+nearly odd about the centre of the distribution (nearly linear payoffs are the main
+example), and it is useless
+when $f$ is even.
+
+\paragraph{Cost and efficiency.} A pair costs $c$ times a single draw with $1\le c\le2$:
+$c\approx2$ when evaluating the payoff dominates, and less when generating normals or paths
+dominates, since the antithetic path reuses them. By \eqref{eq:cv-efficiency} and
+\eqref{eq:cv-antithetic-var}, the efficiency of $n$ pairs against $n$ plain draws is
+$2/(c(1+\rho))$; at $c=2$ it is $1/(1+\rho)$, which is at least $1$ under the hypotheses of
+(iii).
+
+\begin{example}[The stock]\label{eg:cv-stock}
+For $f(z)=e^{-rT}Se^{\nu T}e^{sz}$ the even and odd parts are multiples of $\cosh(sz)$ and
+$\sinh(sz)$. With $\E\cosh(sZ)=e^{s^2/2}$, $\E\cosh^2(sZ)=\frac12(e^{2s^2}+1)$ and
+$\E\sinh^2(sZ)=\frac12(e^{2s^2}-1)$,
+\[
+  \Var\cosh(sZ)=\tfrac12(e^{s^2}-1)^2,\qquad \Var\sinh(sZ)=\tfrac12(e^{2s^2}-1),
+  \qquad\text{so}\qquad \rho=-e^{-s^2} .
+\]
+For $s=0.2$: $\rho=-0.9608$, the standard-error ratio is
+$\sqrt{(1+\rho)/2}=\sqrt{(1-e^{-s^2})/2}=0.1400\approx s/\sqrt2$, and the efficiency at
+$c=2$ is $1/(1-e^{-s^2})=25.5$. These are the course's ``about 14\%'' and ``about 25'':
+over the range of $sZ$ the exponential is nearly linear, and linear functions are
+integrated exactly.
+\end{example}
+
+For payoffs that vanish on part of the line, the antithetic correlation has a closed form.
+This is the course's exam formula.
+
+\begin{proposition}[Disjoint payoffs]\label{prop:cv-disjoint}
+In the setting of \cref{prop:cv-antithetic}, suppose that $f(Z)f(-Z)=0$ almost surely, and
+let $\mu=\E f(Z)$. Then $\mu^2\le\sigma^2$ and
+\[
+  \rho=-\frac{\mu^2}{\sigma^2},\qquad
+  \Var\big(\hat\mu^{\mathrm a}_n\big)=\frac{\sigma^2-\mu^2}{2n},\qquad
+  \frac{\sqrt{\Var\hat\mu^{\mathrm a}_n}}{\sqrt{\Var\hat\mu_n}}=\frac{1}{\sqrt2}\sqrt{1-\frac{\mu^2}{\sigma^2}},
+\]
+and the efficiency at $c=2$ is $\sigma^2/(\sigma^2-\mu^2)\ge1$ (infinite if
+$\mu^2=\sigma^2$). In the Black--Scholes model the call $(S_T-K)^+$ and the digital call
+$\1_{\{S_T>K\}}$ satisfy the hypothesis if and only if $K\ge Se^{\nu T}$, the median of
+$S_T$; the put and the digital put if and only if $K\le Se^{\nu T}$.
+\end{proposition}
+
+\begin{proof}
+$\Cov(f(Z),f(-Z))=\E[f(Z)f(-Z)]-\mu^2=-\mu^2$, so $\rho=-\mu^2/\sigma^2$; $\rho\ge-1$ gives
+$\mu^2\le\sigma^2$, and the rest is \eqref{eq:cv-antithetic-var} and $1/(1+\rho)$. For the
+call, $S_T(z)\,S_T(-z)=S^2e^{2\nu T}$. If $K\ge Se^{\nu T}$ and $S_T(z)>K$, then
+$S_T(-z)<S^2e^{2\nu T}/K\le K$, so the two payoffs are never positive together. If
+$K<Se^{\nu T}$, both are positive on $\{K<S_T<S^2e^{2\nu T}/K\}$, a nonempty interval of
+values of $S_T$ and therefore an event of positive probability. The digital has the same
+supports, and for puts the inequalities reverse.
+\end{proof}
+
+In the test case the median is $Se^{\nu T}=97.04<K$, so the at-the-money call is disjoint:
+with $\mu=7.36429$ and $\sigma^2=158.006$, $\mu^2/\sigma^2=0.3432$, so $\rho=-0.3432$, the
+standard-error ratio is $0.5730$ and the efficiency at $c=2$ is $1.523$, the course's
+``about 57\%'' and ``about 1.5''. For strikes below the median the supports overlap,
+$\E[f(Z)f(-Z)]>0$, and $\rho$ is larger than $-\mu^2/\sigma^2$ (\cref{fig:cv-antithetic}).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch08-antithetic}
+  \caption{(a) The discounted at-the-money call payoff $f(z)$, its antithetic image
+    $f(-z)$ and the even part $f_{\mathrm e}$, the only part the antithetic estimator has to
+    sample; the supports are disjoint (\cref{prop:cv-disjoint}). (b) The antithetic
+    correlation $\rho$ against the strike, exact (lines, by quadrature) and from $20{,}000$
+    pairs (dots); the dotted line is the median of $S_T$. Near the median the straddle
+    $|S_T-K|$ is almost even in $z$: $\rho=0.85$ at the median and $0.90$ at its maximum,
+    near $K=99$.}
+  \label{fig:cv-antithetic}
+\end{figure}
+
+\begin{remark}[When pairing fails]\label{rem:cv-antithetic-fails}
+Without monotonicity, \cref{prop:cv-antithetic}(iii) gives no guarantee. If $f$ is even,
+then $f_{\mathrm o}=0$, $\rho=1$, and a pair is worth one draw at up to twice the cost. Payoffs
+that are nearly even in $z$ (straddles, butterflies, digital ranges centred near the median of
+$S_T$) have $\rho$ close to $1$ (\exref{ex:cv-straddle}). At the other extreme, a deep
+out-of-the-money call is disjoint with $\mu^2\ll\sigma^2$, so $\rho\approx0$ and the
+efficiency tends to $1$ at $c=2$: rare events need importance sampling
+(\cref{ch:09-importance-sampling}). For paths, an arithmetic Asian call is nondecreasing in
+every increment, so (iii) applies; a knock-out barrier is not monotone, and the
+correlation must be measured.
+\end{remark}
+
+\demo{08-antithetic-control.ipynb}{the even and odd parts of any payoff, and the
+antithetic correlation against the strike for calls, puts, digitals and straddles.}
+
+\section{Moment matching}\label{sec:cv-mm}
+
+Antithetic pairs make the sample symmetric. Moment matching goes further and transforms the
+whole sample so that its first moments are exactly those of the model.
+
+\begin{definition}[Moment matching]\label{def:cv-mm}
+Let $Z_1,\dots,Z_n$ be i.i.d.\ $\mathcal N(0,1)$, $\bar Z_n=\frac1n\sum_iZ_i$ and
+$\tilde s_n^2=\frac1n\sum_i(Z_i-\bar Z_n)^2$ (divisor $n$).
+\begin{enumerate}[label=(\alph*)]
+  \item \emph{Log matching}: $Z'_i=(Z_i-\bar Z_n)/\tilde s_n$. Then
+    $\frac1n\sum_iZ'_i=0$ and $\frac1n\sum_iZ'^2_i=1$, so the simulated log-prices
+    $\ln S+\nu T+sZ'_i$ have exactly the mean and the variance of $\ln S_T$.
+  \item \emph{Exponential-mean matching}: $Z'_i=\alpha_n+Z_i/\tilde s_n$ with
+    $\alpha_n=\frac s2-\frac1s\ln\big(\frac1n\sum_ie^{sZ_i/\tilde s_n}\big)$. The sample variance
+    of the $Z'_i$ is still $1$, and $\frac1n\sum_ie^{sZ'_i}=e^{s^2/2}=\E e^{sZ}$: the sample
+    mean of $S'_{T,i}$ equals the forward $Se^{(r-y)T}$.
+\end{enumerate}
+The moment-matched estimator is $\hat\mu^{\mathrm{mm}}_n=\frac1n\sum_if(Z'_i)$.
+\end{definition}
+
+In (b) the sample reprices the forward exactly, so the matched estimates of a call and a
+put with the same strike satisfy put--call parity exactly. The course also matches the
+``exponential variance'', which requires solving a nonlinear equation for the scale by
+Newton's method. For paths, match each time step's normals across the sample.
+
+\begin{proposition}[Moment matching: structure and bias]\label{prop:cv-moment-matching}
+In the setting of \cref{def:cv-mm}(a), with $n\ge3$:
+\begin{enumerate}[label=(\roman*)]
+  \item $\hat\mu^{\mathrm{mm}}_n=\E f(Z)$ exactly for every quadratic $f(z)=a+bz+cz^2$.
+  \item The vector $Z'=(Z'_1,\dots,Z'_n)$ is independent of $(\bar Z_n,\tilde s_n)$. Its
+    components are identically distributed but not independent ($\sum_iZ'_i=0$).
+  \item If $|f(z)|\le Ce^{c|z|}$ for all $z$, then, with $\mathrm{He}_4(z)=z^4-6z^2+3$,
+    \[
+      \E\hat\mu^{\mathrm{mm}}_n=\E f(Z)-\frac{\E[f(Z)\mathrm{He}_4(Z)]}{4n}+O(n^{-2}) .
+    \]
+  \item The sample variance of $f(Z'_1),\dots,f(Z'_n)$ does not estimate
+    $n\Var\hat\mu^{\mathrm{mm}}_n$ in general. If the $n$ draws are split into $m$ batches of
+    size $k=n/m$, each matched separately, the $m$ batch estimates are i.i.d.\ with mean
+    $\E\hat\mu^{\mathrm{mm}}_k=\mu+O(1/k)$. For fixed $k$ and $m\to\infty$, the central limit
+    theorem for these i.i.d.\ estimates gives an asymptotically valid confidence interval for
+    $\E\hat\mu^{\mathrm{mm}}_k$; for fixed $m$ and $k\to\infty$, \cref{prop:mc-batch}(iii)
+    gives one for $\mu$ provided $\sqrt k(\hat\mu^{\mathrm{mm}}_k-\mu)$ is asymptotically
+    normal, which \cref{rem:cv-mm-as-cv} indicates but we do not prove.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\frac1n\sum_i(a+bZ'_i+cZ'^2_i)=a+c=\E[a+bZ+cZ^2]$.
+
+(ii) Complete $u_0=n^{-1/2}(1,\dots,1)$ to an orthonormal basis $u_0,\dots,u_{n-1}$ of
+$\R^n$. The coordinates $G_j=\langle Z,u_j\rangle$ are i.i.d.\ $\mathcal N(0,1)$, being an
+orthogonal transformation of a standard normal vector. Now $\bar Z_n=G_0/\sqrt n$,
+$Z-\bar Z_n(1,\dots,1)=\sum_{j\ge1}G_ju_j$, so with $G=(G_1,\dots,G_{n-1})$ we get
+$\tilde s_n=\|G\|/\sqrt n$ and $Z'=\sqrt n\sum_{j\ge1}(G_j/\|G\|)u_j$. In polar coordinates the
+density of $G$ is a function of $\|G\|$ times the uniform measure on the unit sphere, so
+the direction $G/\|G\|$ is independent of the radius $\|G\|$; both are independent of
+$G_0$. Hence $Z'$, a function of the direction, is independent of $(\bar Z_n,\tilde s_n)$.
+Permuting the $Z_i$ permutes the $Z'_i$, so they are exchangeable.
+
+(iii) By exchangeability $\E\hat\mu^{\mathrm{mm}}_n=\E f(Z'_1)$. By (ii),
+$Z'_1=\sqrt n\langle G/\|G\|,w\rangle$ with $w=(\langle e_1,u_j\rangle)_{j\ge1}$ and
+$\|w\|^2=1-\frac1n$; by rotation invariance of $G$ this has the law of
+$\sqrt{n-1}\,G_1/\|G\|$. As $G_1^2\sim\chi^2_1$ and $\|G\|^2-G_1^2\sim\chi^2_{n-2}$ are
+independent, $G_1^2/\|G\|^2$ has the $\mathrm{Beta}(\frac12,\frac{n-2}2)$ law, and $Z'_1$ has the
+density $q_n(x)=\kappa_n\big(1-\frac{x^2}{n-1}\big)^{(n-4)/2}$ on $|x|<\sqrt{n-1}$, and $0$
+outside. Write $q_n=\kappa_n\sqrt{2\pi}\,\varphi\,g_n$, with $\varphi$ the standard normal
+density and $g_n(x)=(1-u)^{(n-4)/2}e^{x^2/2}$, $u=x^2/(n-1)$. From
+$\ln(1-u)=-u-\frac{u^2}2-\theta(u)$ with $0\le\theta(u)\le u^3/(1-u)$,
+\[
+  \ln g_n(x)=\frac{3x^2}{2(n-1)}-\frac{(n-4)x^4}{4(n-1)^2}-\frac{n-4}{2}\theta(u) .
+\]
+For $|x|\le n^{1/4}$ and $n\ge7$ we have $u\le\frac12$, so $\ln g_n(x)=h(x)/n+O((1+x^6)/n^2)$
+with $h(x)=\frac32x^2-\frac14x^4$, and $|h|/n\le1$; hence
+$g_n(x)=1+h(x)/n+O((1+x^{12})/n^2)$ uniformly there. For $|x|>n^{1/4}$, both $\varphi g_n\le
+e^{-x^2(n-4)/(2(n-1))}\le e^{-x^2/4}$ and $\varphi(1+|h|/n)$ are dominated by a multiple of
+$e^{-x^2/4}$, and against $|f|\le Ce^{c|x|}$ these regions contribute $O(e^{-\sqrt n/8})$ once
+$n^{1/4}\ge8c$. Therefore $J_n(f):=\int f\varphi g_n\,\dd x=\E f(Z)+\E[f(Z)h(Z)]/n+O(n^{-2})$.
+Since $\E f(Z'_1)=J_n(f)/J_n(1)$ and $J_n(1)=1+\E h(Z)/n+O(n^{-2})=1+\frac{3}{4n}+O(n^{-2})$,
+\[
+  \E f(Z'_1)=\E f(Z)+\frac{\E\big[f(Z)\big(h(Z)-\frac34\big)\big]}{n}+O(n^{-2}),
+  \qquad h-\tfrac34=-\tfrac14\mathrm{He}_4 .
+\]
+
+(iv) For $f(z)=z$ the estimator is exactly $0=\E Z$, while the sample variance of the
+$Z'_i$ is $1$. Batches drawn from disjoint sets of i.i.d.\ normals are independent and
+identically distributed, with the bias $O(1/k)$ of (iii) and finite variance (the $Z'_i$ of a
+batch are bounded by $\sqrt k$); the rest is the central limit theorem and
+\cref{prop:mc-batch}(iii).
+\end{proof}
+
+\begin{remark}[Moment matching is a control variate in disguise]\label{rem:cv-mm-as-cv}
+Expanding $f(Z'_i)\approx f(Z_i)+f'(Z_i)(Z'_i-Z_i)$ with
+$Z'_i-Z_i\approx-\bar Z_n-Z_i(\tilde s_n-1)$ and $\tilde s_n-1\approx\frac12(\frac1n\sum_jZ_j^2-1)$,
+and using Stein's identities $\E f'(Z)=\E[Zf(Z)]=:a_1$ and
+$\E[Zf'(Z)]=\E[(Z^2-1)f(Z)]=:a_2$, one finds
+\[
+  \hat\mu^{\mathrm{mm}}_n\approx\frac1n\sum_{i=1}^n\Big(f(Z_i)-a_1Z_i-\frac{a_2}{2}(Z_i^2-1)\Big),
+\]
+so that, heuristically, $\sqrt n(\hat\mu^{\mathrm{mm}}_n-\mu)$ is asymptotically normal with variance
+$\Var\big(f(Z)-a_1Z-\frac{a_2}2(Z^2-1)\big)$. Since $Z$ and $Z^2-1$ are uncorrelated with
+variances $1$ and $2$, the coefficients $a_1$ and $a_2/2$ are exactly the optimal ones of
+\cref{thm:cv-multiple}: \emph{asymptotically, log matching is the optimal control-variate
+estimator with the controls $Z$ and $Z^2$}, obtained without estimating any coefficient
+(\exref{ex:cv-skewness} proves this for $f(z)=z^3$). The bias, by contrast, is exact to first
+order by \cref{prop:cv-moment-matching}(iii): its constant $-\frac14\E[f(Z)\mathrm{He}_4(Z)]$ is
+$-6$ for $z^4$ and $1.75$ for the call (\cref{fig:cv-bias}). By this linearisation the test-case
+standard-error ratios are $0.0162$ for the stock and $0.188$ for the call, the course's ``about 1.6\%'' and ``about 20\%'' (and its ``11\% and 33\% of the
+antithetic errors'' are $0.0162/0.140$ and $0.188/0.573$). Exponential-mean matching
+reprices the stock exactly and gives $0.182$ for the call.
+\end{remark}
+
+\begin{remark}[Batches: how many?]\label{rem:cv-mm-batches}
+By \cref{prop:cv-moment-matching}(iv), with $m$ batches the bias is about $c_fm/n$ while the
+standard error is of order $n^{-1/2}$, so their ratio grows like $m/\sqrt n$; with too few
+batches the error estimate itself is noisy ($m-1$ degrees of freedom). Keep $m$ well below
+$\sqrt n$: with $n=2^{20}$ and $m=256$ the bias of the call estimate is about
+$1.75\cdot256/2^{20}\approx4\times10^{-4}$, a fifth of its standard error $2.2\times10^{-3}$.
+How coverage collapses when $m$ is too large is the subject of \exref{ex:cv-mm-coverage}.
+\end{remark}
+
+\begin{remark}[Antithetic variates against moment matching]\label{rem:cv-anti-vs-mm}
+Antithetic sampling acts \emph{locally}: each draw is paired with its mirror image,
+independently of the others, so the pair averages are i.i.d.\ and the usual standard error
+applies. The resulting sample is symmetric, so its mean and all its odd moments are exactly
+$0$, but its variance is not matched. Moment matching acts \emph{globally}: one affine map,
+computed from the whole sample, fixes the first two moments and introduces dependence and
+an $O(1/n)$ bias. The two can be combined, and the order matters: rescaling a symmetric
+sample keeps it symmetric, so antithetic sampling followed by scale matching fixes the mean,
+the variance and every odd moment; but exponential-mean matching shifts the sample and
+destroys its symmetry. With (randomised) quasi-Monte Carlo point sets
+(\cref{ch:11-quasi-monte-carlo}) the low moments are already integrated very accurately, and
+matching adds bias for little gain.
+\end{remark}
+
+\section{Common random numbers}\label{sec:cv-crn}
+
+Often the quantity of interest is a difference of two prices: the same option under two
+models or two volatilities, two strikes, or a bumped Greek (\cref{ch:13-mc-greeks}). Each
+price may be poorly estimated while their difference is estimated well, provided both use
+the same random numbers.
+
+\begin{proposition}[Common random numbers]\label{prop:cv-crn}
+Let $U$ be a random vector with independent components, $f_1(U),f_2(U)\in L^2$ with
+variances $\sigma_1^2,\sigma_2^2$, and $\delta=\E f_1(U)-\E f_2(U)$.
+\begin{enumerate}[label=(\roman*)]
+  \item With independent draws for the two terms, the estimator of $\delta$ from $n$ draws
+    of each has variance $(\sigma_1^2+\sigma_2^2)/n$; with common random numbers,
+    $\frac1n\sum_i\big(f_1(U_i)-f_2(U_i)\big)$ has variance
+    $\big(\sigma_1^2+\sigma_2^2-2\Cov(f_1(U),f_2(U))\big)/n$.
+  \item If, for each $j$, $f_1$ and $f_2$ are monotone in $u_j$ in the same direction, then
+    $\Cov(f_1(U),f_2(U))\ge0$ and common random numbers never increase the variance. If they
+    are monotone in opposite directions in every coordinate, the covariance is $\le0$ and
+    common random numbers never decrease it; if moreover $U\eqd-U$, pairing $f_1(U_i)$ with
+    $f_2(-U_i)$ restores a nonnegative covariance without changing the mean.
+  \item Let $f(\theta,u)$ depend on a parameter, with
+    $|f(\theta+h,u)-f(\theta,u)|\le L(u)|h|$ and $\E L(U)^2<\infty$. Then the common-random-number
+    difference quotient $(f(\theta+h,U)-f(\theta,U))/h$ has variance at most $\E L(U)^2$
+    for every $h$, while with independent draws its variance
+    $(\sigma^2(\theta+h)+\sigma^2(\theta))/h^2$ tends to infinity as $h\to0$ whenever
+    $\sigma^2(\theta)=\Var f(\theta,U)>0$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) is the variance of a difference. (ii) As in the proof of
+\cref{prop:cv-antithetic}(iii), let $V_j=\varepsilon_jU_j$ with signs chosen so that
+$g_k(v)=f_k(\varepsilon_1v_1,\dots,\varepsilon_dv_d)$ is nondecreasing in every coordinate for
+$k=1$; $V$ has independent components and $f_k(U)=g_k(V)$. In the first case $g_2$ is
+nondecreasing as well, in the second $-g_2$ is, and \cref{lem:cv-association} gives
+$\Cov(g_1(V),g_2(V))\ge0$, respectively $\le0$. For the pairing, $u\mapsto f_2(-u)$ moves in
+the same direction as $f_1$ in every coordinate, so the first case applies to $f_1$ and
+$f_2(-\,\cdot)$, and $f_2(-U)\eqd f_2(U)$. (iii) The variance is at most the second moment,
+which is at most $\E L(U)^2$; the independent case is (i) divided by $h^2$.
+\end{proof}
+
+For the test case, the prices at $\sigma=20\%$ and $21\%$ differ by $0.39048$. Both
+discounted payoffs are nondecreasing in $z$, and their correlation is $0.99999$: the
+variance per draw of the difference is $0.535$ with common normals and $334.85$ with
+independent ones, a standard-error ratio of $0.040$. Comparing a call with a put is the
+opposite case (\exref{ex:cv-crn-parity}). Finite-difference Greeks are the main
+application; \cref{prop:gr-finite-difference} works out the optimal bump with and without
+common random numbers. \textcite{glasserman-yao-crn} give general conditions under which
+common random numbers are guaranteed to help.
+
+\section{Control variates}\label{sec:cv-control}
+
+Suppose that alongside the payoff $Y=f(Z)$ we can compute, at little extra cost, a
+\emph{control} $X=g(Z)$ whose mean $\mu_X$ is known exactly: the stock, a vanilla option,
+a geometric average, a hedge. With i.i.d.\ copies $(X_i,Y_i)$ and a coefficient $\beta$,
+\begin{equation}\label{eq:cv-estimator}
+  \hat\mu_n(\beta)=\frac1n\sum_{i=1}^n\big(Y_i-\beta(X_i-\mu_X)\big).
+\end{equation}
+We estimate the mean of $Y$ by estimating the mean of the error $Y-\beta X$ and adding
+back the known part. The course uses $\beta=1$.
+
+\begin{theorem}[The optimal control coefficient]\label{thm:cv-optimal}
+Let $X,Y\in L^2$ with $\sigma_X^2=\Var X>0$, $\sigma_Y^2=\Var Y$, $\sigma_{XY}=\Cov(X,Y)$ and
+$\rho=\Corr(X,Y)$.
+\begin{enumerate}[label=(\roman*)]
+  \item For every $\beta$, $\hat\mu_n(\beta)$ is unbiased with
+    $n\Var\hat\mu_n(\beta)=\sigma_Y^2-2\beta\sigma_{XY}+\beta^2\sigma_X^2$.
+  \item This is minimised uniquely at $\beta^*=\sigma_{XY}/\sigma_X^2$, where
+    \[
+      n\Var\hat\mu_n(\beta^*)=\sigma_Y^2\,(1-\rho^2).
+    \]
+  \item If a sample with its control costs $c$ times a plain sample, the efficiency of
+    $\hat\mu_n(\beta^*)$ relative to plain Monte Carlo is $1/\big(c(1-\rho^2)\big)$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) $\E[Y_i-\beta(X_i-\mu_X)]=\E Y$, and the variance of $Y-\beta X$ expands as stated.
+(ii) Completing the square,
+$\sigma_Y^2-2\beta\sigma_{XY}+\beta^2\sigma_X^2=\sigma_X^2(\beta-\beta^*)^2+\sigma_Y^2-\sigma_{XY}^2/\sigma_X^2$,
+and $\sigma_{XY}^2/\sigma_X^2=\rho^2\sigma_Y^2$. (iii) is \eqref{eq:cv-efficiency}.
+\end{proof}
+
+Geometrically, $\beta^*(X-\mu_X)$ is the orthogonal projection of $Y-\E Y$ onto $X-\mu_X$ in
+$L^2$, and the control removes all of $Y$'s variance except the part orthogonal to $X$. The
+factor $1-\rho^2$ is unforgiving: $\rho=0.9$ gives a variance factor $0.19$, $\rho=0.99$ gives
+$0.02$. With $\beta=1$ and $\sigma_X=\sigma_Y$ the variance factor is $2(1-\rho)$, the
+course's formula; \exref{ex:cv-fixed-beta} asks when a fixed coefficient helps at all.
+
+\begin{example}[The square-root call]\label{eg:cv-sqrt}
+Take $Y=e^{-rT}(\sqrt{S_T}-\sqrt K)^+$. Since $\sqrt{S_T}$ is lognormal with volatility
+$\sigma/2$, the ``pre-wash'' map of \cref{prop:sr-power} prices it as a Black--Scholes call
+on $\sqrt S$ with strike $\sqrt K$, volatility $\sigma/2$ and yield
+$\frac12(r+y+\sigma^2/4)$. The course chooses devious inputs, $S=K=10^4$, $T=1$, $r=1\%$,
+$y=-1\%$, $\sigma=40\%$, which map exactly to the test case: the price is $7.36429$. The
+control is the tangent of the payoff at the kink,
+$X=e^{-rT}(S_T-K)^+/(2\sqrt K)$, that is $\frac1{200}$ of a vanilla call, with known mean
+$\mu_X=8.43615$, about $15\%$ above the price (\cref{fig:cv-control}a). By quadrature,
+$\rho=0.9960$, $\sigma_X^2=235.75$, $\sigma_Y^2=158.01$ and $\beta^*=0.8154$. With the
+course's $\beta=1$ the standard-error ratio is $0.2424$, the course's ``errors reduced by
+about 75\%''; with $\beta^*$ it is $\sqrt{1-\rho^2}=0.0889$, a further factor $7.4$ in
+efficiency. The course inferred $\rho\approx0.97$ by reading the $\beta=1$ result through
+$2(1-\rho)=0.25^2$, which assumes $\sigma_X=\sigma_Y$; here $\sigma_X/\sigma_Y=1.22$, and the
+true correlation is much higher. (The course writes the resulting efficiency as $2/0.25^2=8$;
+the formula is $1/(2\cdot0.25^2)=8$.)
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch08-control}
+  \caption{The square-root call with the course's devious inputs. (a) The payoff
+    $(\sqrt{S_T}-\sqrt K)^+$ and its control, the tangent call $(S_T-K)^+/(2\sqrt K)$.
+    (b) Two thousand discounted samples $(X_i,Y_i)$ and the lines through the exact means
+    $(\mu_X,\mu_Y)$ with slope $\beta=1$ and with the least-squares slope $\hat\beta$. Here $Y$ is a
+    function of $X$, so the points lie on a curve; what the control leaves is the deviation of
+    that curve from a straight line.}
+  \label{fig:cv-control}
+\end{figure}
+
+\subsection{Estimating the coefficient}
+
+$\beta^*$ involves $\Cov(X,Y)$, which is unknown (if it were known, we would hardly need
+simulation). The natural estimator is the least-squares slope from the same sample,
+\[
+  \hat\beta_n=\frac{\sum_i(X_i-\bar X_n)(Y_i-\bar Y_n)}{\sum_i(X_i-\bar X_n)^2},\qquad
+  \hat\mu^{\mathrm{cv}}_n=\bar Y_n-\hat\beta_n(\bar X_n-\mu_X),
+\]
+when the denominator is positive; when it vanishes (all $X_i$ equal) we set $\hat\beta_n=0$.
+This is not an idle case: the tangent call of \cref{eg:cv-sqrt} vanishes with probability
+$N(0.15)=0.56$, so all $n$ controls are $0$ with probability $0.56^n$.
+
+\begin{proposition}[Estimated coefficient: bias and splitting]\label{prop:cv-estimated-beta}
+Let $(X_i,Y_i)$ be i.i.d.\ copies of $(X,Y)$ as in \cref{thm:cv-optimal}.
+\begin{enumerate}[label=(\roman*)]
+  \item $\hat\beta_n\to\beta^*$ almost surely, and
+    $\sqrt n\,(\hat\mu^{\mathrm{cv}}_n-\E Y)\Rightarrow\mathcal N\big(0,\sigma_Y^2(1-\rho^2)\big)$:
+    estimating the coefficient costs nothing asymptotically.
+  \item If $\E\hat\beta_n^2<\infty$, the bias is
+    $\E\hat\mu^{\mathrm{cv}}_n-\E Y=-\Cov(\hat\beta_n,\bar X_n)$, and
+    $|\E\hat\mu^{\mathrm{cv}}_n-\E Y|\le\sigma_X\,\mathrm{sd}(\hat\beta_n)/\sqrt n$; if moreover
+    $\mathrm{sd}(\hat\beta_n)=O(n^{-1/2})$, the bias is $O(1/n)$.
+  \item If $X$ has a continuous law and $\E[Y\mid X]=a+bX$ is affine, then
+    $\E[\hat\mu^{\mathrm{cv}}_n\mid X_1,\dots,X_n]=\E Y$; so $\hat\mu^{\mathrm{cv}}_n$ is unbiased
+    whenever it is integrable.
+  \item (\emph{Splitting}.) Let $\hat\beta^{(1)}$ and $\hat\beta^{(2)}$ be the slopes computed
+    on the two halves of the sample, and assume they are integrable. The estimator that
+    applies each half's slope to the other half,
+    \[
+      \hat\mu^{\mathrm{split}}_n=\tfrac12\Big[\bar Y^{(1)}-\hat\beta^{(2)}(\bar X^{(1)}-\mu_X)\Big]
+      +\tfrac12\Big[\bar Y^{(2)}-\hat\beta^{(1)}(\bar X^{(2)}-\mu_X)\Big],
+    \]
+    is unbiased and has the same limit law as in (i).
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By the strong law, $\frac1n\sum(X_i-\bar X_n)(Y_i-\bar Y_n)\to\sigma_{XY}$ and
+$\frac1n\sum(X_i-\bar X_n)^2\to\sigma_X^2$ almost surely, so $\hat\beta_n\to\beta^*$. Write
+\[
+  \sqrt n(\hat\mu^{\mathrm{cv}}_n-\E Y)=\sqrt n\big(\hat\mu_n(\beta^*)-\E Y\big)
+  -(\hat\beta_n-\beta^*)\sqrt n(\bar X_n-\mu_X).
+\]
+The first term converges in law to $\mathcal N(0,\sigma_Y^2(1-\rho^2))$ by the central limit
+theorem and \cref{thm:cv-optimal}; in the second, $\sqrt n(\bar X_n-\mu_X)$ converges in law
+and $\hat\beta_n-\beta^*\to0$, so the product tends to $0$ in probability and Slutsky's lemma
+\citep[Lemma~2.8]{vandervaart-asymptotic} concludes.
+
+(ii) $\E\hat\mu^{\mathrm{cv}}_n=\E Y-\E[\hat\beta_n(\bar X_n-\mu_X)]$ and
+$\E[\hat\beta_n(\bar X_n-\mu_X)]=\Cov(\hat\beta_n,\bar X_n)$ because $\E\bar X_n=\mu_X$.
+Cauchy--Schwarz bounds the covariance by $\mathrm{sd}(\hat\beta_n)\,\sigma_X/\sqrt n$. Both
+hypotheses can fail for small $n$: in the bivariate normal case
+$\Var\hat\beta_n=\sigma_Y^2(1-\rho^2)/(\sigma_X^2(n-3))$ for $n\ge4$, but
+$\E\hat\beta_3^2=\infty$ when $|\rho|<1$ (\exref{ex:cv-lavenberg-welch}).
+
+(iii) Write $Y_i=a+bX_i+\varepsilon_i$ with $\E[\varepsilon_i\mid X_i]=0$; by independence
+across $i$, $\E[\varepsilon_i\mid X_1,\dots,X_n]=0$. Almost surely the $X_i$ are distinct, and
+$\hat\beta_n=b+\sum_i(X_i-\bar X_n)\varepsilon_i/\sum_i(X_i-\bar X_n)^2$ and
+\[
+  \hat\mu^{\mathrm{cv}}_n=a+b\mu_X+\bar\varepsilon_n-(\bar X_n-\mu_X)\frac{\sum_i(X_i-\bar X_n)\varepsilon_i}{\sum_i(X_i-\bar X_n)^2},
+\]
+which is $\E Y=a+b\mu_X$ plus a linear combination of the $\varepsilon_i$ with
+coefficients that are functions of $X_1,\dots,X_n$; its conditional mean is $\E Y$.
+
+(iv) Given the second half, $\hat\beta^{(2)}$ is a constant and the first half is still an
+i.i.d.\ sample independent of it, so the first bracket has conditional mean $\E Y$ (for any
+fixed $\beta$, $\hat\mu(\beta)$ is unbiased); it is integrable since
+$\E|\hat\beta^{(2)}(\bar X^{(1)}-\mu_X)|=\E|\hat\beta^{(2)}|\,\E|\bar X^{(1)}-\mu_X|$. The same
+holds for the second bracket. The limit law follows from (i) applied to each half, since
+each half's slope converges to $\beta^*$.
+\end{proof}
+
+A first-order expansion of the ratio $\hat\beta_n$ suggests the size of the bias in (ii):
+heuristically, $n(\E\hat\mu^{\mathrm{cv}}_n-\E Y)\to-\E\big[(X-\mu_X)^2\varepsilon\big]/\sigma_X^2$
+with $\varepsilon=Y-\E Y-\beta^*(X-\mu_X)$, which vanishes in case (iii); \textcite{nelson-cv}
+discusses this bias and its remedies. For the call with the
+stock as control the constant is $-8.18$ (\cref{fig:cv-bias}). The bias is a fraction
+$O(n^{-1/2})$ of the standard error and is negligible for large samples, but it matters
+for small batches (for instance in the regressions inside American option pricing,
+\cref{ch:14-american-mc}). The standard error of $\hat\mu^{\mathrm{cv}}_n$ is estimated by
+the residual standard deviation with $n-2$ degrees of freedom. A pilot sample, used only to
+estimate $\beta$ and then discarded, removes the bias like splitting does.
+The exact small-sample variance in the normal case is computed in \exref{ex:cv-lavenberg-welch}.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.82\textwidth]{ch08-bias}
+  \caption{$n$ times the bias of three estimators of the test-case call, from $6.4$ million
+    normal draws at each sample size $n$ (bars: two standard errors). Moment matching
+    (\cref{prop:cv-moment-matching}) and the control variate with in-sample coefficient
+    (\cref{prop:cv-estimated-beta}) have bias of order $1/n$, with the predicted constants
+    $1.75$ and $-8.18$ (dashed); the split-sample estimator is unbiased.}
+  \label{fig:cv-bias}
+\end{figure}
+
+\subsection{Several controls}
+
+With several controls $X=(X^1,\dots,X^q)$ of known mean $\mu_X\in\R^q$, use
+$\hat\mu_n(\beta)=\frac1n\sum_i\big(Y_i-\beta^\top(X_i-\mu_X)\big)$ with $\beta\in\R^q$.
+
+\begin{theorem}[Multiple controls as regression]\label{thm:cv-multiple}
+Let $Y\in L^2$ with $\sigma_Y^2=\Var Y>0$, $X\in L^2(\R^q)$, with $\Sigma_{XX}=\Cov(X)$ positive definite and
+$\Sigma_{XY}=\Cov(X,Y)\in\R^q$. Set
+$\beta^*=\Sigma_{XX}^{-1}\Sigma_{XY}$ and $R^2=\Sigma_{XY}^\top\Sigma_{XX}^{-1}\Sigma_{XY}/\sigma_Y^2$.
+\begin{enumerate}[label=(\roman*)]
+  \item For every $\beta\in\R^q$,
+    \[
+      n\Var\hat\mu_n(\beta)=\sigma_Y^2(1-R^2)+(\beta-\beta^*)^\top\Sigma_{XX}(\beta-\beta^*),
+    \]
+    so $\beta^*$ is the unique optimum, with variance factor $1-R^2$, and $0\le R^2\le1$.
+  \item $R^2=\max_{a\in\R^q\setminus\{0\}}\Corr(Y,a^\top X)^2$. If $\Sigma_{XY}\ne0$ the maximum
+    is attained exactly at the nonzero multiples of $\beta^*$; if $\Sigma_{XY}=0$, every $a$ gives
+    $0=R^2$. In particular $R^2\ge\Corr(Y,X^k)^2$ for each $k$, and adding a control never increases the
+    optimal variance.
+  \item If $S_{XX}=\sum_i(X_i-\bar X_n)(X_i-\bar X_n)^\top$ is invertible and
+    $\hat\beta_n=S_{XX}^{-1}\sum_i(X_i-\bar X_n)(Y_i-\bar Y_n)$, then
+    $\bar Y_n-\hat\beta_n^\top(\bar X_n-\mu_X)$ is the intercept $\hat a$ of the
+    least-squares fit of $Y_i$ on $(1,X_i-\mu_X)$, that is, the fitted regression evaluated
+    at $X=\mu_X$. As $n\to\infty$,
+    $\sqrt n(\hat a-\E Y)\Rightarrow\mathcal N\big(0,\sigma_Y^2(1-R^2)\big)$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) $\Var(Y-\beta^\top X)=\sigma_Y^2-2\beta^\top\Sigma_{XY}+\beta^\top\Sigma_{XX}\beta$, and
+completing the square with $\Sigma_{XY}=\Sigma_{XX}\beta^*$ gives the formula, since
+$\beta^{*\top}\Sigma_{XX}\beta^*=\sigma_Y^2R^2$. The quadratic form is positive definite, so
+the optimum is unique; at $\beta^*$ the variance $\sigma_Y^2(1-R^2)$ is nonnegative, and
+$R^2\ge0$ since $\Sigma_{XX}^{-1}$ is positive definite.
+
+(ii) In the inner product $\langle u,v\rangle_\Sigma=u^\top\Sigma_{XX}v$,
+$a^\top\Sigma_{XY}=\langle a,\beta^*\rangle_\Sigma$, so by Cauchy--Schwarz
+\[
+  \Corr(Y,a^\top X)^2=\frac{(a^\top\Sigma_{XY})^2}{\sigma_Y^2\,a^\top\Sigma_{XX}a}
+  \le\frac{\langle\beta^*,\beta^*\rangle_\Sigma}{\sigma_Y^2}=R^2,
+\]
+with equality if and only if $a$ and $\beta^*$ are linearly dependent, that is, when
+$\beta^*\ne0$ (equivalently $\Sigma_{XY}\ne0$), if and only if $a$ is a multiple of $\beta^*$; if
+$\Sigma_{XY}=0$ both sides vanish for every $a$. A larger set of controls maximises over a larger
+set of combinations.
+
+(iii) For fixed $b$, $\sum_i(Y_i-a-b^\top(X_i-\mu_X))^2$ is minimised by
+$a=\bar Y_n-b^\top(\bar X_n-\mu_X)$; substituting leaves
+$\sum_i\big((Y_i-\bar Y_n)-b^\top(X_i-\bar X_n)\big)^2$, minimised by $b=\hat\beta_n$ (normal
+equations). The limit law follows as in \cref{prop:cv-estimated-beta}(i), with the strong law
+for $S_{XX}/n$ and the multivariate central limit theorem.
+\end{proof}
+
+In terms of correlations, $1-R^2=1-\rho_{YX}^\top\rho_{XX}^{-1}\rho_{XY}$, the form used in the
+course. Two cautions. First, each estimated coefficient costs a little: when $(X,Y)$ is
+jointly normal, the variance of $\hat a$ is $\sigma_Y^2(1-R^2)/n$ times the loss factor
+$(n-2)/(n-q-2)$ \citep{lavenberg-moeller-welch}, so $q$ must stay small compared with $n$.
+Second, nearly collinear controls make $S_{XX}$ ill-conditioned and $\hat\beta_n$ erratic, even
+though the fitted intercept may remain accurate; drop redundant controls. For the
+square-root call, adding the stock to the tangent call raises $R^2$ from $0.9921$ to $0.9934$
+and lowers the standard-error ratio from $0.0889$ to $0.0815$. The arithmetic Asian option with
+geometric, vanilla and strip controls (\cref{prop:as-control}) is the course's showcase of
+multiple controls.
+
+\subsection{Nonlinear controls and hedges}
+
+Two further ways to use known means lead back to linear controls.
+
+\begin{proposition}[Nonlinear controls]\label{prop:cv-nonlinear}
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Delta method}.) Let $h$ be defined and continuously differentiable on a
+    neighbourhood $U$ of $(\mu_X,\E Y)$, with $h(\mu_X,y)=y$ whenever $(\mu_X,y)\in U$, and set
+    $h(\bar X_n,\bar Y_n)=\bar Y_n$ when $(\bar X_n,\bar Y_n)\notin U$. Then $h(\bar X_n,\bar Y_n)\to\E Y$ almost
+    surely and
+    \[
+      \sqrt n\big(h(\bar X_n,\bar Y_n)-\E Y\big)\Rightarrow
+      \mathcal N\Big(0,\Var\big(Y-\beta_h(X-\mu_X)\big)\Big),\qquad
+      \beta_h=-\partial_xh(\mu_X,\E Y):
+    \]
+    a nonlinear control is asymptotically the linear control with coefficient $\beta_h$, and
+    no better than $\beta^*$.
+  \item (\emph{Hedges as controls}.) Let $V(t,s)$ be the Black--Scholes price of a European
+    claim with a Lipschitz payoff $F(S_T)$ (calls and puts qualify). For a grid
+    $0=t_0<\dots<t_m=T$ let $\tilde S_t=e^{-(r-y)t}S_t$ and
+    \[
+      M_m=\sum_{k=0}^{m-1}e^{-yt_k}\,\partial_sV(t_k,S_{t_k})\,\big(\tilde S_{t_{k+1}}-\tilde S_{t_k}\big).
+    \]
+    Then $\E M_m=0$, and with $Y=e^{-rT}F(S_T)$,
+    $\E\big[(Y-M_m-V(0,S))^2\big]\to0$ as $\max_k(t_{k+1}-t_k)\to0$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By the strong law, $(\bar X_n,\bar Y_n)\in U$ for all large $n$, almost surely, so the
+convention outside $U$ does not affect the limits; continuity of $h$ gives the almost sure
+limit. By the multivariate
+central limit theorem and the delta method \citep[Theorem~3.1]{vandervaart-asymptotic},
+$\sqrt n(h(\bar X_n,\bar Y_n)-h(\mu_X,\E Y))$ converges in law to
+$\nabla h^\top N$ with $N\sim\mathcal N(0,\Cov(X,Y))$, that is, to the law of
+$\partial_xh\,X+\partial_yh\,Y$ centred. Differentiating $h(\mu_X,y)=y$ gives $\partial_yh=1$,
+and $\partial_xh=-\beta_h$. The last claim is \cref{thm:cv-optimal}(ii).
+
+(ii) Under $\Q$, $\tilde S_t=S\exp(\sigma W_t-\sigma^2t/2)$ is a square-integrable martingale and
+the weights $e^{-yt_k}\partial_sV(t_k,S_{t_k})$ are bounded and $\F_{t_k}$-measurable, so every
+term of $M_m$ has mean zero. Writing
+$V(t,s)=e^{-r(T-t)}\E F\big(se^{\nu(T-t)+\sigma\sqrt{T-t}Z}\big)$ and differentiating under the
+Gaussian integral, $V$ is $C^{1,2}$ on $[0,T)\times(0,\infty)$ and solves the Black--Scholes
+equation; if $L$ is the Lipschitz constant of $F$, $|\partial_sV|\le Le^{-y(T-t)}$, the delta is
+continuous, and $V(t,s)\to F(s)$ as $t\uparrow T$ by dominated convergence. It\^o's formula gives,
+as in the delta-hedging argument of the IEOR 222 notes,
+$\dd(e^{-rt}V(t,S_t))=e^{-rt}\partial_sV\,\sigma S_t\,\dd W_t=h_t\,\dd\tilde S_t$ with
+$h_t=e^{-yt}\partial_sV(t,S_t)$. Letting $t\uparrow T$ (the integrand is bounded, and
+$V(t,S_t)\to F(S_T)$ since $V$ is jointly continuous up to $T$ by the same argument), $Y=V(0,S)+\int_0^Th_t\,\dd\tilde S_t$. Hence
+$Y-V(0,S)-M_m=\int_0^T(h_t-h_{\eta(t)})\,\dd\tilde S_t$ with $\eta(t)=t_k$ on $[t_k,t_{k+1})$,
+and by the It\^o isometry
+\[
+  \E\big[(Y-M_m-V(0,S))^2\big]=\E\int_0^T(h_t-h_{\eta(t)})^2\sigma^2\tilde S_t^2\,\dd t\longrightarrow0
+\]
+by dominated convergence: the integrand is bounded by $4\sup|h|^2\sigma^2\tilde S_t^2$, which
+is integrable, and tends to $0$ for every $t<T$ along every path, by continuity of $h$.
+\end{proof}
+
+Part (i) explains the classical ratio estimator $\bar Y_n\mu_X/\bar X_n$ ($\mu_X\ne0$, with
+$U$ a neighbourhood not meeting $\{x=0\}$), for which
+$\beta_h=\E Y/\mu_X$: for the call with the stock as control this is $0.075$, far from
+$\beta^*=0.560$, so the ratio estimator barely helps. Part (ii) says that the ideal control is
+the claim's own hedge: a control variate is a hedge whose cost is known. With the
+Black--Scholes delta of the call itself as weights, the standard-error ratio for the test-case
+call is about $0.48$, $0.15$ and $0.075$ for $m=1$, $12$ and $52$ rebalancing dates
+($20{,}000$ paths), a variance falling asymptotically like $1/m$ as in \cref{prop:hd-discrete-error}. In
+practice the delta of a nearby tractable claim is used: the static tangent call of
+\cref{eg:cv-sqrt} is the one-date version, and the asymptotic square-root call of
+\exref{ex:cv-asc} uses the vanilla call with the coefficient $F'(K+)=1$ read off the
+replication.
+
+\section{Combining the techniques: a laboratory}\label{sec:cv-lab}
+
+\Cref{tab:cv-lab} runs every method of this chapter on the same $n=2^{20}$ normal draws
+(seed $1$) and sets the measured standard-error ratios beside the exact asymptotic ones,
+computed by quadrature from the formulas above. Moment matching uses $256$ separately matched
+batches, and its measured ratios carry the noise of a batch standard error, about $4\%$.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}llccc@{}}
+    \toprule
+    target & method & exact & laboratory & efficiency \\
+    \midrule
+    stock & antithetic & $0.140$ & $0.140$ & $25.5$ \\
+     & moment matching (log) & $0.016$ & $0.017$ & $1.9\times10^3$ \\
+     & exponential matching; control $S_T$ & $0$ & $0$ & exact \\
+    \midrule
+    call & antithetic & $0.573$ & $0.574$ & $1.5$ \\
+     & moment matching (log) & $0.188$ & $0.180$ & $14$ \\
+     & moment matching (exponential) & $0.182$ & $0.174$ & $15$ \\
+     & control $S_T$, $\hat\beta_n$ & $0.472$ & $0.472$ & $2.2$ \\
+     & antithetic and control $S_T$ & $0.151$ & $0.152$ & $22$ \\
+    \midrule
+    square-root call & control, $\beta=1$ & $0.242$ & $0.242$ & $8.5$ \\
+     & control, $\hat\beta_n$ & $0.089$ & $0.089$ & $63$ \\
+     & tangent call and stock & $0.081$ & $0.082$ & $75$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Standard-error ratios to plain Monte Carlo at equal $n$, exact (asymptotic, by
+    quadrature) and measured in the laboratory ($n=2^{20}$, seed $1$), for the test case and
+    the square-root call, and the efficiency $1/(2\varrho^2)$ of \eqref{eq:cv-efficiency} at
+    the course's conservative cost $c=2$. Antithetic ratios compare $n$ pairs with $n$ draws.
+    The exact entries for moment matching use the linearisation of \cref{rem:cv-mm-as-cv}.}
+  \label{tab:cv-lab}
+\end{table}
+
+\begin{remark}[Why combinations are not multiplicative]\label{rem:cv-combine}
+Antithetic sampling removes the odd part $f_{\mathrm o}$; a control applied afterwards
+regresses the even part of $Y$ on the even part of $X$, and only the correlation of the even
+parts matters. For the call with the stock as control, the even parts have correlation
+$0.9645$, against $0.882$ for the raw payoffs, and the combination reaches $0.151$, better than
+the product $0.573\times0.472=0.270$ of the separate ratios. The opposite also happens: the
+control $Z$ itself, which helps alone, is useless after pairing, because its even part is
+zero; the variance it would remove is odd, and pairing has already removed it. Likewise, log
+matching already contains the optimal controls $Z$ and $Z^2$ (\cref{rem:cv-mm-as-cv}), so
+little is left for a further control: exponential-mean matching, which also fixes the mean of
+the stock, improves the ratio only from $0.188$ to $0.182$. The lesson of the table is the course's: almost any combination
+helps, but the gains must be measured, not multiplied.
+\end{remark}
+
+\paragraph{Course examples reproduced.} The antithetic ratios $14\%$ (stock) and $57\%$ (call)
+with efficiencies $25$ and $1.5$; the moment-matching ratios $1.6\%$ and $20\%$ (efficiencies
+$1.9\times10^3$ and $14$ here, about $2000$ and $13$ in the course); the square-root call
+$7.36429$, its control mean $8.43615$ and the $75\%$ error reduction at $\beta=1$; and the
+call-payoff variance $161.2$.
+
+\demo{08-antithetic-control.ipynb}{moment matching with batches, the bias of order $1/n$,
+control variates with a slider for the coefficient, common random numbers for a volatility
+bump, and the laboratory of \cref{tab:cv-lab} with measured execution times.}
+
+\furtherreading
+\textcite{glasserman-mc} is the standard reference: Sections~4.1 (control variates, with
+multiple, small-sample and nonlinear controls in~4.1.2--4.1.4), 4.2 (antithetic variates),
+4.5.1 (moment matching) and~7.1 (common random numbers for Greeks). Antithetic variates go back to
+\textcite{hammersley-morton}; the association inequality behind
+\cref{lem:cv-association} is developed in \textcite{esary-proschan-walkup}.
+\textcite{lavenberg-welch} survey control variates with estimated coefficients; the loss
+factor is due to \textcite{lavenberg-moeller-welch}, and \textcite{nelson-cv} treats the bias
+and its remedies. \textcite{glasserman-yao-crn} study common random numbers.
+\textcite{boyle-broadie-glasserman} review variance reduction for security pricing.

@@ -1,5 +1,750 @@
-\begin{planned}
-  \item the Monte Carlo estimator, the central limit theorem and confidence intervals
-  \item batches and the efficiency of an estimator
-  \item demo: Monte Carlo prices converging to Black--Scholes
-\end{planned}
+% Chapter 6: Monte Carlo pricing and its error.
+
+Every price in these notes is a discounted expectation under a risk-neutral measure
+(\cref{prop:sm-risk-neutral}). For a European claim with payoff $f(S_T)$ it is
+$e^{-rT}\EQ[f(S_T)]$; for a path-dependent or multi-asset claim the payoff depends on more
+than one random number, but the price is still an expectation. When that expectation has no
+closed form we estimate it by simulation: generate many independent scenarios under $\Q$,
+compute the discounted payoff in each, and average. This is the Monte Carlo method,
+brought to option pricing by \textcite{boyle-mc}.
+
+This chapter is about what the average is worth. A simulation reports three numbers: an
+estimate, its standard error and the time it took. The central limit theorem connects the
+first two: the error shrinks like $n^{-1/2}$ in the number $n$ of scenarios, whatever the
+dimension of the problem and however irregular the payoff. That is the strength of the
+method (\cref{sec:mc-dimension}) and its weakness: one more correct digit costs a hundred
+times more work. The computing time enters through the efficiency of an estimator
+(\cref{sec:mc-efficiency}), which is what the variance reduction methods of
+\cref{ch:08-antithetic-control,ch:09-importance-sampling,ch:10-stratification,ch:11-quasi-monte-carlo,ch:12-multilevel}
+improve. Much of the chapter is about when the reported standard error should not be
+believed: small samples, skewed payoffs, heavy tails, dependent samples and biased
+estimators.
+
+Samples are drawn under some probability measure; in pricing it is the risk-neutral
+measure $\Q$, but to lighten notation we write $\Prob$ and $\E$ for whichever measure the
+samples come from. $X$ is a real random variable, typically a discounted payoff, and
+$\mu=\E[X]$ is the number we want. $\mathcal N(m,v)$ is the normal law, $N$ the standard
+normal distribution function, and $t_k$ Student's $t$ law with $k$ degrees of freedom.
+
+\section{The Monte Carlo estimator}\label{sec:mc-estimator}
+
+Our running example is the Black--Scholes model with a dividend yield. Under $\Q$,
+\begin{equation}\label{eq:mc-gbm}
+  S_T=S_0\exp\big(\nu T+\sigma\sqrt T\,Z\big),\qquad Z\sim\mathcal N(0,1),\qquad
+  \nu=r-y-\tfrac{\sigma^2}{2},
+\end{equation}
+and the call price is $C=e^{-rT}\EQ\big[(S_T-K)^+\big]$. From independent standard normals
+$Z_1,Z_2,\dots$ (\cref{ch:05-random-numbers}) we obtain independent copies
+$X_i=e^{-rT}\big(S_0e^{\nu T+\sigma\sqrt TZ_i}-K\big)^+$ of the discounted payoff
+$X=e^{-rT}(S_T-K)^+$, whose mean is $C$.
+
+\begin{definition}[Monte Carlo estimator]\label{def:mc-estimator}
+Let $X$ be an integrable random variable with mean $\mu=\E[X]$, and let $X_1,X_2,\dots$ be
+independent random variables with the law of $X$. The \emph{Monte Carlo estimator} of $\mu$
+from $n$ draws is
+\[
+  \hat X_n=\frac1n\sum_{i=1}^nX_i .
+\]
+For $n\ge2$, the \emph{sample variance}, the \emph{sample standard deviation} and the
+\emph{standard error} are
+\[
+  \hat s_n^2=\frac{1}{n-1}\sum_{i=1}^n\big(X_i-\hat X_n\big)^2,\qquad
+  \hat s_n=\sqrt{\hat s_n^2},\qquad \frac{\hat s_n}{\sqrt n}.
+\]
+For $\delta\in(0,1)$ let $z_\delta=N^{-1}(1-\delta/2)$, so that $z_{0.05}=1.96$. The interval
+\begin{equation}\label{eq:mc-ci}
+  I_n=\Big[\hat X_n-z_\delta\frac{\hat s_n}{\sqrt n},\ \hat X_n+z_\delta\frac{\hat s_n}{\sqrt n}\Big]
+\end{equation}
+is the \emph{nominal $(1-\delta)$ confidence interval} for $\mu$.
+\end{definition}
+
+The word \emph{nominal} is a warning: whether $\Prob(\mu\in I_n)$ is close to $1-\delta$ is a
+theorem with hypotheses, the subject of \cref{sec:mc-clt}.
+
+An expectation that we can simulate is an integral over a cube. If one draw of $X$
+consumes a fixed number $d$ of independent uniform random numbers, then $X=g(U_1,\dots,U_d)$ for some
+function $g$, and
+\begin{equation}\label{eq:mc-integral}
+  \mu=\int_{[0,1]^d}g(u)\,\dd u .
+\end{equation}
+For the call, $d=1$ with $Z=N^{-1}(U)$; for a payoff observed at $m$ dates on $k$ assets,
+$d=mk$. The dimension $d$ decides the fate of deterministic quadrature, but it enters the
+error of Monte Carlo only through the variance of $g$ (\cref{sec:mc-dimension}).
+
+\begin{proposition}[Unbiasedness and consistency]\label{prop:mc-unbiased}
+Let $X$ be integrable with mean $\mu$.
+\begin{enumerate}[label=(\roman*)]
+  \item $\E[\hat X_n]=\mu$ for every $n\ge1$.
+  \item $\hat X_n\to\mu$ almost surely as $n\to\infty$.
+\end{enumerate}
+If moreover $\E[X^2]<\infty$ and $\sigma^2=\Var(X)$, then:
+\begin{enumerate}[label=(\roman*),resume]
+  \item $\E\big[(\hat X_n-\mu)^2\big]=\Var(\hat X_n)=\sigma^2/n$, and $\E[\hat s_n^2]=\sigma^2$
+    for $n\ge2$;
+  \item $\hat s_n\to\sigma$ almost surely.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) is linearity of expectation. (ii) is the strong law of large numbers, whose only
+hypothesis for independent identically distributed variables is $\E|X|<\infty$
+\citep[Section~2.4]{durrett}.
+
+(iii) Variances of independent variables add, so $\Var(\hat X_n)=n\sigma^2/n^2$, and
+$\E[(\hat X_n-\mu)^2]=\Var(\hat X_n)$ by (i). Expanding the squares around $\hat X_n$,
+\[
+  \sum_{i=1}^n(X_i-\hat X_n)^2=\sum_{i=1}^n(X_i-\mu)^2-n(\hat X_n-\mu)^2,
+\]
+whose expectation is $n\sigma^2-\sigma^2$. Dividing by $n-1$ gives $\E[\hat s_n^2]=\sigma^2$.
+
+(iv) Apply the strong law to $X$ and to $X^2$, which is integrable by assumption:
+$\frac1n\sum_iX_i^2\to\E[X^2]$ and $\hat X_n\to\mu$ almost surely. Hence
+$\hat s_n^2=\frac{n}{n-1}\big(\frac1n\sum_iX_i^2-\hat X_n^2\big)\to\E[X^2]-\mu^2=\sigma^2$,
+and $\hat s_n\to\sigma$ by continuity of the square root.
+\end{proof}
+
+Two things (iii) does not say. First, $\hat s_n$ is biased low:
+$\E[\hat s_n]\le\sqrt{\E[\hat s_n^2]}=\sigma$ by Jensen's inequality, although the bias
+vanishes as $n\to\infty$. Second, the estimate and its standard error come from the same
+sample, and in general they are not independent (for a normal sample they are). For a call, a sample that
+happens to contain few large payoffs has both a low mean and a small $\hat s_n$: the
+interval is short exactly when it is in the wrong place. \Cref{sec:mc-clt} shows the
+consequence.
+
+\begin{example}[Bare-bones Monte Carlo for the test case]\label{exa:mc-bbmc}
+Take the course's test case $S_0=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, for which
+$\EQ[S_T]=S_0e^{(r-y)T}=99.0050$ and $C=7.36429$. The course's \emph{bare-bones} Monte Carlo
+draws $n$ standard normals, builds $S_T$ from \eqref{eq:mc-gbm}, and reports the estimate
+and the standard error for $\EQ[S_T]$, for $\EQ[(S_T-K)^+]$ and for $C$. With $n=2^{20}$, our
+implementation (NumPy's \texttt{default\_rng}, seed $2024$) returns $\hat C=7.3786$ with standard error $0.0123$, an error of $1.17$
+standard errors, and $99.0263$ with standard error $0.0196$ for $\EQ[S_T]$. The exact
+standard deviation of the discounted call payoff is $\sigma=12.570$
+(\exref{ex:mc-call-variance}), so the standard error at $n=2^{20}$ is $12.570/1024=0.0123$,
+as reported. To be within one cent of $C$ with probability $95\%$ we need
+$(1.96\times12.570/0.01)^2\approx6.1\times10^6$ paths.
+\end{example}
+
+\begin{incode}
+\begin{lstlisting}
+z = np.random.default_rng(seed).standard_normal(n)
+ST = S * np.exp((r - y - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * z)
+X = np.exp(-r * T) * np.maximum(ST - K, 0.0)       # discounted payoffs
+C_hat, se = X.mean(), X.std(ddof=1) / np.sqrt(n)   # estimate, standard error
+\end{lstlisting}
+\texttt{bs\_call\_bbmc} in \coderef{code/src/mfe230d/montecarlo.py} does this for the three
+targets of \cref{exa:mc-bbmc}; \texttt{mc\_estimate} and \texttt{batch\_estimate} return
+estimates, standard errors and confidence intervals for any array of samples.
+\end{incode}
+
+\section{The central limit theorem and confidence intervals}\label{sec:mc-clt}
+
+\begin{theorem}[Central limit theorem for Monte Carlo]\label{thm:mc-clt}
+Let $\E[X^2]<\infty$ and $\sigma^2=\Var(X)>0$, and let $T_n=\sqrt n\,(\hat X_n-\mu)/\hat s_n$
+on the event $\{\hat s_n>0\}$ and $T_n=0$ otherwise.
+\begin{enumerate}[label=(\roman*)]
+  \item $\sqrt n\,(\hat X_n-\mu)/\sigma$ converges in distribution to $\mathcal N(0,1)$.
+  \item $T_n$ converges in distribution to $\mathcal N(0,1)$, and the interval
+    \eqref{eq:mc-ci} has asymptotically its nominal coverage: $\Prob(\mu\in I_n)\to1-\delta$.
+  \item If $X$ is normal, then $T_n$ has the law $t_{n-1}$ for every $n\ge2$, and the
+    interval \eqref{eq:mc-ci} with $z_\delta$ replaced by the $(1-\delta/2)$-quantile
+    $t_{n-1,\delta}$ of $t_{n-1}$ has coverage exactly $1-\delta$.
+\end{enumerate}
+If instead $\E|X|<\infty$ but $\E[X^2]=\infty$, then $\hat X_n\to\mu$ almost surely as
+before, but $\hat s_n\to\infty$ almost surely.
+\end{theorem}
+
+\begin{proof}
+(i) is the central limit theorem for independent identically distributed variables with
+finite variance \citep[Section~3.4.1]{durrett}.
+
+(ii) By \cref{prop:mc-unbiased}(iv), $\sigma/\hat s_n\to1$ almost surely; in particular
+$\Prob(\hat s_n=0)\to0$. Off that event,
+$T_n=(\sigma/\hat s_n)\cdot\sqrt n(\hat X_n-\mu)/\sigma$ is the product of a sequence that
+converges in distribution to $\mathcal N(0,1)$ and one that converges in probability to $1$,
+so $T_n\Rightarrow\mathcal N(0,1)$ by Slutsky's lemma \citep[Section~2.1, Lemma~2.8]{vandervaart-asymptotic}. On
+$\{\hat s_n>0\}$ the events $\{\mu\in I_n\}$ and $\{|T_n|\le z_\delta\}$ coincide, and the
+normal distribution function is continuous, so
+$\Prob(\mu\in I_n)\to\Prob(|Z|\le z_\delta)=1-\delta$ for $Z\sim\mathcal N(0,1)$.
+
+(iii) For a normal sample, $\hat X_n$ and $\hat s_n^2$ are independent,
+$\sqrt n(\hat X_n-\mu)/\sigma\sim\mathcal N(0,1)$ and $(n-1)\hat s_n^2/\sigma^2$ has the
+$\chi^2$ law with $n-1$ degrees of freedom \citep[Theorem~5.3.1]{casella-berger}. So $T_n$
+is a standard normal divided by the square root of an independent $\chi^2_{n-1}/(n-1)$
+variable, which is the definition of $t_{n-1}$.
+
+Finally, suppose that $\E|X|<\infty=\E[X^2]$. The strong law still gives $\hat X_n\to\mu$. For $M>0$, the variables
+$\min(X_i^2,M)$ are bounded, so by the strong law
+$\liminf_n\frac1n\sum_iX_i^2\ge\lim_n\frac1n\sum_i\min(X_i^2,M)=\E[\min(X^2,M)]$ almost
+surely. As $M\uparrow\infty$ through the integers, $\E[\min(X^2,M)]\uparrow\E[X^2]=\infty$ by
+monotone convergence, and a countable intersection of almost sure events is almost sure;
+hence $\frac1n\sum_iX_i^2\to\infty$ almost surely. Since $\hat X_n^2\to\mu^2<\infty$,
+$\hat s_n^2=\frac{n}{n-1}\big(\frac1n\sum_iX_i^2-\hat X_n^2\big)\to\infty$.
+\end{proof}
+
+Part (i) says that $\hat X_n\approx\mu+\sigma Z/\sqrt n$ with $Z$ standard normal. Three
+consequences shape the rest of Part~II. The error is of order $\sigma/\sqrt n$, so each
+additional decimal digit costs a factor of $100$ in the number of paths. The rate does not
+depend on the dimension $d$ in \eqref{eq:mc-integral} or on the smoothness of $g$: only
+$\sigma^2<\infty$ is needed. And the constant $\sigma$ is what can be improved: halving
+$\sigma$ is worth four times as many paths, which is what variance reduction does
+(\cref{ch:08-antithetic-control}).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch06-convergence}
+  \caption{Bare-bones Monte Carlo on the test case (\cref{exa:mc-bbmc}): one stream of
+    $2^{20}$ normal draws (seed $2024$), read at $n=2,4,\dots,2^{20}$. Dots: the actual
+    errors for $\EQ[S_T]$ (left) and for the call price (right). Solid: the standard error
+    $\hat s_n/\sqrt n$. Dashed: the batch standard error of \cref{prop:mc-batch} with
+    $\min(2^{10},n)$ batches, which coincides with $\hat s_n/\sqrt n$ for $n\le2^{10}$. Both
+    standard errors fall on a line of slope $-\frac12$ and describe the size of the errors
+    from a few dozen samples on.}
+  \label{fig:mc-convergence}
+\end{figure}
+
+\demo{06-monte-carlo.ipynb}{rerun the bare-bones Monte Carlo of \cref{fig:mc-convergence}
+with other seeds, strikes and sample sizes, and watch the errors scatter around the
+standard error.}
+
+\subsection{Small samples and Student's \texorpdfstring{$t$}{t}}
+
+\begin{remark}[When to use $t$ quantiles]\label{rem:mc-student}
+For the sample sizes of pricing, the quantiles of $t_{n-1}$ and of $\mathcal N(0,1)$ are
+indistinguishable: $t_{999,0.05}=1.9623$ against $z_{0.05}=1.9600$. Student's $t$ matters
+where the number of independent observations is small: a handful of batches
+(\cref{prop:mc-batch}), a few independent runs of an expensive model, or a comparison
+across a few seeds. With $10$ observations, $t_{9,0.05}=2.262$, and an interval built with
+$1.96$ instead covers a normal mean with probability $91.8\%$, not $95\%$. Part (iii) of
+\cref{thm:mc-clt} is exact only for normal $X$; for a skewed payoff the $t$ correction
+accounts for the randomness of $\hat s_n$ but not for the skewness.
+\end{remark}
+
+\subsection{How accurate is the normal approximation?}
+
+The central limit theorem is a statement about $n\to\infty$. How large $n$ must be depends
+on the shape of the law of $X$, and the Berry--Esseen theorem quantifies it.
+
+\begin{remark}[Berry--Esseen]\label{rem:mc-berry-esseen}
+If $\E|X|^3<\infty$, let $\rho=\E|X-\mu|^3$. There is an absolute constant $C_{\mathrm{BE}}$
+such that for all $n\ge1$ and $x\in\R$,
+\begin{equation}\label{eq:mc-berry-esseen}
+  \Big|\Prob\Big(\frac{\sqrt n(\hat X_n-\mu)}{\sigma}\le x\Big)-N(x)\Big|\le
+  \frac{C_{\mathrm{BE}}\,\rho}{\sigma^3\sqrt n}.
+\end{equation}
+\textcite{durrett}, Section~3.4.4, proves it with $C_{\mathrm{BE}}=3$; the best proved bound is
+$C_{\mathrm{BE}}<0.4748$ \citep{shevtsova-be}, and Esseen's lower bound $0.4097$ shows that the
+constant cannot be much smaller (see the same paper). A bound of the same form, with another constant,
+holds for the studentised statistic $T_n$ \citep{bentkus-gotze}. The ratio $\rho/\sigma^3$
+measures the asymmetry of the payoff. For the test case it is $1.70$ for $S_T$ and $2.48$
+for the at-the-money call. For an indicator of an event of probability $p$, such as a
+digital option,
+\[
+  \frac{\rho}{\sigma^3}=\frac{p(1-p)^3+(1-p)p^3}{\big(p(1-p)\big)^{3/2}}
+  =\frac{(1-p)^2+p^2}{\sqrt{p(1-p)}}\approx\frac{1}{\sqrt p}\quad(p\to0),
+\]
+which is $9.85$ for $p=1\%$. The bound \eqref{eq:mc-berry-esseen} is a worst case and is
+pessimistic, but its scaling is right: for a rare event the bound is about
+$C_{\mathrm{BE}}/\sqrt{np}$, so what must be large is the expected number of hits $np$, not
+$n$. In the extreme case where no scenario hits, $\hat X_n=0$, $\hat s_n=0$ and $I_n=\{0\}$:
+the interval claims certainty (\exref{ex:mc-zero-hits}).
+\end{remark}
+
+\Cref{fig:mc-coverage} (left) measures the coverage directly. For the at-the-money call the
+nominal $95\%$ is reached, within the $\pm1\%$ accuracy of the measurement, from about
+$n=2^7$ on; with $8$ samples it is about $82\%$. For the digital paying in $1\%$ of the
+scenarios the coverage is below $30\%$ for $n\le2^5$, where most samples contain no hit at
+all, and approaches $95\%$ once $np$ is in the tens. Coverage below the nominal level is
+the typical failure for right-skewed payoffs, and the mechanism is the one noted after
+\cref{prop:mc-unbiased}: samples that miss the large payoffs underestimate the mean and the
+standard error at the same time.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch06-coverage}
+  \caption{Left: coverage of the nominal $95\%$ interval \eqref{eq:mc-ci}, estimated from
+    $2000$ independent samples of each size $n$, for the discounted at-the-money call of the
+    test case, a digital paying $1$ when $S_T>154.54$ (probability $1\%$ under $\Q$), and a
+    Pareto variable with $\alpha=1.5$ (infinite variance). Right: the sample standard
+    deviation $\hat s_n$ along single runs, for Pareto variables with $\alpha=1.5$ (three
+    runs), for which $\hat s_n\to\infty$ (\cref{thm:mc-clt}), and $\alpha=3$, for which
+    $\hat s_n\to\sigma$.}
+  \label{fig:mc-coverage}
+\end{figure}
+
+\subsection{Heavy tails and infinite variance}
+
+The last statement of \cref{thm:mc-clt} describes what survives when $\E[X^2]=\infty$:
+unbiasedness and the strong law, but not the rate $n^{-1/2}$ or the standard error. The standard example is the Pareto law,
+$\Prob(X>x)=x^{-\alpha}$ for $x\ge1$, which can be sampled by inversion as
+$X=U^{-1/\alpha}$ (\cref{ch:05-random-numbers}). Its mean $\alpha/(\alpha-1)$ is finite for
+$\alpha>1$, and $\E[X^2]=1+\int_1^\infty 2x\cdot x^{-\alpha}\,\dd x$ is infinite for
+$\alpha\le2$. In \cref{fig:mc-coverage} (right), $\hat s_n$ creeps upwards with $n$ for
+$\alpha=1.5$, jumping whenever a new extreme sample arrives; the reported standard error
+does not estimate the error.
+
+\begin{remark}[What breaks with infinite variance]\label{rem:mc-heavy-tails}
+Let $X$ be Pareto with $1<\alpha<2$.
+\begin{enumerate}[label=(\alph*)]
+  \item \emph{The rate.} $n^{1-1/\alpha}(\hat X_n-\mu)$ converges in distribution to a
+    non-Gaussian stable law \citep[Section~3.8]{durrett}, so the error decays like
+    $n^{-(1-1/\alpha)}$: like $n^{-1/3}$ for $\alpha=1.5$, against $n^{-1/2}$ with finite
+    variance. A heuristic shows why. The largest of $n$ samples is of order $n^{1/\alpha}$,
+    since $\Prob(\max_{i\le n}X_i\le tn^{1/\alpha})=(1-t^{-\alpha}/n)^n\to e^{-t^{-\alpha}}$,
+    and a single sample of that size moves the average by $n^{1/\alpha-1}$, which is much
+    larger than $n^{-1/2}$ when $\alpha<2$. The fluctuations of the average are dominated
+    by its few largest terms: most runs miss the rare huge values that carry part of the
+    mean, so $\hat X_n$ is usually below $\mu$ and occasionally far above it.
+  \item \emph{The interval.} $T_n$ converges in distribution to $\mathcal N(0,1)$ if and
+    only if $X$ is in the domain of attraction of the normal law \citep{gine-gotze-mason}.
+    For $\alpha<2$ it is not; in fact $T_n$ then converges in distribution to a non-normal
+    law \citep{logan-mallows-rice-shepp}, so the coverage of $I_n$ tends to a limit other
+    than $95\%$. In \cref{fig:mc-coverage} it creeps up from $55\%$ to about $80\%$ for
+    $\alpha=1.5$, and it is still about $80\%$ at $n=2^{18}$. Infinite variance alone does not decide this.
+    For $\alpha=2$ the variance is infinite, yet $(\hat X_n-\mu)\sqrt{n/\log n}$ is
+    asymptotically standard normal,\footnote{Truncate at $b_n=\sqrt{n\log n}$. With
+    probability at least $1-n\,b_n^{-2}=1-1/\log n$ no sample exceeds $b_n$. The truncated
+    variables $X\1_{\{X\le b_n\}}$ have variance $\log n+O(\log\log n)$, satisfy
+    Lindeberg's condition \citep[Section~3.4.2]{durrett}, and their mean differs from $\mu$
+    by $\E[X\1_{\{X>b_n\}}]=2/b_n$, which is $o(b_n/n)$.} so $X$ is in the domain of
+    attraction of the normal law, $T_n\Rightarrow\mathcal N(0,1)$, and the coverage tends to
+    $95\%$, slowly.
+  \item \emph{Batching does not help}: every batch mean has infinite variance too.
+\end{enumerate}
+In pricing, infinite variance arises from importance sampling with too narrow a sampling
+law (\cref{prop:is-gaussian}), and from payoffs that grow like a power of the underlying in
+models with moment explosions: in the Heston model, depending on the parameters, a moment
+$\E[S_T^p]$ of order $p>1$ is finite only for maturities $T$ below a critical time
+$T^*(p)$ \citep{andersen-piterbarg}, so a claim with a finite
+price can have a payoff with infinite variance (\cref{ch:19-stochastic-vol}). The symptoms
+are those of \cref{fig:mc-coverage}: a standard error that grows when it should shrink, and
+estimates that jump when one sample dominates the sum.
+\end{remark}
+
+\demo{06-monte-carlo.ipynb}{the coverage of the nominal interval for calls and digitals of
+any strike, the histogram of $T_n$ against the normal density, and running means and
+standard deviations of Pareto samples for any $\alpha$.}
+
+\section{Batch means}\label{sec:mc-batch}
+
+The standard error $\hat s_n/\sqrt n$ is justified by independence of the samples and by the
+estimator being their plain average. Several methods of Part~II violate one or the other.
+Moment matching rescales all the samples with their own sample moments, which couples them
+(\cref{prop:cv-moment-matching}); randomised quasi-Monte Carlo points are deliberately
+dependent (\cref{prop:qmc-rqmc}); and samples produced by a Markov chain are correlated. The
+remedy used throughout the course is to run the whole procedure $m$ times independently and
+to measure the error by the spread of the $m$ results.
+
+\begin{proposition}[Batch means]\label{prop:mc-batch}
+Let $Y_1,\dots,Y_m$, $m\ge2$, be independent and identically distributed outputs of $m$
+independent runs (\emph{batches}) of an estimator, each run using $k$ samples, with
+$\E[Y_1^2]<\infty$. Let
+\[
+  \bar Y=\frac1m\sum_{j=1}^mY_j,\qquad
+  \hat V_m=\frac{1}{m(m-1)}\sum_{j=1}^m\big(Y_j-\bar Y\big)^2 .
+\]
+\begin{enumerate}[label=(\roman*)]
+  \item $\E[\hat V_m]=\Var(\bar Y)$, whatever the dependence between the samples inside a
+    batch. The \emph{batch standard error} is $\sqrt{\hat V_m}$.
+  \item For plain Monte Carlo, with $n=mk$ samples $X_i$ as in \cref{def:mc-estimator} split
+    into consecutive batches $Y_j=\frac1k\sum_{i=(j-1)k+1}^{jk}X_i$, one has $\bar Y=\hat X_n$
+    and $\E[\hat V_m]=\sigma^2/n=\E[\hat s_n^2/n]$.
+  \item Suppose that, as $k\to\infty$ with $m$ fixed, $\sqrt k\,(Y_1-\mu)$ converges in
+    distribution to $\mathcal N(0,v)$ for some $v>0$ (a bias of order $o(k^{-1/2})$ inside
+    each batch is allowed). Then
+    \[
+      \frac{\bar Y-\mu}{\sqrt{\hat V_m}}\ \Rightarrow\ t_{m-1},
+    \]
+    so the interval $\bar Y\pm t_{m-1,\delta}\sqrt{\hat V_m}$ has asymptotic coverage
+    $1-\delta$. In the setting of (ii) the hypothesis holds with $v=\sigma^2$ whenever
+    $0<\sigma^2<\infty$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\hat V_m$ is $1/m$ times the sample variance of the independent identically
+distributed $Y_j$, which is unbiased for $\Var(Y_1)$ by \cref{prop:mc-unbiased}(iii); and
+$\Var(\bar Y)=\Var(Y_1)/m$.
+
+(ii) The batches use disjoint sets of independent samples, so the $Y_j$ are independent,
+identically distributed, with variance $\sigma^2/k$; averaging them averages all $n$
+samples. By (i), $\E[\hat V_m]=\sigma^2/(km)$, and $\E[\hat s_n^2]=\sigma^2$.
+
+(iii) Let $W_j=\sqrt k\,(Y_j-\mu)/\sqrt v$. The ratio in question is
+$g(W_1,\dots,W_m)$, where
+\[
+  g(w)=\frac{\sqrt m\,\bar w}{\big(\frac1{m-1}\sum_j(w_j-\bar w)^2\big)^{1/2}},\qquad
+  \bar w=\frac1m\sum_jw_j,
+\]
+because the factors $\sqrt k$ and $\sqrt v$ cancel. The $W_j$ are independent, so the
+characteristic function of $(W_1,\dots,W_m)$ is the product of theirs, and each factor
+converges to $e^{-u_j^2/2}$; by Lévy's continuity theorem in $\R^m$
+\citep[Section~3.10]{durrett}, $(W_1,\dots,W_m)$ converges in distribution to a vector
+$(Z_1,\dots,Z_m)$ of independent standard normals. The map $g$ (set to $0$ on the diagonal $\{w_1=\dots=w_m\}$, as $T_n$ in
+\cref{thm:mc-clt}) is continuous except on that diagonal, which has probability zero under
+the limit, so by the
+mapping theorem \citep[Theorem~2.7]{billingsley} $g(W)$ converges in distribution to
+$g(Z)$, whose law is $t_{m-1}$ by \cref{thm:mc-clt}(iii). The coverage follows as in
+\cref{thm:mc-clt}(ii), the $t_{m-1}$ distribution function being continuous. For plain
+Monte Carlo, $\sqrt k(Y_1-\mu)\Rightarrow\mathcal N(0,\sigma^2)$ is \cref{thm:mc-clt}(i)
+applied to one batch.
+\end{proof}
+
+The course uses $m=2^{10}$ batches. With independent samples, batching changes nothing on
+average, by (ii), but the batch standard error is noisier: it rests on $m-1$ degrees of
+freedom instead of $n-1$ (\exref{ex:mc-batch-noise}). With $m=2^{10}$ its relative noise is
+about $2\%$ and $t_{1023,0.05}=1.9623$ is indistinguishable from $1.96$; with $m=10$, the
+quantile $2.262$ makes the interval noticeably wider. Both $m$ and $k$ must be large: $m$ for
+an accurate standard error, $k$ for nearly normal batch means. And each batch must be an
+independent run of the \emph{whole} procedure: moment matching, for instance, must be
+applied inside each batch, or the batches are coupled again. For plain Monte Carlo the two
+standard errors agree (\cref{fig:mc-convergence}); with dependent samples the plain one can
+be wrong by a large factor (\exref{ex:mc-dependent}).
+
+\section{Cost, efficiency and bias}\label{sec:mc-efficiency}
+
+Variance alone does not rank estimators: a method that halves the variance but triples
+the cost per sample is worse than plain Monte Carlo run three times longer.
+
+\begin{definition}[Efficiency]\label{def:mc-efficiency}
+Consider an unbiased estimator obtained by averaging independent replications, each with
+variance $\sigma^2$ and expected computing cost $\tau>0$. Its \emph{efficiency} is
+$1/(\sigma^2\tau)$. The \emph{relative efficiency} of method $2$ with respect to method $1$
+is
+\[
+  \mathcal E_{2,1}=\frac{\sigma_1^2\,\tau_1}{\sigma_2^2\,\tau_2}.
+\]
+\end{definition}
+
+A computing budget $c$ buys $c/\tau_j$ replications of method $j$, hence an estimator with
+variance $\sigma_j^2\tau_j/c$. So $\mathcal E_{2,1}$ is the ratio of the variances at equal
+budget, and equally the ratio of the budgets needed for equal variance; method $2$ is
+better if $\mathcal E_{2,1}>1$. The work-normalised variance $\sigma^2\tau$ is the quantity to
+make small \citep[Section~1.1.3]{glasserman-mc}. If method $2$ cuts the standard error at
+equal $n$ by a factor $q$ and costs $\lambda$ times more per replication, then
+$\mathcal E_{2,1}=1/(\lambda q^2)$: cutting the error by a factor $q=\frac14$ at double cost
+gives $\mathcal E_{2,1}=1/(2\times0.25^2)=8$, while $q=0.8$ at double cost gives $0.78$, a
+loss.
+
+\begin{remark}[Random costs and overheads]\label{rem:mc-budget}
+When the cost of a replication is random (paths stopped at a barrier, rejection sampling),
+a budget $c$ completes a random number $N(c)$ of replications. If the pairs $(X_i,\tau_i)$
+of output and cost are independent and identically distributed, $\tau_i>0$ has a finite
+mean and $\sigma^2<\infty$, then
+$\sqrt c\,(\hat X_{N(c)}-\mu)\Rightarrow\mathcal N(0,\sigma^2\E[\tau])$, which makes
+$\sigma^2\E[\tau]$ the right figure of merit; \textcite{glynn-whitt} prove this and justify
+the criterion from a decision-theoretic point of view (see also \citet[Section~III.10]{asmussen-glynn}).
+Measured times also contain overheads: if a run of $n$ samples costs $c_0+c_1n$, the cost per
+sample $c_1+c_0/n$ makes short runs look inefficient. The course measured the efficiency
+of runs of $n=2,\dots,2^{20}$ samples relative to $n=2^{20}$ and found it rising from about
+$10^{-3}$ to $1$ around $n=2^{14}$, which is this effect: timings compare methods only once
+$n\gg c_0/c_1$ (\exref{ex:mc-overhead}).
+\end{remark}
+
+\demo{06-monte-carlo.ipynb}{time the bare-bones Monte Carlo on your own machine and plot
+its efficiency against $n$.}
+
+An estimator can be biased: the payoff may be computed on a time grid (\cref{ch:07-path-simulation}),
+a coefficient may be estimated from the same sample (\cref{prop:cv-estimated-beta}), or the
+quantity may be a nonlinear function of means (\cref{sec:mc-delta}). The right yardstick is
+then the mean squared error, of which the variance is only one part.
+
+\begin{proposition}[Mean squared error and the cost--error trade-off]\label{prop:mc-mse}
+Let $\hat\theta_n$ be the average of $n$ independent copies of a random variable $Y$ with
+$\E[Y^2]<\infty$, $\E[Y]=\theta+b$ and $\Var(Y)=v>0$.
+\begin{enumerate}[label=(\roman*)]
+  \item $\mathrm{MSE}(\hat\theta_n):=\E\big[(\hat\theta_n-\theta)^2\big]=b^2+v/n$.
+  \item If $b\neq0$, the probability that the nominal interval
+    $\hat\theta_n\pm z_\delta\hat s_n/\sqrt n$, with $\hat s_n$ the sample standard deviation
+    of the copies, contains $\theta$ tends to $0$ as $n\to\infty$.
+  \item Suppose that a parameter $h>0$ (a time step, say) controls bias and cost: the bias
+    is $b(h)=c_bh^\beta$, the variance is $v$ for every $h$, and one copy costs
+    $c_\tau h^{-\gamma}$, with constants $c_b,c_\tau,\beta,\gamma>0$. With a budget $c$ and
+    $n=ch^\gamma/c_\tau$ copies (ignoring rounding), the mean squared error
+    $c_b^2h^{2\beta}+vc_\tau h^{-\gamma}/c$ is minimised at
+    \[
+      h^*=\Big(\frac{\gamma\,v\,c_\tau}{2\beta\,c_b^2\,c}\Big)^{1/(2\beta+\gamma)},
+    \]
+    where the squared bias is the fraction $\gamma/(2\beta+\gamma)$ of the mean squared
+    error, and the minimum is proportional to $c^{-2\beta/(2\beta+\gamma)}$. Equivalently, a
+    root mean squared error $\varepsilon$ costs a budget proportional to
+    $\varepsilon^{-2-\gamma/\beta}$, against $\varepsilon^{-2}$ for an unbiased estimator with
+    fixed cost per sample.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\E[(\hat\theta_n-\theta)^2]=\Var(\hat\theta_n)+(\E[\hat\theta_n]-\theta)^2=v/n+b^2$ by
+\cref{prop:mc-unbiased}(iii).
+
+(ii) By \cref{prop:mc-unbiased}, $\hat\theta_n\to\theta+b$ and $\hat s_n\to\sqrt v$ almost
+surely. So $|\hat\theta_n-\theta|\to|b|>0$ while $z_\delta\hat s_n/\sqrt n\to0$, and almost
+surely the interval misses $\theta$ for all large $n$. The coverage tends to $0$ by bounded
+convergence.
+
+(iii) Write the mean squared error as $\phi(h)=ah^{2\beta}+Bh^{-\gamma}$ with $a=c_b^2$ and
+$B=vc_\tau/c$. Then
+$\phi'(h)=h^{-\gamma-1}\big(2\beta ah^{2\beta+\gamma}-\gamma B\big)$ is negative for
+$h<h^*$ and positive for $h>h^*$, where $(h^*)^{2\beta+\gamma}=\gamma B/(2\beta a)$, which is
+the stated formula; so $h^*$ is the global minimiser. At $h^*$,
+$ah^{2\beta}=\frac{\gamma}{2\beta}Bh^{-\gamma}$, so the squared bias is
+$\frac{\gamma/(2\beta)}{1+\gamma/(2\beta)}=\frac{\gamma}{2\beta+\gamma}$ of the total, and
+$\phi(h^*)=\frac{2\beta+\gamma}{\gamma}\,a\,(h^*)^{2\beta}$ is proportional to
+$c^{-2\beta/(2\beta+\gamma)}$. Setting $\phi(h^*)=\varepsilon^2$ and solving for $c$ gives
+$c\propto\varepsilon^{-(2\beta+\gamma)/\beta}=\varepsilon^{-2-\gamma/\beta}$.
+\end{proof}
+
+Two lessons. First, with a fixed bias more paths do not help: the error levels off at $|b|$,
+and the confidence interval, which knows nothing about $b$, becomes confidently wrong.
+Bias must be controlled and reported separately. Second, bias costs rate: with the Euler
+scheme ($\beta=\gamma=1$) the cost of accuracy $\varepsilon$ grows like $\varepsilon^{-3}$
+instead of $\varepsilon^{-2}$, the allocation of \cref{prop:ps-allocation};
+multilevel Monte Carlo recovers $\varepsilon^{-2}$ up to logarithms (\cref{thm:ml-complexity}).
+In practice $v$ depends on $h$ as well; as long as it stays between two positive constants,
+the exponents are unchanged.
+
+\section{Functions of expectations}\label{sec:mc-delta}
+
+Some quantities are not expectations but smooth functions of expectations: the implied
+volatility of a simulated price, a standard deviation, or a ratio $\E[Y]/\E[X]$. Ratios
+arise as conditional expectations $\E[Y\mid A]=\E[Y\1_A]/\Prob(A)$, as prices measured in
+units of a simulated numeraire, and in self-normalised importance sampling
+(\cref{ch:09-importance-sampling}). We plug sample means into the function. The result is
+consistent by the strong law and continuity, but biased, and its error obeys a central
+limit theorem whose variance comes from the gradient. For a vector $x$, $|x|$ is the
+Euclidean norm, and for a matrix the operator norm.
+
+\begin{proposition}[Delta method and ratio estimator]\label{prop:mc-delta}
+Let $X$ be a random vector in $\R^k$ with $\E|X|^2<\infty$, mean $\mu$ and covariance
+matrix $\Sigma$, and let $\hat X_n$ be the average of $n$ independent copies.
+\begin{enumerate}[label=(\roman*)]
+  \item If $g:\R^k\to\R$ is differentiable at $\mu$, then
+    $\sqrt n\big(g(\hat X_n)-g(\mu)\big)\Rightarrow\mathcal N\big(0,\nabla g(\mu)^\top\Sigma\,\nabla g(\mu)\big)$.
+  \item If moreover $\E|X|^4<\infty$, and $g$ is twice continuously differentiable with a
+    Hessian $H$ that is Lipschitz, $|H(x)-H(x')|\le L|x-x'|$ for all $x,x'\in\R^k$, then
+    \[
+      \E\big[g(\hat X_n)\big]=g(\mu)+\frac{\operatorname{tr}\big(H(\mu)\Sigma\big)}{2n}+R_n,\qquad
+      |R_n|\le\frac L6\,\E|\hat X_n-\mu|^3=O(n^{-3/2}).
+    \]
+  \item (Ratio estimator.) Let $(X,Y)$ be a pair of real random variables with $X\ge a$ for
+    a constant $a>0$, $\E[X^4]<\infty$ and $\E[Y^2]<\infty$; let $\theta=\E[Y]/\E[X]$ and
+    $\hat R_n=\bar Y_n/\bar X_n$, the ratio of the sample means. Then
+    $\sqrt n(\hat R_n-\theta)\Rightarrow\mathcal N\big(0,\Var(Y-\theta X)/\E[X]^2\big)$ and
+    \[
+      \E[\hat R_n]=\theta+\frac{\theta\Var(X)-\Cov(X,Y)}{n\,\E[X]^2}+O(n^{-3/2}).
+    \]
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Differentiability at $\mu$ means that
+$g(x)=g(\mu)+\nabla g(\mu)^\top(x-\mu)+|x-\mu|\,\epsilon(x)$ with $\epsilon(x)\to0=\epsilon(\mu)$
+as $x\to\mu$. Hence
+\[
+  \sqrt n\big(g(\hat X_n)-g(\mu)\big)=\nabla g(\mu)^\top\sqrt n(\hat X_n-\mu)
+  +\big|\sqrt n(\hat X_n-\mu)\big|\,\epsilon(\hat X_n).
+\]
+By the multivariate central limit theorem \citep[Section~3.10]{durrett},
+$\sqrt n(\hat X_n-\mu)\Rightarrow\mathcal N(0,\Sigma)$, so the first term converges in
+distribution to $\mathcal N(0,\nabla g(\mu)^\top\Sigma\nabla g(\mu))$, and
+$|\sqrt n(\hat X_n-\mu)|$ is bounded in probability. By the strong law
+$\epsilon(\hat X_n)\to0$ almost surely, so the second term tends to $0$ in probability, and
+Slutsky's lemma concludes.
+
+(ii) Taylor's formula with integral remainder along the segment from $\mu$ to $x$ gives
+$g(x)=g(\mu)+\nabla g(\mu)^\top(x-\mu)+\frac12(x-\mu)^\top H(\mu)(x-\mu)+R(x)$ with
+\begin{gather*}
+  R(x)=\int_0^1(1-s)\,(x-\mu)^\top\big(H(\mu+s(x-\mu))-H(\mu)\big)(x-\mu)\,\dd s,\\
+  |R(x)|\le\int_0^1(1-s)Ls\,\dd s\;|x-\mu|^3=\frac L6|x-\mu|^3 .
+\end{gather*}
+Every term is integrable at $x=\hat X_n$ because $\E|\hat X_n|^4<\infty$. Take expectations:
+the linear term vanishes, and $\E[(\hat X_n-\mu)^\top H(\mu)(\hat X_n-\mu)]
+=\operatorname{tr}(H(\mu)\Sigma)/n$ since $\hat X_n$ has covariance $\Sigma/n$. For the
+order of the remainder, write $\xi_i=X_i-\mu$. Expanding the fourth power of a coordinate
+of $\sum_i\xi_i$, terms in which some index appears exactly once have mean zero, so
+$\E[(\sum_i\xi_{i,l})^4]=n\E[\xi_{1,l}^4]+3n(n-1)\E[\xi_{1,l}^2]^2\le3n^2\E[\xi_{1,l}^4]$ for
+each coordinate $l$. With $|x|^4\le k\sum_lx_l^4$ this gives $\E|\hat X_n-\mu|^4=O(n^{-2})$,
+and by Jensen's inequality $\E|\hat X_n-\mu|^3\le(\E|\hat X_n-\mu|^4)^{3/4}=O(n^{-3/2})$.
+
+(iii) Let $m=\E[X]$ and $D=Y-\theta X$, so that $\E[D]=0$ and
+$\hat R_n-\theta=\bar D_n/\bar X_n$. The central limit theorem gives
+$\sqrt n\,\bar D_n\Rightarrow\mathcal N(0,\Var D)$, and $\bar X_n\to m$ almost surely, so the
+first claim follows from Slutsky's lemma. For the bias, the identity
+$\frac1{\bar X_n}=\frac1m-\frac{\bar X_n-m}{m^2}+\frac{(\bar X_n-m)^2}{m^2\bar X_n}$ gives
+\[
+  \hat R_n-\theta=\frac{\bar D_n}{m}-\frac{\bar D_n(\bar X_n-m)}{m^2}
+  +\frac{\bar D_n(\bar X_n-m)^2}{m^2\bar X_n}.
+\]
+The first term has mean $0$. The second has mean $-\Cov(D,X)/(nm^2)$, because the cross
+terms between different samples are uncorrelated, and $\Cov(D,X)=\Cov(X,Y)-\theta\Var(X)$.
+In the third, $\bar X_n\ge a$, so by the Cauchy--Schwarz inequality its absolute mean is at
+most $\big(\E[\bar D_n^2]\,\E[(\bar X_n-m)^4]\big)^{1/2}/(m^2a)$, which is
+$O\big((n^{-1}n^{-2})^{1/2}\big)=O(n^{-3/2})$ by the fourth-moment bound in (ii).
+\end{proof}
+
+The assumption $X\ge a>0$ in (iii) keeps $1/\bar X_n$ bounded. The same proof works when
+$X>0$ with $\E[X^8]<\infty$ and $\E[X^{-4}]<\infty$, which covers a lognormal $X$ such as
+$S_T$: bound the third term with Hölder's inequality (exponents $2,4,4$) instead of
+Cauchy--Schwarz, use $\bar X_n^{-4}\le\frac1n\sum_iX_i^{-4}$ (convexity of $x\mapsto x^{-4}$),
+and $\E[(\bar X_n-m)^8]=O(n^{-4})$. The last bound follows from the counting argument of (ii):
+in the expansion of $\E[(\sum_i\xi_i)^8]$ only index tuples in which every index appears at
+least twice survive, they involve at most four distinct indices, there are $O(n^4)$ of them,
+and each term is at most $\E[\xi_1^8]$ by Hölder's inequality. If instead $\Prob(X=0)>0$, as
+for $X=\1_A$, then $\bar X_n=0$ with positive probability and $\hat R_n$ is not even
+defined for every sample; for more general conditions see
+\citet[Section~III.3]{asmussen-glynn}. The standard error of $\hat R_n$ is estimated from the
+residuals $Y_i-\hat R_nX_i$ (\texttt{ratio\_estimate} in the code). The bias is of order $1/n$
+and the error of order $n^{-1/2}$, so the bias is negligible for one large sample. It is not
+negligible if many small-sample ratios are averaged: the average of $m$ batch ratios, each
+on $k$ samples, has a bias of order $1/k$ and a standard error of order $1/\sqrt{mk}$, so
+form the ratio of the overall means instead.
+
+\begin{example}[How accurate is the standard error?]\label{exa:mc-se-accuracy}
+The sample standard deviation is a smooth function of two sample means:
+$\sqrt{(n-1)/n}\;\hat s_n=g\big(\frac1n\sum_iX_i,\frac1n\sum_iX_i^2\big)$ with
+$g(m_1,m_2)=\sqrt{m_2-m_1^2}$. Assume $\E[X^4]<\infty$, so that the vector $(X,X^2)$ has a
+finite covariance matrix, and write $\mu_4=\E[(X-\mu)^4]$. Since $\hat s_n$ does not change
+when a constant is added to $X$, take $\mu=0$; then $\nabla g(0,\sigma^2)=(0,1/(2\sigma))$
+and part (i) gives
+\[
+  \sqrt n\,(\hat s_n-\sigma)\Rightarrow\mathcal N\Big(0,\frac{\mu_4-\sigma^4}{4\sigma^2}\Big),
+  \qquad\text{relative error of }\hat s_n\approx\sqrt{\frac{\kappa-1}{4n}},\quad
+  \kappa=\frac{\mu_4}{\sigma^4}.
+\]
+For normal $X$, $\kappa=3$ and the relative error is $1/\sqrt{2n}$. For the at-the-money call
+of the test case, $\kappa=8.95$ and the relative error is $1.41/\sqrt n$: with $100$ paths
+the standard error is itself uncertain by about $14\%$, with $10^4$ paths by $1.4\%$. Heavy
+tails hurt here first: if $\E[X^4]=\infty$ but $\E[X^2]<\infty$, the central limit theorem
+for $\hat X_n$ still holds, but this approximation for $\hat s_n$ does not, and the standard
+error itself is then typically much less accurate than $n^{-1/2}$ suggests.
+\end{example}
+
+\section{Monte Carlo against quadrature}\label{sec:mc-dimension}
+
+Why simulate at all? The course compares the ways of computing an expectation by their
+cost $\tau$ to reach an error $\varepsilon$. A deterministic quadrature rule with error of
+order $n^{-\alpha}$ for $n$ points per dimension needs $n^d$ points in dimension $d$, so
+$\tau\sim\varepsilon^{-d/\alpha}$. Lattice and finite-difference methods add a time
+dimension, $\tau\sim\varepsilon^{-(d+1)/\alpha}$ (\cref{ch:20-grids}). Monte Carlo needs
+$\varepsilon^{-2}$ samples, each costing about $d$ operations, so $\tau\sim d\,\varepsilon^{-2}$.
+The next proposition makes the comparison precise for functions with two bounded
+derivatives, and shows that the exponent $d/2$ is not a defect of one particular rule. Let
+\[
+  \mathcal F_d=\big\{f\in C^2([0,1]^d):\ |\partial^a f(x)|\le1\text{ for all }x\text{ and all
+  multi-indices }a\text{ with }|a|\le2\big\},
+\]
+and $I(f)=\int_{[0,1]^d}f(x)\,\dd x$.
+
+\begin{proposition}[Monte Carlo against quadrature]\label{prop:mc-dimension}
+Let $d\ge1$.
+\begin{enumerate}[label=(\roman*)]
+  \item (Product midpoint rule.) For $k\ge1$, let $h=1/k$ and let $Q_kf$ be the average of
+    $f$ over the $N=k^d$ centres of the cubes of side $h$ that tile $[0,1]^d$. For every
+    $f\in C^2([0,1]^d)$,
+    \[
+      |I(f)-Q_kf|\le\frac{h^2}{24}\sum_{j=1}^d\sup_{[0,1]^d}|\partial_{jj}f|,
+      \qquad\text{so}\quad |I(f)-Q_kf|\le\frac{d}{24}N^{-2/d}\ \text{ on }\mathcal F_d .
+    \]
+  \item (No deterministic rule does better.) There is $c_d>0$ such that for every $N\ge1$,
+    all nodes $x_1,\dots,x_N\in[0,1]^d$ and all weights $w_1,\dots,w_N\in\R$, some
+    $f\in\mathcal F_d$ satisfies $\big|I(f)-\sum_{i=1}^Nw_if(x_i)\big|\ge c_dN^{-2/d}$.
+  \item (Monte Carlo.) For every $f$ with $I(f^2)<\infty$, the average of $f$ at $N$
+    independent uniform points of $[0,1]^d$ is unbiased with root mean squared error
+    $\sigma_f/\sqrt N$, where $\sigma_f^2=I(f^2)-I(f)^2$. On $\mathcal F_d$, $\sigma_f\le1$.
+\end{enumerate}
+Consequently, guaranteeing an error $\varepsilon$ uniformly on $\mathcal F_d$ takes at least
+$(c_d/\varepsilon)^{d/2}$ function values for any rule of the form in (ii), and at least
+$(c_d/2\varepsilon)^{d/2}$ for any deterministic rule (see the remark after the proof), while Monte Carlo
+reaches a root mean squared error $\varepsilon$ with $\varepsilon^{-2}$ of them, in every
+dimension.
+\end{proposition}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch06-dimension}
+  \caption{Left: the course's one-dimensional example $\int_0^1\frac\pi2\sin(\pi x)\,\dd x=1$.
+    Because the integrand vanishes at both ends, the left and right Riemann sums
+    (``forward'' and ``backward Euler'') coincide with the trapezoid rule, and all rules are
+    of order $N^{-2}$ (\exref{ex:mc-sine}); Monte Carlo, of order $N^{-1/2}$, is no match.
+    Right: the product of $d$ copies of the same integrand on $[0,1]^d$, whose integral is
+    $1$. Solid: the product midpoint rule with $N=k^d$ points, with slope $-2/d$. Dashed: the
+    root mean squared error $\sigma_f/\sqrt N$ of Monte Carlo, with
+    $\sigma_f^2=(\pi^2/8)^d-1$. At $d=4$ the slopes agree and Monte Carlo has the smaller
+    constant; at $d=8$, Monte Carlo with $10^4$ points is more accurate than the product rule
+    with $1.7\times10^6$.}
+  \label{fig:mc-dimension}
+\end{figure}
+
+\begin{proof}
+(i) One dimension first. If $u\in C^2[c-\frac h2,c+\frac h2]$, Taylor's formula at the centre
+gives $u(x)=u(c)+u'(c)(x-c)+\frac12u''(\eta_x)(x-c)^2$; the linear term integrates to zero
+over the cell, so
+\[
+  \Big|\int_{c-h/2}^{c+h/2}u(x)\,\dd x-h\,u(c)\Big|\le\frac12\sup|u''|\int_{-h/2}^{h/2}s^2\,\dd s
+  =\frac{h^3}{24}\sup|u''|,
+\]
+and summing over the $k$ cells of $[0,1]$ bounds the error of the composite midpoint rule
+$M$ by $\frac{h^2}{24}\sup|u''|$. In $d$ dimensions, let $I_j$ and $M_j$ be integration and the
+midpoint rule in the variable $x_j$ alone. Then $I=I_1\cdots I_d$ and $Q_k=M_1\cdots M_d$, and
+telescoping,
+\[
+  I-Q_k=\sum_{j=1}^dM_1\cdots M_{j-1}\,(I_j-M_j)\,I_{j+1}\cdots I_d .
+\]
+In the $j$-th term, $I_{j+1}\cdots I_df$ is a $C^2$ function of $(x_1,\dots,x_j)$ whose second
+derivative in $x_j$ is bounded by $\sup|\partial_{jj}f|$ (differentiate under the integral
+sign); $I_j-M_j$ maps it to a function bounded by $\frac{h^2}{24}\sup|\partial_{jj}f|$; and
+$M_1,\dots,M_{j-1}$ are averages, which do not increase the supremum. Sum over $j$. On
+$\mathcal F_d$ each supremum is at most $1$, and $h^2=N^{-2/d}$.
+
+(ii) Let $\varphi(t)=e^{-1/(t(1-t))}$ for $t\in(0,1)$ and $\varphi=0$ elsewhere: a $C^\infty$
+function on $\R$ that is positive exactly on $(0,1)$. Let
+$\psi(u)=\lambda\prod_{j=1}^d\varphi(u_j)$ with $\lambda>0$ so small that $|\partial^a\psi|\le1$
+for $|a|\le2$. Set $k=\lceil(2N)^{1/d}\rceil$ and $h=1/k$, and tile $[0,1]^d$ by the
+$k^d\ge2N$ open cubes of side $h$. They are disjoint, so each node lies in at most one of
+them, and at least $k^d-N\ge k^d/2$ cubes contain no node. For each such cube, with lower
+corner $z$, put $\psi_z(x)=h^2\psi((x-z)/h)$, and let $f$ be the sum of these $\psi_z$. Since
+$\partial^a\psi_z(x)=h^{2-|a|}(\partial^a\psi)((x-z)/h)$ and $h\le1$, every
+$\psi_z$ has derivatives of order at most $2$ bounded by $1$; they vanish, with all their
+derivatives, outside their own cube, so $f\in\mathcal F_d$. Now $f(x_i)=0$ at every node, so
+the rule returns $0$, while
+\[
+  I(f)\ \ge\ \frac{k^d}{2}\,h^{d+2}\,I(\psi)=\frac{h^2}{2}\,I(\psi)\ \ge\ \frac{I(\psi)}{8\,(2N)^{2/d}},
+\]
+because $k\le(2N)^{1/d}+1\le2(2N)^{1/d}$. This is the claim with $c_d=2^{-3-2/d}I(\psi)$.
+
+(iii) Unbiasedness and the variance are \cref{prop:mc-unbiased}(i),(iii) for $X=f(U)$ with $U$
+uniform on $[0,1]^d$. On $\mathcal F_d$, $|f|\le1$, so $\sigma_f^2\le I(f^2)\le1$.
+\end{proof}
+
+The proof of (ii) uses only the values of $f$ at the nodes, so it extends, with the constant
+$c_d/2$, to any rule that looks at $N$ values of $f$, linear or not: such a rule returns the
+same number $A$ for $f$ and for $0$, so one of the errors $|I(f)-A|$ and $|A|$ is at least
+$I(f)/2$. If the rule chooses its nodes adaptively, run it on $f\equiv0$ to see where it
+looks and build $f$ there. The comparison of
+exponents is now clear: for functions with two bounded derivatives, deterministic rules
+converge at best like $N^{-2/d}$ and Monte Carlo like $N^{-1/2}$, so Monte Carlo wins
+asymptotically when $d>4$, and the two rates are equal at $d=4$ (\cref{fig:mc-dimension}). For functions with $r$
+bounded derivatives the same two proofs, with rules of order $r$ and bumps scaled by $h^r$,
+give the rate $N^{-r/d}$, and the threshold moves to $d=2r$. But option payoffs have kinks
+(calls) and jumps (digitals), so $r$ is small, while Monte Carlo needs only a finite
+variance.
+
+Three caveats keep the comparison honest. The guarantees are of different kinds: the
+quadrature bound is deterministic, the Monte Carlo one holds in mean square. The Monte Carlo
+constant $\sigma_f$ can grow with the dimension. And between the two lie methods that
+exploit more structure: quasi-Monte Carlo, whose error bound is of order $(\log N)^d/N$
+for integrands of bounded variation in the sense of Hardy and Krause
+(\cref{thm:qmc-koksma-hlawka}), and sparse grids \citep{bungartz-griebel}
+for functions with bounded mixed derivatives; how well they do in high dimension depends on
+the effective dimension of the integrand (\cref{rem:qmc-effective-dimension}).
+
+\demo{06-monte-carlo.ipynb}{product rules against Monte Carlo for a smooth integrand in the
+dimension of your choice.}
+
+\furtherreading
+\textcite{glasserman-mc}, Section~1.1 and Appendix~A, covers the principles of this chapter
+in the setting of financial engineering. \textcite{asmussen-glynn}, Chapter~III, is a
+thorough treatment of output analysis: confidence intervals, smooth functions of
+expectations, sectioning (batching) of independent runs, bias--variance trade-offs and the
+simulation budget; their Chapter~IV treats batch means for dependent output.
+\textcite{glynn-whitt} is the reference on efficiency. Durrett's book \citep{durrett} has the
+limit theorems we used, including stable laws and the Berry--Esseen theorem.

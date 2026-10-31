@@ -1,5 +1,614 @@
-\begin{planned}
-  \item the formula by direct integration
-  \item the formula by solving the PDE with Laplace and Fourier transforms
-  \item the Greeks and their relations; implied volatility
-\end{planned}
+% Chapter 2: The Black--Scholes formula three ways.
+\providecommand{\C}{\mathbb{C}}
+
+Every method in these notes is tested against the Black--Scholes formula. This chapter derives it three
+times, with the dividend yield of the standard model (\cref{def:sm-model}), each time with a method that
+outlives the formula. The first integrates the payoff against the lognormal law of $S_T$, the computation
+that Monte Carlo replaces when there is no closed form (Part~II). The second solves the pricing equation:
+a change of variables gives the heat equation, and a Fourier transform in the log-price an ordinary
+differential equation; with another characteristic function the same transform prices options in other
+models (\cref{ch:19-stochastic-vol}). The third takes a Laplace transform in time and inverts it
+numerically. On the way we meet two hypotheses that are easy to forget: the call payoff has no Fourier
+transform without damping, and the pricing equation has many solutions unless we fix a growth class.
+The chapter ends with the Greeks and the scaling relations between them, and with the implied
+volatility: Newton's method on the price converges monotonically from the right starting point, and on
+the logarithm of the price, for out-of-the-money options and with a halving safeguard, from any starting point. The code is \coderef{code/src/mfe230d/transforms.py}
+and \coderef{code/src/mfe230d/impliedvol.py}; the closed forms are in \coderef{code/src/mfe230d/bs.py}.
+
+\paragraph{Setting and notation.} We work in the standard model of \cref{def:sm-model}: under the
+risk-neutral measure $\Q$ the stock solves $\dd S_t=(r-y)S_t\,\dd t+\sigma S_t\,\dd W^\Q_t$, with constant
+rate $r$, yield $y$ and volatility $\sigma>0$, and $\nu=r-y-\frac{\sigma^2}{2}$. For a valuation time
+$t<T$ we write $\tau=T-t$ for the time to maturity, and for a spot $x>0$ and a strike $K>0$
+\begin{equation}\label{eq:bsf-dpm}
+  F=xe^{(r-y)\tau},\qquad w=\sigma\sqrt\tau,\qquad m=\log\frac FK,\qquad
+  d_\pm=\frac{\log(x/K)+(r-y\pm\frac{\sigma^2}{2})\tau}{\sigma\sqrt\tau}=\frac mw\pm\frac w2 :
+\end{equation}
+the forward price, the \emph{total volatility}, the log-moneyness and the two arguments of the
+formula. $N$ and $N'$ are the standard normal distribution function and density. The course's test
+case is $S=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, for which $F=99.0050$, $m=-0.01$,
+$d_+=0.05$ and $d_-=-0.15$.
+
+\section{The formula by direct integration}\label{sec:bsf-integration}
+
+By \cref{prop:sm-risk-neutral}, a claim paying $f(S_T)$, with $f$ Borel and $\EQ|f(S_T)|<\infty$, is
+worth $V_t=v(t,S_t)$ at time $t<T$, where
+\begin{equation}\label{eq:bsf-price-integral}
+  v(t,x)=e^{-r\tau}\int_\R f\big(xe^{\nu\tau+wz}\big)\,N'(z)\,\dd z .
+\end{equation}
+The whole computation rests on completing a square: for real $a$ and $z$,
+\begin{equation}\label{eq:bsf-shift}
+  e^{az-a^2/2}\,N'(z)=N'(z-a),\qquad\text{hence}\qquad
+  \int_b^\infty e^{az-a^2/2}N'(z)\,\dd z=N(a-b)\quad(b\in[-\infty,\infty)) .
+\end{equation}
+
+\begin{theorem}[The Black--Scholes formula]\label{thm:bsf-formula}
+In the standard model, let $K>0$, $0\le t<T$ and $\tau=T-t$. The time-$t$ prices of the European
+call and put with strike $K$ and maturity $T$ are $C_t=c(t,S_t)$ and $P_t=p(t,S_t)$, where, with
+$d_\pm=d_\pm(\tau,x)$ as in \eqref{eq:bsf-dpm},
+\begin{equation}\label{eq:bsf-call}
+  c(t,x)=xe^{-y\tau}N(d_+)-Ke^{-r\tau}N(d_-),\qquad
+  p(t,x)=Ke^{-r\tau}N(-d_-)-xe^{-y\tau}N(-d_+) .
+\end{equation}
+Both are $\phi\,[xe^{-y\tau}N(\phi d_+)-Ke^{-r\tau}N(\phi d_-)]$, with $\phi=1$ for the call and
+$\phi=-1$ for the put. The \emph{cash-or-nothing} call and put, paying $\1_{\{S_T>K\}}$ and
+$\1_{\{S_T\le K\}}$, are worth $e^{-r\tau}N(d_-)$ and $e^{-r\tau}N(-d_-)$; the \emph{asset-or-nothing}
+call and put, paying $S_T\1_{\{S_T>K\}}$ and $S_T\1_{\{S_T\le K\}}$, are worth $xe^{-y\tau}N(d_+)$ and
+$xe^{-y\tau}N(-d_+)$. In particular $c(t,x)-p(t,x)=xe^{-y\tau}-Ke^{-r\tau}$.
+\end{theorem}
+
+\begin{proof}
+All four binary payoffs are bounded by $1+S_T$, which is $\Q$-integrable, so
+\eqref{eq:bsf-price-integral} applies to each, and the call and put are the differences
+$S_T\1_{\{S_T>K\}}-K\1_{\{S_T>K\}}$ and $K\1_{\{S_T\le K\}}-S_T\1_{\{S_T\le K\}}$. Fix $x>0$. Since
+$w>0$, $xe^{\nu\tau+wz}>K$ if and only if $z>\big(\log(K/x)-\nu\tau\big)/w=-d_-$. For the
+cash-or-nothing call, \eqref{eq:bsf-price-integral} gives
+$e^{-r\tau}\int_{-d_-}^\infty N'(z)\,\dd z=e^{-r\tau}N(d_-)$. For the asset-or-nothing call, write
+$\nu\tau=(r-y)\tau-\frac{w^2}{2}$ and use \eqref{eq:bsf-shift} with $a=w$:
+\[
+  e^{-r\tau}\int_{-d_-}^\infty xe^{\nu\tau+wz}N'(z)\,\dd z
+  =xe^{-y\tau}\int_{-d_-}^\infty e^{wz-w^2/2}N'(z)\,\dd z=xe^{-y\tau}N(d_-+w)=xe^{-y\tau}N(d_+) .
+\]
+The puts integrate over $z\le-d_-$ instead, which gives $e^{-r\tau}N(-d_-)$ and, since
+$\int_{-\infty}^{-d_-}N'(z-w)\,\dd z=N(-d_--w)$, the value $xe^{-y\tau}N(-d_+)$. Subtracting gives
+\eqref{eq:bsf-call}, and parity follows from $N(u)+N(-u)=1$.
+\end{proof}
+
+In the test case the call is worth $7.36429$ and the put $8.34941$; the cash-or-nothing call is
+worth $0.436000$ and the asset-or-nothing call $50.9643$, and indeed $50.9643-100\times0.436000=7.3643$.
+Here $N(d_-)=\Q(S_T>K\mid S_t=x)$, and \eqref{eq:bsf-shift} is a change of measure to the share numeraire
+(\cref{ch:17-multi-asset}), under which $N(d_+)$ is the probability of exercise. The prices depend on $x$, $r$
+and $y$ only through $F$ and $e^{-r\tau}$: $c=e^{-r\tau}[FN(d_+)-KN(d_-)]$ (Black's form); when $r=y$, $F=x$.
+
+
+\begin{remark}[Degenerate cases and limits]\label{rem:bsf-limits}
+Fix $K>0$; each limit follows from the behaviour of $d_\pm=m/w\pm w/2$.
+(a) $\sigma\downarrow0$: $d_\pm\to+\infty$, $-\infty$ or $0$ as $F>K$, $F<K$ or $F=K$, so
+$c\to e^{-r\tau}(F-K)^+=(xe^{-y\tau}-Ke^{-r\tau})^+$, the discounted intrinsic value \emph{at the forward}
+(the riskless price); at $F=K$, $0\le c=e^{-r\tau}F(2N(w/2)-1)\le e^{-r\tau}Fw/\sqrt{2\pi}$.
+(b) $\sigma\to\infty$: $c\to xe^{-y\tau}$ and $p\to Ke^{-r\tau}$, the upper no-arbitrage bounds
+(\cref{prop:sk-strike-bounds}).
+(c) $c(t,x)\to(x_0-K)^+$ as $(t,x)\to(T,x_0)$, for every $x_0>0$: for $x_0\ne K$, $d_\pm\to\pm\infty$ with the
+sign of $\log(x_0/K)$; for $x_0=K$, since $0\le N(d_+)-N(d_-)\le w/\sqrt{2\pi}$,
+$|c|\le|xe^{-y\tau}-Ke^{-r\tau}|+Ke^{-r\tau}\sigma\sqrt\tau/\sqrt{2\pi}\to0$. The same holds for $p$.
+(d) $K\downarrow0$: $c\to xe^{-y\tau}$, the price of the claim to $S_T$, which does not depend on $\sigma$.
+(e) $x\downarrow0$: $c\to0$ and $p\to Ke^{-r\tau}$; as $x\to\infty$, $c-(xe^{-y\tau}-Ke^{-r\tau})=p\to0$.
+\end{remark}
+
+\section{The pricing equation and the heat equation}\label{sec:bsf-heat}
+
+By the Feynman--Kac formula (\cref{thm:sm-feynman-kac}), a smooth solution of the pricing equation
+with polynomial growth is the risk-neutral price. Here we forget the probability and solve the
+equation. For a strike $K>0$ the problem is to find $V\in C^{1,2}([0,T)\times(0,\infty))$ with
+\begin{gather}
+  \partial_tV+(r-y)\,x\,\partial_xV+\frac{\sigma^2x^2}{2}\,\partial_{xx}V-rV=0\qquad\text{on }[0,T)\times(0,\infty),
+  \label{eq:bsf-pde}\\
+  V(t,x)\to(x_0-K)^+\qquad\text{as }(t,x)\to(T,x_0),\ t<T,\ \text{for every }x_0>0 .\label{eq:bsf-terminal}
+\end{gather}
+The coefficients grow with $x$; in the log-price they are constant, and in a frame that moves with the
+drift only the diffusion remains.
+
+\begin{lemma}[Reduction to the heat equation]\label{lem:bsf-heat}
+For $V:[0,T)\times(0,\infty)\to\R$ define $u:(0,\sigma^2T]\times\R\to\R$ by
+\begin{equation}\label{eq:bsf-change}
+  V(t,x)=Ke^{-r\tau}\,u(s,\xi),\qquad s=\sigma^2\tau,\qquad \xi=\log\frac xK+\nu\tau,\qquad \tau=T-t .
+\end{equation}
+The map $(t,x)\mapsto(s,\xi)$ is a bijection from $[0,T)\times(0,\infty)$ onto $(0,\sigma^2T]\times\R$,
+infinitely differentiable in both directions, and it extends to a homeomorphism from
+$[0,T]\times(0,\infty)$ onto $[0,\sigma^2T]\times\R$ that maps $(T,x_0)$ to $(0,\log(x_0/K))$.
+\begin{enumerate}[label=(\roman*)]
+  \item $V\in C^{1,2}([0,T)\times(0,\infty))$ if and only if $u\in C^{1,2}((0,\sigma^2T]\times\R)$, and then
+    \[
+      \partial_tV+(r-y)x\,\partial_xV+\frac{\sigma^2x^2}{2}\partial_{xx}V-rV
+      =\sigma^2Ke^{-r\tau}\Big(\frac12\partial_{\xi\xi}u-\partial_su\Big)(s,\xi) .
+    \]
+    So $V$ solves \eqref{eq:bsf-pde} if and only if $u$ solves the \emph{heat equation}
+    $\partial_su=\frac12\partial_{\xi\xi}u$ on $(0,\sigma^2T]\times\R$.
+  \item $V$ satisfies \eqref{eq:bsf-terminal} if and only if $u$ extends continuously to
+    $[0,\sigma^2T]\times\R$ with $u(0,\xi)=u_0(\xi):=(e^\xi-1)^+$.
+  \item $|V(t,x)|\le A\exp\big(a(\log x)^2\big)$ for some constants $A,a$ if and only if
+    $|u(s,\xi)|\le A'\exp(a'\xi^2)$ for some constants $A',a'$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+The inverse map is $\tau=s/\sigma^2$, $x=K\exp(\xi-\nu s/\sigma^2)$. (i) By the chain rule, with $\partial_t\tau=-1$, $x\partial_x\xi=1$ and
+$x^2\partial_{xx}=(x\partial_x)^2-x\partial_x$,
+\[
+  \partial_tV=Ke^{-r\tau}\big(ru-\sigma^2\partial_su-\nu\,\partial_\xi u\big),\qquad
+  x\,\partial_xV=Ke^{-r\tau}\partial_\xi u,\qquad x^2\partial_{xx}V=Ke^{-r\tau}\big(\partial_{\xi\xi}u-\partial_\xi u\big),
+\]
+and $C^{1,2}$ regularity transfers in both directions. Substituting, the terms in $u$ cancel and the
+coefficient of $\partial_\xi u$ is $-\nu+(r-y)-\frac{\sigma^2}{2}=0$. (ii) Along the homeomorphism,
+$(t,x)\to(T,x_0)$ exactly when $(s,\xi)\to(0,\log(x_0/K))$, $e^{-r\tau}\to1$, and
+$(x_0-K)^+=K(e^{\xi_0}-1)^+$. (iii) $\log x=\xi-\nu\tau+\log K$ with $|\nu\tau-\log K|\le b:=|\nu|T+|\log K|$,
+$(\xi\pm b)^2\le2\xi^2+2b^2$, and $e^{-|r|T}\le e^{-r\tau}\le e^{|r|T}$.
+\end{proof}
+
+Without a growth condition the heat equation does not determine its solutions: \textcite{tychonoff-heat}
+constructed a nonzero solution, continuous up to $s=0$ and vanishing there, that grows faster than
+$e^{a\xi^2}$ for every $a$ (see also \textcite{john-pde}, Chapter~7); through \eqref{eq:bsf-change} it gives
+nonzero solutions of \eqref{eq:bsf-pde} with zero terminal value. The class $e^{a\xi^2}$ excludes it.
+
+\begin{theorem}[Uniqueness for the heat equation]\label{thm:bsf-tychonoff}
+Let $S>0$ and let $u\in C^{1,2}((0,S]\times\R)\cap C([0,S]\times\R)$ solve
+$\partial_su=\frac12\partial_{\xi\xi}u$ on $(0,S]\times\R$ with $u(0,\cdot)=0$. If
+$|u(s,\xi)|\le Ae^{a\xi^2}$ on $[0,S]\times\R$ for constants $A,a\ge0$, then $u=0$.
+\end{theorem}
+
+This is \textcite{evans-pde}, Section~2.3.3, Theorem~7, for the equation $\partial_t\tilde u=\partial_{\xi\xi}\tilde u$,
+applied to $\tilde u(t,\xi)=u(2t,\xi)$ on $[0,S/2]$. In the price variable the class is
+$|V(t,x)|\le A\exp(a(\log x)^2)$ (\cref{lem:bsf-heat}(iii)); it contains every function bounded by
+$C(x^p+x^{-p})$, since $e^{p|\log x|}\le e^{p^2/(4a)}e^{a(\log x)^2}$, so it is larger than the
+polynomial class in which \cref{thm:sm-feynman-kac} gives uniqueness.
+
+\section{Solving the equation by Fourier transform}\label{sec:bsf-fourier}
+
+For an integrable $g:\R\to\C$ and real $\omega$ let $\hat g(\omega)=\int_\R e^{-i\omega\xi}g(\xi)\,\dd\xi$.
+The transform turns $\partial_\xi$ into multiplication by $i\omega$, so the heat equation becomes
+$\partial_s\hat u=-\frac12\omega^2\hat u$, solved by $\hat u(s,\omega)=\hat u_0(\omega)e^{-s\omega^2/2}$.
+The obstacle is the payoff. The function $u_0(\xi)=(e^\xi-1)^+$ grows like $e^\xi$: it is not integrable,
+and it is not a tempered distribution either: since $u_0\ge0$, a tempered extension $T$ would give, for
+$\varphi=e^{-\sqrt{1+\xi^2}/2}$ and a smooth cutoff $0\le\chi\le1$ equal to $1$ near $0$ and nonincreasing in $|\xi|$,
+$T(\varphi)=\lim_nT(\chi(\cdot/n)\varphi)=\lim_n\int u_0\chi(\cdot/n)\varphi=\infty$ by monotone convergence. So it has no
+Fourier transform, even in the sense of distributions. The remedy is \emph{damping}: for $a>1$ the function $e^{-a\xi}u_0(\xi)$
+is integrable, and its transform is the \emph{generalised} transform of $u_0$ at complex frequencies,
+\begin{equation}\label{eq:bsf-payoff-transform}
+  \int_\R e^{-i\omega\xi}e^{-a\xi}u_0(\xi)\,\dd\xi=\hat u_0(\omega-ia),\qquad
+  \hat u_0(z):=\int_0^\infty e^{-iz\xi}(e^\xi-1)\,\dd\xi=\frac{1}{iz-1}-\frac{1}{iz}=-\frac{1}{z(z+i)},
+\end{equation}
+valid for $\operatorname{Im}z<-1$, where both integrals converge absolutely ($|e^{-iz\xi}|=e^{\xi\operatorname{Im}z}$).
+The heat kernel $k(s,\xi)=(2\pi s)^{-1/2}e^{-\xi^2/(2s)}$, the density of $\sqrt sZ$ with
+$Z\sim\mathcal N(0,1)$, has the transform
+\begin{equation}\label{eq:bsf-kernel-transform}
+  \int_\R e^{-iz\xi}k(s,\xi)\,\dd\xi=\E\big[e^{-iz\sqrt sZ}\big]=e^{-sz^2/2}\qquad\text{for every }z\in\C,
+\end{equation}
+because $\E[e^{\theta Z}]=e^{\theta^2/2}$ holds for real $\theta$, and both sides are entire functions of
+$\theta$ (differentiate under the integral), so they agree on $\C$.
+
+\begin{proposition}[The formula by solving the pricing equation]\label{prop:bsf-pde}
+Let $K,\sigma>0$ and $r,y\in\R$. There is exactly one $V\in C^{1,2}([0,T)\times(0,\infty))$ that solves
+\eqref{eq:bsf-pde}--\eqref{eq:bsf-terminal} and satisfies $|V(t,x)|\le A\exp\big(a(\log x)^2\big)$ for some
+constants $A,a$: the call price $c$ of \cref{thm:bsf-formula}. For every damping $a>1$, every $t<T$ and
+every $x>0$, with $s=\sigma^2\tau$ and $\xi=\log(x/K)+\nu\tau$,
+\begin{equation}\label{eq:bsf-fourier}
+  c(t,x)=\frac{Ke^{-r\tau}e^{a\xi}}{\pi}\int_0^\infty\operatorname{Re}\Big[e^{i\omega\xi}\,\hat u_0(\omega-ia)\,
+  e^{-s(\omega-ia)^2/2}\Big]\,\dd\omega .
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+By \cref{lem:bsf-heat}, with $S=\sigma^2T$, we must show that there is exactly one
+$u\in C^{1,2}((0,S]\times\R)\cap C([0,S]\times\R)$ with $\partial_su=\frac12\partial_{\xi\xi}u$,
+$u(0,\cdot)=u_0$ and $|u|\le A'e^{a'\xi^2}$, and identify it.
+
+\emph{Uniqueness.} The difference of two such solutions satisfies the hypotheses of
+\cref{thm:bsf-tychonoff} (the sum of two bounds $A_ie^{a_i\xi^2}$ is a bound of the same form), so it vanishes.
+
+\emph{Existence, by Fourier transform.} Fix $a>1$ and, for $s>0$, let
+\[
+  u(s,\xi)=\frac{1}{2\pi}\int_\R e^{iz\xi}\,\hat u_0(z)\,e^{-sz^2/2}\,\dd\omega,\qquad z=\omega-ia,
+\]
+which is \eqref{eq:bsf-fourier} written over $\R$ (the integrand at $-\omega$ is the conjugate of that at
+$\omega$). Here $|e^{iz\xi}|=e^{a\xi}$, $|e^{-sz^2/2}|=e^{-s(\omega^2-a^2)/2}$ and $|\hat u_0(z)|\le1/(a(a-1))$.
+A derivative of order $j$ in $\xi$ and $l$ in $s$ multiplies the integrand by $(iz)^j(-z^2/2)^l$, which for
+$s\ge s_0>0$ and $|\xi|\le R$ is bounded by the integrable $C(1+|\omega|)^{j+2l}e^{aR+Sa^2/2}e^{-s_0\omega^2/2}$.
+So we may differentiate under the integral: $u$ is infinitely differentiable on $(0,S]\times\R$ and, since
+$-\frac12z^2=\frac12(iz)^2$, solves the heat equation.
+
+\emph{The solution is a convolution.} The functions $f_1=e^{-a\xi}k(s,\xi)$ and $f_2=e^{-a\xi}u_0(\xi)$ are
+integrable, $f_1$ is bounded and continuous, so $f_1*f_2$ is continuous, and
+$(f_1*f_2)(\xi)=e^{-a\xi}\int_\R k(s,\xi-\eta)u_0(\eta)\,\dd\eta$. By \eqref{eq:bsf-payoff-transform},
+\eqref{eq:bsf-kernel-transform} and the convolution theorem (\textcite{rudin-rca}, Theorem~9.2(c)), its transform
+is the integrable function $e^{-sz^2/2}\hat u_0(z)$; by the inversion theorem (\textcite{rudin-rca},
+Theorem~9.11) it is the inverse transform of that function at every point. Multiplying by $e^{a\xi}$,
+\begin{equation}\label{eq:bsf-convolution}
+  u(s,\xi)=\int_\R k(s,\xi-\eta)\,u_0(\eta)\,\dd\eta=\E\big[u_0(\xi+\sqrt sZ)\big].
+\end{equation}
+
+\emph{Initial value and growth.} For $|\xi|\le R$ and $s\le S$, $0\le u_0(\xi+\sqrt sZ)\le e^{R+\sqrt S|Z|}$,
+which is integrable; $u_0$ is continuous, so dominated convergence gives $u(s,\xi)\to u_0(\xi_0)$ as
+$(s,\xi)\to(0,\xi_0)$. Setting $u(0,\cdot)=u_0$ makes $u$ continuous on $[0,S]\times\R$. Moreover
+$0\le u(s,\xi)\le\E[e^{\xi+\sqrt sZ}]=e^{\xi+s/2}\le e^{S/2+1/4}e^{\xi^2}$.
+
+\emph{Evaluation.} The integrand $(e^{\xi+\sqrt sz}-1)^+$ is positive exactly when $z>-\xi/\sqrt s$, and
+\eqref{eq:bsf-shift} with $a=\sqrt s$ gives
+$u(s,\xi)=e^{\xi+s/2}N\big((\xi+s)/\sqrt s\big)-N\big(\xi/\sqrt s\big)$. With $s=w^2$ and
+$\xi=\log(x/K)+\nu\tau$ we have $\xi/\sqrt s=d_-$, $(\xi+s)/\sqrt s=d_+$ and
+$Ke^{-r\tau}e^{\xi+s/2}=xe^{-y\tau}$, so $Ke^{-r\tau}u=c$, the formula \eqref{eq:bsf-call}.
+\end{proof}
+
+The proof did not use the stock or the measure $\Q$: the call price is the only solution of the pricing
+equation in the class $e^{a(\log x)^2}$, and the Fourier transform finds it. The convolution
+\eqref{eq:bsf-convolution} is \cref{prop:sm-green} in other variables. In \eqref{eq:bsf-fourier} the model enters
+only through $\phi_Y(-z)$, where $\phi_Y(u)=\E[e^{iuY}]$ is the characteristic function of the log-price increment
+$Y=\sqrt sZ$ (here $\phi_Y(-z)=e^{-sz^2/2}$; it is finite at $z=\omega-ia$ when $\E[S_T^a]<\infty$). Where $\phi_Y$ is
+known but the density is not, as in L\'evy and affine stochastic-volatility models, the same integral of the
+transformed payoff prices the call \citep{lewis-2001}; \textcite{carr-madan-fft} damp the price in the
+log-strike instead (\cref{prop:sv-fourier}).
+
+\paragraph{Computing the integral.} \Cref{fig:bsf-transforms}(a) evaluates \eqref{eq:bsf-fourier} by the
+trapezoidal rule with step $h$. As a function of $\omega$ the integrand has poles only at $\omega=ia$ and
+$\omega=i(a-1)$ (where $z=0$ and $z=-i$), so it is analytic in the strip $|\operatorname{Im}\omega|<d$ for every
+$d<a-1$, and the error of the rule on the whole line is at most $2M_d/(e^{2\pi d/h}-1)$, where $M_d$ bounds the
+integrals along horizontal lines in the strip (\textcite{trefethen-weideman}, Theorem~5.1). To leading order,
+the error is the contribution of the nearest pole, $z=-i$, whose residue has modulus $e^{-(a-1)\xi+s/2}$:
+$Ke^{-r\tau}e^{\xi+s/2}e^{-2\pi(a-1)/h}=xe^{-y\tau}e^{-2\pi(a-1)/h}$. We do not prove that this term
+dominates, but the errors for four dampings fall on it. A larger damping allows a larger step but inflates
+the integrand by $e^{a\xi+sa^2/2}$, and rounding errors with it. Truncation at $\Omega$ costs about
+$e^{-s\Omega^2/2}$, so the number of nodes grows like $s^{-1/2}$ as $s\downarrow0$.
+
+\section{Solving the equation by Laplace transform}\label{sec:bsf-laplace}
+
+The course takes a Laplace transform in time instead, for all maturities at once:
+$\bar u(\lambda,\xi)=\int_0^\infty e^{-\lambda s}u(s,\xi)\,\dd s$. Formally, $\partial_su$ becomes $\lambda\bar u-u_0$,
+and the heat equation the ordinary differential equation $\frac12\partial_{\xi\xi}\bar u-\lambda\bar u=-u_0$, with
+homogeneous solutions $e^{\pm q\xi}$, $q=\sqrt{2\lambda}$; growth at $\pm\infty$ selects one on each side of the
+kink. For the Green's function, $u_0=\delta_0$: a bounded solution of $\frac12g''=\lambda g$ off $0$ whose slope
+jumps by $-2$ at $0$. The next proposition confirms these formal computations.
+
+\begin{proposition}[The formula by Laplace transform]\label{prop:bsf-laplace}
+Let $q=\sqrt{2\lambda}$, with the principal square root.
+\begin{enumerate}[label=(\roman*)]
+  \item For $\lambda>0$ and $\xi\in\R$,
+    \begin{equation}\label{eq:bsf-laplace-kernel}
+      \int_0^\infty e^{-\lambda s}k(s,\xi)\,\dd s=\frac{e^{-q|\xi|}}{q} .
+    \end{equation}
+    As a function of $\xi$ it is the only bounded continuous function that is $C^2$ off $0$, solves
+    $\frac12g''=\lambda g$ there, and has $g'(0+)-g'(0-)=-2$.
+  \item Let $u$ be the heat solution \eqref{eq:bsf-convolution} of the call, defined for all $s>0$. For
+    $\lambda>\frac12$, $\bar u(\lambda,\xi)=\int_0^\infty e^{-\lambda s}u(s,\xi)\,\dd s$ is finite and
+    \begin{equation}\label{eq:bsf-laplace-call}
+      \bar u(\lambda,\xi)=\begin{cases}
+        \dfrac{e^{q\xi}}{q^2(q-1)}, & \xi\le0,\\[1.2ex]
+        \dfrac{e^\xi}{\lambda-\frac12}-\dfrac1\lambda+\dfrac{e^{-q\xi}}{q^2(q+1)}, & \xi\ge0 .
+      \end{cases}
+    \end{equation}
+    It is the only $C^1$ function with $|\bar u|\le A(1+e^\xi)$ that is $C^2$ off $0$ and solves
+    $\frac12\bar u''-\lambda\bar u=-u_0$ there.
+  \item The right side of \eqref{eq:bsf-laplace-call} is analytic in $\lambda$ on
+    $\C\setminus\big((-\infty,0]\cup\{\frac12\}\big)$ and equals the Laplace transform for
+    $\operatorname{Re}\lambda>\frac12$. For every $c>\frac12$, $s>0$ and $\xi$,
+    \begin{equation}\label{eq:bsf-bromwich}
+      u(s,\xi)=\lim_{R\to\infty}\frac{1}{2\pi i}\int_{c-iR}^{c+iR}e^{\lambda s}\,\bar u(\lambda,\xi)\,\dd\lambda .
+    \end{equation}
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Write $b=|\xi|/\sqrt2$, so that $\lambda s+\xi^2/(2s)=(\sqrt{\lambda s}-b/\sqrt s)^2+2b\sqrt\lambda$ and,
+with $s=v^2$,
+\[
+  \int_0^\infty e^{-\lambda s}k(s,\xi)\,\dd s=\frac{e^{-2b\sqrt\lambda}}{\sqrt{2\pi}}\int_0^\infty2e^{-(\sqrt\lambda v-b/v)^2}\,\dd v .
+\]
+Call the last integral $2J$. If $b=0$, $J=\sqrt\pi/(2\sqrt\lambda)$. If $b>0$, the substitution
+$v=b/(\sqrt\lambda u)$ maps $\sqrt\lambda v-b/v$ to $-(\sqrt\lambda u-b/u)$, so
+$J=\int_0^\infty e^{-(\sqrt\lambda u-b/u)^2}\frac{b}{\sqrt\lambda u^2}\,\dd u$; averaging the two expressions,
+$2J=\lambda^{-1/2}\int_0^\infty e^{-(\sqrt\lambda u-b/u)^2}\,\dd(\sqrt\lambda u-b/u)=\sqrt{\pi/\lambda}$, since
+$\sqrt\lambda u-b/u$ increases from $-\infty$ to $\infty$. Either way the integral equals
+$e^{-2b\sqrt\lambda}(2\pi)^{-1/2}\sqrt{\pi/\lambda}=e^{-q|\xi|}/q$. This $g$ has $\frac12g''=\frac{q^2}{2}g=\lambda g$
+off $0$ and $g'(0\pm)=\mp1$. If $g_1,g_2$ both have the stated properties, $D=g_1-g_2$ is $C^1$ (the
+jumps cancel), solves $\frac12D''=\lambda D$ on both sides, hence, being determined by $D(0)$ and $D'(0)$,
+is $\alpha e^{q\xi}+\beta e^{-q\xi}$ on $\R$; boundedness forces $\alpha=\beta=0$.
+
+(ii) By Tonelli's theorem (everything is nonnegative) and (i),
+$\bar u(\lambda,\xi)=\int_\R\frac{e^{-q|\xi-\eta|}}{q}(e^\eta-1)^+\,\dd\eta$, which is finite exactly when
+$q>1$, that is $\lambda>\frac12$. For $\xi\le0$ only $\eta>0\ge\xi$ contributes:
+$\frac{e^{q\xi}}q\big(\frac1{q-1}-\frac1q\big)$. For $\xi\ge0$, splitting at $\eta=\xi$ gives
+$e^\xi\big(\frac1{q(q-1)}+\frac1{q(q+1)}\big)-\frac2{q^2}+e^{-q\xi}\big(\frac1{q^2}-\frac1{q(q+1)}\big)$, which is
+\eqref{eq:bsf-laplace-call} since $\frac2{q^2-1}=\frac1{\lambda-1/2}$. Both branches have value $\frac1{q^2(q-1)}$ and
+slope $\frac1{q(q-1)}$ at $0$, and direct differentiation gives the equation. Uniqueness is proved as in (i):
+since $q>1$, $\alpha e^{q\xi}+\beta e^{-q\xi}=O(1+e^\xi)$ forces $\alpha=\beta=0$.
+
+(iii) With the principal root, $q$ is analytic off $(-\infty,0]$ with $\operatorname{Re}q>0$; the right side
+of \eqref{eq:bsf-laplace-call} has singularities only where $q\in\{0,1\}$ or $\lambda\in\{0,\frac12\}$. The
+Laplace transform is analytic on $\operatorname{Re}\lambda>\frac12$ (it converges absolutely there, since
+$0\le u\le e^{\xi+s/2}$) and agrees with the right side on $(\frac12,\infty)$, hence on the whole half-plane.
+For \eqref{eq:bsf-bromwich}, apply the Fourier inversion theorem for functions that are integrable and of
+bounded variation near the point (\textcite{dlmf}, Eq.~(1.14.3)) to $f(\varsigma)=e^{-c\varsigma}u(\varsigma,\xi)\1_{\{\varsigma>0\}}$,
+which is integrable because $c>\frac12$ and continuously differentiable near $\varsigma=s$. Its transform at
+$\omega$ is $\bar u(c+i\omega,\xi)$; inverting at $\varsigma=s$ and substituting $\lambda=c+i\omega$ gives
+\eqref{eq:bsf-bromwich}.
+\end{proof}
+
+\paragraph{The course's variables.} In $R=x/K$ and $\varsigma=\sigma^2\tau$ the course's transformed equation
+for the Green's function is of Euler type, with solutions $R^{\lambda_\pm}$,
+$\lambda_\pm=-\alpha\pm\sqrt{\alpha^2+2(\eta+\zeta)}$, $\alpha=\frac{r-y}{\sigma^2}-\frac12$, $\eta=\frac r{\sigma^2}$. By
+\cref{lem:bsf-heat} the Green's function is $e^{-\alpha z}e^{-(\eta+\alpha^2/2)\varsigma}k(\varsigma,z)$, $z=\log R$, whose
+transform $e^{-\alpha z-q|z|}/q$ at $\lambda=\zeta+\eta+\frac{\alpha^2}2$ is $R^{\lambda_\mp}/q$ for $R\gtrless1$. Its
+Bromwich inversion, collapsing the line onto the cut, is \exref{ex:bsf-bromwich}.
+
+\paragraph{Numerical inversion.} Deforming the Bromwich line into a contour that wraps around the negative
+real axis, where $e^{\lambda s}$ is small, needs all singularities to its left; because of the pole at
+$\lambda=\frac12$ we invert $\lambda\mapsto\bar u(\lambda+\frac12,\xi)$, whose singularities lie on $(-\infty,0]$,
+and multiply by $e^{s/2}$. The \emph{fixed Talbot} rule of
+\textcite{abate-valko} discretises Talbot's contour $\lambda(\theta)=\rho\theta(\cot\theta+i)$,
+$-\pi<\theta<\pi$ \citep{talbot-1979}, with $M$ nodes and $\rho=2M/(5s)$:
+\begin{equation}\label{eq:bsf-talbot}
+  f(s)\approx\frac{\rho}{M}\Big[\frac12\bar f(\rho)e^{\rho s}+\sum_{k=1}^{M-1}\operatorname{Re}\Big(e^{s\lambda_k}\bar f(\lambda_k)(1+i\beta_k)\Big)\Big],
+  \qquad \lambda_k=\lambda(\theta_k),\ \theta_k=\frac{k\pi}M,
+\end{equation}
+with $\beta_k=\theta_k+(\theta_k\cot\theta_k-1)\cot\theta_k$. We do not prove the deformation or the error
+bound: \textcite{abate-valko} report about $0.6M$ correct digits in exact arithmetic, and in double precision
+the factor $e^{\rho s}=e^{0.4M}$ amplifies rounding errors, so the error in \cref{fig:bsf-transforms}(b) falls
+until $M\approx20$ and then grows. At the test case, $M=20$ gives an error of $1.5\times10^{-13}$, and the Fourier rule with
+$a=1.5$, $h=0.05$ an error of $3\times10^{-15}$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch02-transforms}
+  \caption{The test-case call by numerical inversion. (a) Fourier: absolute error of the trapezoidal rule
+    for \eqref{eq:bsf-fourier}, with dampings $a=1.25,1.5,2,3$ and steps $h$ chosen so that
+    $2\pi(a-1)/h$ lies between $2$ and $34$; all four fall on the nearest-pole estimate
+    $Se^{-yT}e^{-2\pi(a-1)/h}$ (dashed). (b) Laplace: absolute error of the fixed Talbot rule
+    \eqref{eq:bsf-talbot} applied to \eqref{eq:bsf-laplace-call}, against the number of nodes
+    $M=4,6,\dots,40$, for $K=80$, $100$ and $125$.}
+  \label{fig:bsf-transforms}
+\end{figure}
+
+\begin{incode}
+\coderef{code/src/mfe230d/transforms.py}: \texttt{heat\_variables} is \eqref{eq:bsf-change};
+\texttt{fourier\_call} evaluates \eqref{eq:bsf-fourier} by the trapezoidal rule; \texttt{laplace\_heat\_call} is
+\eqref{eq:bsf-laplace-call}, \texttt{talbot} is \eqref{eq:bsf-talbot}, and \texttt{laplace\_call} combines them.
+\end{incode}
+
+\demo{02-black-scholes.ipynb}{Fourier and Laplace prices and their errors, for any inputs and node counts.}
+
+\section{The Greeks and the relations between them}\label{sec:bsf-greeks}
+
+We use the conventions of \coderef{code/src/mfe230d/bs.py}. For a price $V(t,x)$ that also depends on $K$,
+$r$, $y$ and $\sigma$: the delta $\Delta=\partial_xV$, the gamma $\Gamma=\partial_{xx}V$, the vega
+$\mathcal V=\partial_\sigma V$, the theta $\Theta=\partial_tV$ in calendar time (per year; at fixed $t$ it
+equals $-\partial_TV$), and the rhos $\rho_r=\partial_rV$ and $\rho_y=\partial_yV$.
+
+\begin{proposition}[The Greeks of calls and puts]\label{prop:bsf-greeks}
+Let $K>0$, $t<T$, $x>0$ and $d_\pm=d_\pm(\tau,x)$.
+\begin{enumerate}[label=(\roman*)]
+  \item $xe^{-y\tau}N'(d_+)=Ke^{-r\tau}N'(d_-)$.
+  \item The call $c$ of \eqref{eq:bsf-call} has
+    \[
+    \begin{aligned}
+      &\Delta=e^{-y\tau}N(d_+),\qquad \Gamma=\frac{e^{-y\tau}N'(d_+)}{x\sigma\sqrt\tau},\qquad
+      \mathcal V=xe^{-y\tau}N'(d_+)\sqrt\tau,\\
+      &\Theta=-\frac{xe^{-y\tau}N'(d_+)\sigma}{2\sqrt\tau}+y\,xe^{-y\tau}N(d_+)-rKe^{-r\tau}N(d_-),\\
+      &\rho_r=\tau Ke^{-r\tau}N(d_-),\qquad \rho_y=-\tau xe^{-y\tau}N(d_+),\qquad \partial_Kc=-e^{-r\tau}N(d_-).
+    \end{aligned}
+    \]
+    The put $p$ has the same $\Gamma$ and $\mathcal V$, and, by parity, $\Delta_p=\Delta-e^{-y\tau}$,
+    $\partial_Kp=\partial_Kc+e^{-r\tau}$, $\Theta_p=\Theta-yxe^{-y\tau}+rKe^{-r\tau}$,
+    $\rho_{r,p}=\rho_r-\tau Ke^{-r\tau}$ and $\rho_{y,p}=\rho_y+\tau xe^{-y\tau}$.
+  \item For $V=c$ and for $V=p$, with the Greeks of (ii):
+    \begin{enumerate}[label=(\alph*)]
+      \item (homogeneity) $V=x\Delta+K\,\partial_KV$;
+      \item (carry) $\rho_y=-\tau x\Delta$ and $\rho_r=-\tau K\,\partial_KV$, hence $\rho_r+\rho_y=-\tau V$;
+      \item (vega and gamma) $\mathcal V=\sigma\tau x^2\Gamma$;
+      \item (time) $\Theta=-\big(r\rho_r+y\rho_y+\frac12\sigma\mathcal V\big)/\tau$;
+      \item (the pricing equation) $\Theta+(r-y)x\Delta+\frac12\sigma^2x^2\Gamma=rV$.
+    \end{enumerate}
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $d_+^2-d_-^2=(d_+-d_-)(d_++d_-)=w\cdot\frac{2m}{w}=2m$, so
+$N'(d_-)/N'(d_+)=e^{(d_+^2-d_-^2)/2}=F/K=xe^{(r-y)\tau}/K$.
+
+(ii) Let $\theta$ be any of $x,K,t,r,y,\sigma$. By the chain rule and (i),
+\[
+  \partial_\theta c=\partial_\theta\big(xe^{-y\tau}\big)N(d_+)-\partial_\theta\big(Ke^{-r\tau}\big)N(d_-)
+  +xe^{-y\tau}N'(d_+)\,\partial_\theta(d_+-d_-),
+\]
+and $d_+-d_-=\sigma\sqrt\tau$ depends only on $\sigma$ and $t$; this gives each first-order Greek, with
+$\partial_t\tau=-1$ for the theta. The gamma is $e^{-y\tau}N'(d_+)\partial_xd_+$, $\partial_xd_+=1/(x\sigma\sqrt\tau)$.
+The put Greeks follow by differentiating the parity $p=c-xe^{-y\tau}+Ke^{-r\tau}$.
+
+(iii) For the call, each identity is a substitution of (ii):
+$x\Delta+K\partial_Kc=xe^{-y\tau}N(d_+)-Ke^{-r\tau}N(d_-)=c$; $-\tau x\Delta=\rho_y$ and
+$-\tau K\partial_Kc=\rho_r$, whose sum is $-\tau(x\Delta+K\partial_Kc)=-\tau c$ by (a);
+$\sigma\tau x^2\Gamma=xe^{-y\tau}N'(d_+)\sqrt\tau=\mathcal V$; and
+$-(r\rho_r+y\rho_y)/\tau=-rKe^{-r\tau}N(d_-)+yxe^{-y\tau}N(d_+)$, to which $-\sigma\mathcal V/(2\tau)$ adds the
+first term of $\Theta$. The put differs from the call by $\varphi=xe^{-y\tau}-Ke^{-r\tau}$, which has
+$\Delta=e^{-y\tau}$, $\partial_K\varphi=-e^{-r\tau}$, $\Gamma=\mathcal V=0$, $\rho_y=-\tau xe^{-y\tau}$,
+$\rho_r=\tau Ke^{-r\tau}$ and $\Theta=yxe^{-y\tau}-rKe^{-r\tau}$, and satisfies (a)--(d); by linearity so
+does $p$. Finally, (e) is a combination of (a)--(d): by (b) and (a),
+$-r\rho_r/\tau=r(V-x\Delta)$ and $-y\rho_y/\tau=yx\Delta$, and by (c) $-\sigma\mathcal V/(2\tau)=-\frac12\sigma^2x^2\Gamma$;
+substituted in (d) they give (e).
+\end{proof}
+
+Each relation is a symmetry, and (e) is their sum. (a): the price is homogeneous of degree one in $(x,K)$:
+quoting in cents multiplies spot, strike and price by $100$ (Euler's theorem, \cref{prop:sr-euler}). (b): $r$ and
+$y$ enter only through $F$ and the discount factor. (d): $\tau$ enters only through $r\tau$, $y\tau$ and
+$\sigma^2\tau$. (c): raising the variance $\sigma^2\tau$ runs the heat equation of \cref{lem:bsf-heat}.
+
+In the test case the call has
+$\Delta=e^{-yT}N(d_+)=0.509643$, $\Gamma=0.0195277$, $\mathcal V=39.0554$, $\Theta=-3.32226$ per year,
+$\rho_r=43.6000$ and $\rho_y=-50.9643$; the put has $\Delta=-0.470555$, $\Theta=-4.29260$, $\rho_r=-55.4049$
+and $\rho_y=47.0555$. For instance $\rho_r+\rho_y=-7.36429=-TC$, and
+$-(0.01\times43.6000-0.02\times50.9643+0.1\times39.0554)=-3.32226=\Theta$. The strike Greeks are the
+digital and the Arrow--Debreu prices: $-\partial_Kc=e^{-rT}N(d_-)=0.436000$ is the cash-or-nothing call of
+\cref{thm:bsf-formula}, and $\partial_{KK}c=e^{-rT}N'(d_-)/(K\sigma\sqrt T)$ is the Green's function of
+\cref{prop:sm-green} at $K$ (Breeden--Litzenberger, \cref{thm:sk-breeden-litzenberger}). In the test case
+$\partial_{KK}c=0.0195277=\Gamma$: not a coincidence, since $S=K$ (\exref{ex:bsf-strike-greeks}).
+
+$\Theta$ is per year and $\mathcal V$ per unit of $\sigma$. The call theta need not be negative:
+$\Theta-(yxe^{-y\tau}-rKe^{-r\tau})\to0$ as $x\to\infty$, so it is positive for large $x$ when $y>0$.
+
+\demo{02-black-scholes.ipynb}{the Greeks against the spot, and the relations of \cref{prop:bsf-greeks}.}
+
+\section{Implied volatility}\label{sec:bsf-implied-vol}
+
+All inputs of the formula except $\sigma$ are observable, and markets quote options by the volatility that
+reproduces their price. Write $D=e^{-rT}$ and
+$F=Se^{(r-y)T}$ for the time-$0$ discount factor and forward. With $m=\log(F/K)$ and the total volatility
+$w=\sigma\sqrt T$, Black's form gives $c(0,S)=DK\,c(m,w)$, where
+\begin{equation}\label{eq:bsf-normalised}
+  c(m,w)=e^mN\Big(\frac mw+\frac w2\Big)-N\Big(\frac mw-\frac w2\Big),\qquad w>0,
+\end{equation}
+the call price in units of the discounted strike: one function of two variables instead of six.
+
+\begin{definition}[Implied volatility]\label{def:bsf-implied-vol}
+Let $S,K,T>0$ and $r,y\in\R$. The \emph{implied volatility} of a call price $C$ is the unique
+$\sigma_{\mathrm{imp}}>0$, if there is one, whose Black--Scholes call price is $C$; for a put price, use the put
+formula. The \emph{total implied volatility} $w_{\mathrm{imp}}=\sigma_{\mathrm{imp}}\sqrt T$ solves $c(m,w)=C/(DK)$.
+\end{definition}
+
+\begin{proposition}[Implied volatility: existence, uniqueness and Newton's method]\label{prop:bsf-implied-vol}
+Fix $m\in\R$ and write $c(w)=c(m,w)$, $d_\pm=m/w\pm w/2$.
+\begin{enumerate}[label=(\roman*)]
+  \item $c$ is infinitely differentiable and strictly increasing on $(0,\infty)$, with
+    $c'(w)=N'(d_-)>0$, $\lim_{w\downarrow0}c(w)=(e^m-1)^+$ and $\lim_{w\to\infty}c(w)=e^m$. Hence a call
+    price $C$ has an implied volatility if and only if
+    \begin{equation}\label{eq:bsf-iv-bounds}
+      \big(Se^{-yT}-Ke^{-rT}\big)^+<C<Se^{-yT},
+    \end{equation}
+    a put price $P$ if and only if $(Ke^{-rT}-Se^{-yT})^+<P<Ke^{-rT}$, and prices that satisfy parity have
+    the same implied volatility.
+  \item $c''(w)=d_+d_-N'(d_-)/w$. If $m\ne0$, $c$ is strictly convex on $(0,w^*]$ and strictly concave on
+    $[w^*,\infty)$, where
+    \[
+      w^*=\sqrt{2|m|},\qquad\text{that is}\qquad \sigma^{*2}=\frac{2|\log(F/K)|}{T};
+    \]
+    if $m=0$, $c$ is strictly concave on $(0,\infty)$. So $w^*$ is where the vega $c'$ is largest.
+  \item (Newton on the price; \textcite{manaster-koehler}.) Let $\hat c$ be a value in $\big((e^m-1)^+,e^m\big)$ and $w_{\mathrm{imp}}$ the
+    solution of $c(w)=\hat c$. If $m\ne0$, the iteration
+    \[
+      w_{n+1}=w_n-\frac{c(w_n)-\hat c}{N'\big(d_-(w_n)\big)},\qquad w_0=w^*,
+    \]
+    stays in $(0,\infty)$ and converges monotonically to $w_{\mathrm{imp}}$: increasing if
+    $w_{\mathrm{imp}}>w^*$, decreasing if $w_{\mathrm{imp}}<w^*$. If $m=0$, the same holds from
+    $w_0=\sqrt{2\pi}\,\hat c$, which lies below $w_{\mathrm{imp}}$. In both cases the convergence is
+    eventually quadratic.
+  \item (Newton on the log-price.) Let $m\le0$. Then $\log c$ is strictly concave in $w$ on $(0,\infty)$. For every
+    $w_0>0$, the iteration
+    \[
+      w_{n+1}=w_n-\big(\log c(w_n)-\log\hat c\big)\frac{c(w_n)}{N'\big(d_-(w_n)\big)},
+    \]
+    replaced by $w_{n+1}=w_n/2$ when this is not positive, converges to $w_{\mathrm{imp}}$. Its iterates fall to or below $w_{\mathrm{imp}}$ after finitely many steps,
+    then increase monotonically, and the convergence is eventually quadratic.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Differentiating \eqref{eq:bsf-normalised}, with $e^mN'(d_+)=N'(d_-)$ (the normalised form of
+\cref{prop:bsf-greeks}(i)) and $\partial_w(d_+-d_-)=1$, gives $c'=N'(d_-)$: the vega in units of
+$DK\sqrt T$. As $w\downarrow0$, $d_\pm$ tend to $+\infty$, $-\infty$ or $0$ according as $m>0$, $m<0$ or
+$m=0$, so $c\to e^m-1$, $0$ or $\frac12-\frac12=0$; as $w\to\infty$, $d_\pm\to\pm\infty$ and $c\to e^m$. By
+continuity and strict monotonicity, $c(w)=\hat c$ has a solution if and only if $(e^m-1)^+<\hat c<e^m$, and
+then exactly one. With $\hat c=C/(DK)$, $DK(e^m-1)^+=(Se^{-yT}-Ke^{-rT})^+$ and $DKe^m=Se^{-yT}$, which is
+\eqref{eq:bsf-iv-bounds}. A put price $P$ has implied volatility $\sigma$ if and only if
+$P+Se^{-yT}-Ke^{-rT}$ is the call price at $\sigma$ (parity, \cref{thm:bsf-formula}), which gives the put
+bounds and the last claim.
+
+(ii) $\partial_wN'(d_-)=-d_-N'(d_-)\,\partial_wd_-$ and $\partial_wd_-=-m/w^2-\frac12=-d_+/w$. The product
+$d_+d_-=m^2/w^2-w^2/4$ is positive for $w<\sqrt{2|m|}$ and negative for $w>\sqrt{2|m|}$; if $m=0$ it is
+$-w^2/4<0$.
+
+(iii) We use a \emph{tangent argument}. Let $f$ be increasing and differentiable with $f'>0$, $f(w_{\mathrm{imp}})=0$, and
+$w_{n+1}=w_n-f(w_n)/f'(w_n)$, the zero of the tangent $\ell_n$ at $w_n$. If $f$ is concave on an interval
+containing $w_n$ and $w_{\mathrm{imp}}$, with $w_n\le w_{\mathrm{imp}}$, then $\ell_n\ge f$ there, so $\ell_n(w_n)\le0\le\ell_n(w_{\mathrm{imp}})$ and
+$w_n\le w_{n+1}\le w_{\mathrm{imp}}$. If $f$ is convex on such an interval and $w_{\mathrm{imp}}\le w_n$, then
+$\ell_n\le f$ there and $w_{\mathrm{imp}}\le w_{n+1}\le w_n$. Apply this to $f=c-\hat c$. If $m\ne0$ and
+$w_{\mathrm{imp}}\ge w^*$, $c$ is concave on $[w^*,\infty)$ and the iterates increase from $w^*$; if
+$w_{\mathrm{imp}}<w^*$, $c$ is convex on $(0,w^*]$ and they decrease, staying above $w_{\mathrm{imp}}>0$. If $m=0$,
+$c(w)=\int_{-w/2}^{w/2}N'(u)\,\dd u\le w/\sqrt{2\pi}$ since $N'\le1/\sqrt{2\pi}$; at $w_{\mathrm{imp}}$ this gives
+$0<w_0=\sqrt{2\pi}\hat c\le w_{\mathrm{imp}}$, and $c$ is concave on $(0,\infty)$. In each case the iterates are
+monotone and bounded, so they converge to some $L>0$, and letting $n\to\infty$ in the iteration gives
+$c(L)=\hat c$, so $L=w_{\mathrm{imp}}$. For the rate, Taylor's formula gives
+$w_{n+1}-w_{\mathrm{imp}}=c''(\eta_n)(w_n-w_{\mathrm{imp}})^2/(2c'(w_n))$ with $\eta_n$ between $w_n$ and $w_{\mathrm{imp}}$,
+and on the compact interval that contains the iterates $|c''|$ is bounded and $c'$ is bounded away from $0$.
+
+(iv) For $m\le0$, $c(0+)=0$, so $c(w)=\int_0^wg(v)\,\dd v$ with $g(v)=N'(m/v-v/2)=c'(v)$. Since
+$\log g(v)=\frac m2-\frac{m^2}{2v^2}-\frac{v^2}8-\log\sqrt{2\pi}$ is strictly concave, $g'/g$ is strictly decreasing,
+and for $w>0$
+\[
+  c(w)\,\frac{g'(w)}{g(w)}=\int_0^wg(v)\frac{g'(w)}{g(w)}\,\dd v<\int_0^wg'(v)\,\dd v=g(w)-g(0+)\le g(w),
+\]
+that is, $cc''<c'^2$: $G=\log c-\log\hat c$ is strictly concave, with $G'=c'/c>0$ (the integral of a log-concave
+function is log-concave; \textcite{bagnoli-bergstrom}, Theorem~1).
+Now apply the tangent argument to $G$, which is concave everywhere. If $w_n>w_{\mathrm{imp}}$, the tangent
+$\ell_n\ge G$ has $\ell_n(w_n)>0$ and $\ell_n(w_{\mathrm{imp}})\ge0$, so the Newton point is at most $w_{\mathrm{imp}}$;
+if it is not positive, $w_{n+1}=w_n/2$. Halving
+can happen only finitely many times in a row before an iterate drops to or below $w_{\mathrm{imp}}$, so some
+$w_{n_0}\le w_{\mathrm{imp}}$. If $w_n\le w_{\mathrm{imp}}$, then
+$w_n\le w_{n+1}\le w_{\mathrm{imp}}$, with no halving. From $n_0$ on, the iterates increase to a limit
+$L\in(0,w_{\mathrm{imp}}]$ with $G(L)=0$, so $L=w_{\mathrm{imp}}$; the rate follows as in (iii), with $G$ in place
+of $c$.
+\end{proof}
+
+Part (iv) is due to \textcite{choi-huh-su}: their Lemma~2 (the ratio $c/c'$ of price to vega increases in $w$) is
+the concavity of $\log c$, and their Proposition~6 runs Newton on $\log c$ from a lower bound. The halving
+safeguard, hence convergence from every start, is added here; \textcite{jaeckel-rational}'s objective $1/\log b$
+for small prices is a close relative. The concavity holds in $w=\sigma\sqrt T$, hence
+in $\sigma$ for fixed $T$, and in the total variance $w^2$ by composition with the concave increasing square root.
+It fails for $m>0$, where $c(0+)=e^m-1>0$: at $m=0.5$, $w=0.3$, $(\log c)''=1.73$.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{ch02-implied-vol}
+  \caption{Newton's method for the implied volatility. (a) The normalised price $c(m,w)$ for $m=-0.5$,
+    convex below $w^*=1$ and concave above. Newton on the price from $w^*$ decreases to the target
+    $w=0.4$ (blue) and increases to the target $w=2$ (gold); horizontal lines mark the target prices.
+    The tangent at $w_0=3$ (dashed) meets the level of the first target at $w_1=-1.90$. (b) Iterations to
+    convergence against the implied total volatility $w$ (from $0.02$ to $4$), for $m=-0.05$, $-0.5$ and $-2$:
+    Newton on the log-price with the starting point of \cref{rem:bsf-iv-algorithm} (solid) and Newton on the
+    price from $w^*$ (dashed, stopped at $300$ iterations). Points with $c(m,w)<10^{-300}$ are omitted.}
+  \label{fig:bsf-implied-vol}
+\end{figure}
+
+\begin{remark}[Newton on the price is not globally convergent]\label{rem:bsf-newton-fails}
+Part (iii) needs its starting point. At the money ($m=0$, $c$ concave), with $w_{\mathrm{imp}}=0.2$
+($\hat c=2N(0.1)-1=0.0797$) and $w_0=2$, the first step gives $w_1=-0.492$; for $m=-0.5$, $w_{\mathrm{imp}}=0.4$
+($\hat c=0.0155$) and $w_0=3$, it gives $w_1=-1.904$ (\cref{fig:bsf-implied-vol}(a)). From both starts the
+iteration of (iv) converges.
+\end{remark}
+
+\begin{remark}[The algorithm]\label{rem:bsf-iv-algorithm}
+\coderef{code/src/mfe230d/impliedvol.py} proceeds as follows.
+(1) \emph{Degenerate inputs.} If $T\le0$, or $K=0$ (price $Se^{-yT}$ for every $\sigma$), there is no implied
+volatility; a price outside the bounds of (i) is an arbitrage (\cref{prop:sk-strike-bounds}); a price at the
+lower bound is the limit $\sigma\downarrow0$ (\cref{rem:bsf-limits}), reported as $0$, and one at the upper
+bound is reported as $+\infty$.
+(2) \emph{Out of the money.} If $m>0$ we pass to the put by parity, $\hat p=\hat c-(e^m-1)$, and use
+\emph{put--call symmetry}, $\hat p(m,w)=N(-d_-)-e^mN(-d_+)=e^m\,c(-m,w)$ (as $-d_\pm(m)=d_\mp(-m)$), so we always
+solve $c(m,w)=\beta$ with $m\le0$ and $0<\beta<e^m$, where (iv) applies. The parity step loses relative accuracy
+when the time value is small: the price then carries little information about the volatility.
+(3) \emph{Start.} At $w^*$, $d_+=0$ and $d_-=-w^*$, so $c(w^*)=\frac12e^m-N(-w^*)$. If $\beta\ge c(w^*)$ we start
+at $w^*$, below the root; otherwise at $\min(w^*,w_g)$, where $w_g$ solves $d_-(w)=-\sqrt{-2\log\beta}$ (the
+leading term of $\log c$ for small prices), on either side of the root, which (iv) allows. At $m=0$ we start
+at $\sqrt{2\pi}\beta$ \citep{brenner-subrahmanyam}.
+(4) \emph{Iteration.} Below $w^*$ we evaluate $\log c=\log N'(d_-)+\log\big(R(-d_+)-R(-d_-)\big)$, where
+$R(u)=N(-u)/N'(u)$ is Mills' ratio, computed from the scaled complementary error function, to avoid underflow. We stop when an update is below $10^{-15}w$ or when an
+iterate below the root fails to increase (rounding).
+
+Our implementation (numpy \texttt{default\_rng}, seed $2026$), on $12{,}454$ random cases ($m$ uniform on
+$[-2,0]$, $w$ log-uniform on $[0.02,2]$, $c(m,w)>10^{-14}e^m$), needs $6.3$ iterations on average and $17$ at
+most, with relative errors below $10^{-13}$; Newton on the price from $w^*$ needs $9.3$ and $34$, and many more
+for smaller prices (\cref{fig:bsf-implied-vol}(b)), though it is faster near the money. The test-case call
+($m=-0.01$, $\beta=0.0744>c(w^*)=0.0513$) takes $5$ iterations.
+\end{remark}
+
+
+\demo{02-black-scholes.ipynb}{Newton on the price and on the log-price, from a start you choose.}
+
+\furtherreading
+The formula is due to \textcite{black-scholes} and \textcite{merton1973}. On implied volatility see
+\textcite{manaster-koehler}, \textcite{higham-option}, Chapter~14, and \textcite{jaeckel-rational}, who reaches machine
+precision with two third-order (Householder) steps.

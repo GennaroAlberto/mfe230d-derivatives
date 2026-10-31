@@ -1,0 +1,691 @@
+% Chapter 7: Simulating paths.
+
+\Cref{ch:06-monte-carlo} priced claims that depend on the stock only at maturity: one
+normal draw per sample gives $S_T$ exactly. An Asian option needs the average of the
+stock over a set of fixing dates, a barrier option needs to know whether the path crossed a
+level, and a model without a closed-form solution, such as a local or stochastic volatility
+model, cannot be sampled at $T$ in one step. In all three cases we must simulate a
+\emph{path}: the vector $(S_{t_1},\dots,S_{t_m})$ on a grid of dates.
+
+Two situations arise. When the joint law of the vector is known, as for geometric Brownian
+motion with time-dependent parameters or for any Gaussian process, it can be sampled
+exactly, with no error other than the statistical one, on any grid. Even then there is a
+choice: the same vector can be built from the same normals in different orders, and the
+order decides which normals carry most of the variance. This is irrelevant for plain Monte
+Carlo and decisive for stratification and quasi-Monte Carlo. When the law is not known,
+the stochastic differential equation must be discretised, and the scheme introduces a
+bias. We measure the bias (strong and weak orders), remove its leading term (Richardson
+extrapolation), and decide how to split a computing budget between finer time steps and
+more paths (Duffie and Glynn).
+
+Throughout, $0=t_0<t_1<\dots<t_m=T$ is a time grid with steps $\Delta_j=t_j-t_{j-1}$,
+$W$ is a Brownian motion under the risk-neutral measure $\Q$, and $Z_1,Z_2,\dots$ are
+independent $\mathcal N(0,1)$ variables. Path arrays in the code have one row per path.
+
+\section{Exact simulation on a time grid}\label{sec:ps-exact}
+
+\subsection{Geometric Brownian motion with term structures}
+
+In the standard model of \cref{def:sm-model} the parameters are constants. Market data
+are not: the rate and the yield are read off a curve, and implied volatilities depend on
+the maturity. The simplest model consistent with such data lets $r$, $y$ and $\sigma$
+depend on time. Let $r,y,\sigma:[0,T]\to\R$ be bounded Borel functions, $\sigma\ge0$, and
+\begin{equation}\label{eq:ps-gbm-ts}
+  \frac{\dd S_t}{S_t}=\big(r(t)-y(t)\big)\,\dd t+\sigma(t)\,\dd W_t,\qquad S_0>0 .
+\end{equation}
+For $0\le s<t$ write
+\[
+  \bar r(s,t)=\frac1{t-s}\int_s^tr(u)\,\dd u,\qquad
+  \bar\sigma^2(s,t)=\frac1{t-s}\int_s^t\sigma(u)^2\,\dd u,
+\]
+and $\bar y(s,t)$ likewise. The \emph{term rate} and the \emph{term volatility} are
+$r_{0,t}=\bar r(0,t)$ and $\sigma_{0,t}=\bar\sigma(0,t)$; the \emph{interval forward}
+quantities on the grid are $\bar r_j=\bar r(t_{j-1},t_j)$, $\bar y_j$ and
+$\bar\sigma_j^2=\bar\sigma^2(t_{j-1},t_j)$, and we set
+$\bar\nu_j=\bar r_j-\bar y_j-\tfrac12\bar\sigma_j^2$. Forward variances are recovered from
+term volatilities by
+\begin{equation}\label{eq:ps-forward-variance}
+  \bar\sigma_j^2\,\Delta_j=t_j\,\sigma_{0,t_j}^2-t_{j-1}\,\sigma_{0,t_{j-1}}^2 ,
+\end{equation}
+so a term structure of volatility is consistent with \eqref{eq:ps-gbm-ts} only if the
+total variance $t\,\sigma_{0,t}^2$ is nondecreasing in $t$ (\exref{ex:ps-forward-variance}).
+
+The integrals of a deterministic integrand against $W$ are Gaussian. We record the fact
+with a proof, since it is the whole content of exact simulation.
+
+\begin{lemma}[Wiener integrals]\label{lem:ps-wiener}
+Let $g:[0,T]\to\R$ be a deterministic function with $\int_0^Tg^2<\infty$, and
+$I_j=\int_{t_{j-1}}^{t_j}g(u)\,\dd W_u$ for $j=1,\dots,m$. Then $I_1,\dots,I_m$ are
+independent and $I_j\sim\mathcal N\big(0,\int_{t_{j-1}}^{t_j}g^2\big)$.
+\end{lemma}
+
+\begin{proof}
+If $g$ is a step function, constant on the intervals of a partition that refines the grid,
+each $I_j$ is a finite
+linear combination of increments of $W$ over disjoint subintervals of $(t_{j-1},t_j]$. So
+$(I_1,\dots,I_m)$ is a linear image of independent Gaussian increments; distinct $I_j$ use
+disjoint sets of increments, hence are independent, and $\Var(I_j)$ is the sum of
+$g^2$ times the lengths of the subintervals, that is $\int_{t_{j-1}}^{t_j}g^2$.
+
+For general $g$, pick step functions $g_n\to g$ in $L^2[0,T]$ (they are dense) and let
+$I^{(n)}_j$ be the corresponding integrals. By It\^o's isometry,
+$\E[(I^{(n)}_j-I_j)^2]=\int_{t_{j-1}}^{t_j}(g_n-g)^2\to0$. For $u\in\R^m$, using
+$|e^{ia}-e^{ib}|\le|a-b|$ and the Cauchy--Schwarz inequality,
+\[
+  \Big|\E\big[e^{i\sum_ju_jI^{(n)}_j}\big]-\E\big[e^{i\sum_ju_jI_j}\big]\Big|
+  \le\sum_j|u_j|\,\E\big[(I^{(n)}_j-I_j)^2\big]^{1/2}\longrightarrow0 .
+\]
+The left characteristic function equals $\prod_j\exp\big(-\tfrac12u_j^2\int_{t_{j-1}}^{t_j}g_n^2\big)$
+by the step-function case, and converges to $\prod_j\exp\big(-\tfrac12u_j^2\int_{t_{j-1}}^{t_j}g^2\big)$.
+A characteristic function determines the law, also in $\R^m$
+\citep[Section~3.10]{durrett}, so the components are independent Gaussians.
+\end{proof}
+
+\begin{proposition}[Exact simulation of GBM]\label{prop:ps-gbm-exact}
+\begin{enumerate}[label=(\roman*)]
+  \item The unique solution of \eqref{eq:ps-gbm-ts} is
+    $S_t=S_0\exp\big(\int_0^t\nu(u)\,\dd u+\int_0^t\sigma(u)\,\dd W_u\big)$, with
+    $\nu=r-y-\tfrac12\sigma^2$.
+  \item For every grid, the recursion
+    \begin{equation}\label{eq:ps-gbm-step}
+      \hat S_0=S_0,\qquad
+      \hat S_j=\hat S_{j-1}\exp\big(\bar\nu_j\Delta_j+\bar\sigma_j\sqrt{\Delta_j}\,Z_j\big),
+      \quad j=1,\dots,m,
+    \end{equation}
+    produces a vector $(\hat S_0,\dots,\hat S_m)$ with the same joint law as
+    $(S_{t_0},\dots,S_{t_m})$, whatever the step sizes.
+  \item In particular $\EQ[S_t]=S_0e^{(r_{0,t}-y_{0,t})t}$, and the European call with
+    maturity $t$ has the Black--Scholes price with the term parameters $r_{0,t}$,
+    $y_{0,t}$, $\sigma_{0,t}$ (if $\sigma_{0,t}=0$, the formula is read as its limit
+    $\sigma\downarrow0$, the discounted intrinsic value of the forward).
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Let $X_t=\int_0^t\nu+\int_0^t\sigma\,\dd W$, an It\^o process with
+$\dd X=\nu\,\dd t+\sigma\,\dd W$ and $\dd[X,X]=\sigma^2\dd t$. It\^o's formula applied to
+$S_0e^{X_t}$ gives $\dd S=S\,(\nu+\tfrac12\sigma^2)\,\dd t+S\sigma\,\dd W$, which is
+\eqref{eq:ps-gbm-ts}. Its coefficients are Lipschitz in $S$ uniformly in $t$, because
+$r,y,\sigma$ are bounded, and for such coefficients strong (pathwise) uniqueness holds
+\citep[Theorem~5.2.5]{karatzas-shreve}.
+
+(ii) By (i), $\log S_{t_j}-\log S_{t_{j-1}}=\bar\nu_j\Delta_j+I_j$ with
+$I_j=\int_{t_{j-1}}^{t_j}\sigma\,\dd W$. By \cref{lem:ps-wiener} the $I_j$ are independent
+with $I_j\sim\mathcal N(0,\bar\sigma_j^2\Delta_j)$, so the vector of log-increments has the
+law of $\big(\bar\nu_j\Delta_j+\bar\sigma_j\sqrt{\Delta_j}Z_j\big)_{j\le m}$. Both
+$(S_{t_j})_j$ and $(\hat S_j)_j$ are the same function (cumulative sums, then the
+exponential) of these vectors.
+
+(iii) $\log S_t$ is normal with mean $\log S_0+\int_0^t\nu$ and variance
+$\int_0^t\sigma^2=\sigma_{0,t}^2t$, so
+$\EQ[S_t]=S_0\exp\big(\int_0^t(r-y)\big)$. A lognormal $S_t$ with this mean and this
+log-variance is exactly the terminal law in the Black--Scholes model with constant
+parameters $r_{0,t}$, $y_{0,t}$, $\sigma_{0,t}$, and the discount factor
+$e^{-\int_0^tr}=e^{-r_{0,t}t}$ is the same.
+\end{proof}
+
+Three remarks. The recursion has no discretisation error: a grid is chosen only because
+the payoff looks at those dates. The parameters enter only through their averages over the
+steps; this is the precise meaning of the ``effective'' parameters of a time-stepping
+scheme. And nothing is said about the path between grid dates, which \cref{sec:ps-brownian}
+fills in.
+
+\begin{example}[A term structure from the course]\label{exa:ps-term}
+Take $y=0$, an instantaneous forward rate $r(t)=0.02\,t$, a volatility $\sigma(t)=20\%$
+on $[0,\frac12)$ and $10\%$ afterwards, and monthly dates $t_j=j/12$. The interval forward
+variances are $\bar\sigma_j^2=0.04$ for $j\le6$ and $0.01$ for $j>6$; the interval forward
+rates are $\bar r_j=0.01\,(t_{j-1}+t_j)=0.01\,(2j-1)/12$. At one year the term rate is
+$r_{0,1}=1\%$ and the term volatility $\sigma_{0,1}=\sqrt{0.025}=15.81\%$, so the one-year
+at-the-money call is worth $6.7799$ with $S_0=K=100$ (\cref{prop:ps-gbm-exact}(iii)), and
+\eqref{eq:ps-gbm-step} reproduces this within its standard error
+(\coderef{code/tests/test_paths.py}).
+\end{example}
+
+\begin{remark}[Frozen parameters]\label{rem:ps-frozen}
+A tempting shortcut is to step with the parameters at the left end of each step,
+$r(t_{j-1})$ and $\sigma(t_{j-1})$: this is the Euler scheme of \cref{sec:ps-schemes}
+applied to $\log S$. In \cref{exa:ps-term} it replaces $\int_0^1r=0.01$ by the Riemann sum
+$0.00917$, so the simulated forward is $100.92$ instead of $101.01$. Worse, if the
+convention $\sigma(\frac12)=20\%$ is used at the jump, the variance $\int_0^1\sigma^2$
+becomes $0.0275$ instead of $0.025$, and the call, discounted with the true factor
+$e^{-0.01}$, comes out at $7.0384$ instead of $6.7799$, a $4\%$ error that no number of paths
+will remove (with the convention $\sigma(\frac12)=10\%$ the drift error alone gives
+$6.7337$; discounting with the Riemann sum as well gives $7.0443$ and $6.7393$). With averages
+over the steps, the convention at the jump does not matter.
+\end{remark}
+
+\begin{remark}[Time change]\label{rem:ps-time-change}
+Let $\Theta(t)=\int_0^t\sigma^2$. The process $M_t=\int_0^t\sigma\,\dd W$ is centered
+Gaussian with $\Cov(M_s,M_t)=\Theta(s\wedge t)$ (\cref{lem:ps-wiener}), which is the
+covariance of $B_{\Theta(t)}$ for a Brownian motion $B$. So on any grid, $M$ has the law of
+a standard Brownian motion run on the \emph{variance clock} $\Theta$; the code builds GBM
+paths this way. If moreover the drift is proportional to the variance rate,
+$r(t)-y(t)=\lambda\sigma(t)^2$, then $\log(S_t/S_0)$ has the law of
+$(\lambda-\frac12)\Theta(t)+B_{\Theta(t)}$, a Brownian motion with constant drift in the
+new clock, and constant-coefficient formulas, such as those for barriers in
+\cref{ch:16-barriers}, apply in that clock. In \cref{exa:ps-term}, $\Theta(1)=0.025$ and
+$\int_0^1r=0.01$ give $\lambda=0.4$: a process with the same total drift and
+variance but drift proportional to variance, of the kind used as a control variate for
+discretely monitored barriers, has monthly forward rates $0.4\times0.04=1.6\%$ for the first
+six months and $0.4\times0.01=0.4\%$ afterwards.
+\end{remark}
+
+\subsection{Gaussian processes}
+
+\Cref{prop:ps-gbm-exact} is a case of a general recipe. If $X$ is a Gaussian process, the
+vector $(X_{t_1},\dots,X_{t_m})$ is $\mathcal N(\mu,C)$ with $\mu_i=\E X_{t_i}$ and
+$C_{ij}=\Cov(X_{t_i},X_{t_j})$, and $\mu+AZ$ has this law for any matrix $A$ with
+$AA^\top=C$ (\cref{prop:rng-cholesky}). A dense factorisation costs $O(m^3)$ once and
+$O(m^2)$ per path. When $X$ is also Markov the cost drops to $O(m)$ per path, because
+each $X_{t_j}$ given the past is Gaussian with a mean that depends only on $X_{t_{j-1}}$.
+
+\begin{example}[Ornstein--Uhlenbeck]\label{exa:ps-ou}
+Let $\dd X_t=\kappa(\theta-X_t)\,\dd t+\xi\,\dd W_t$ with $\kappa>0$, the Vasicek short-rate
+model. Applying It\^o's formula to $e^{\kappa t}X_t$ gives
+$\dd(e^{\kappa t}X_t)=e^{\kappa t}(\kappa\theta\,\dd t+\xi\,\dd W_t)$, hence
+\[
+  X_{t+h}=\theta+(X_t-\theta)e^{-\kappa h}+\xi\int_t^{t+h}e^{-\kappa(t+h-u)}\,\dd W_u .
+\]
+By \cref{lem:ps-wiener} (and since the integral is independent of $\F_t$), the exact step is
+$X_{t+h}=\theta+(X_t-\theta)e^{-\kappa h}+\xi\sqrt{(1-e^{-2\kappa h})/(2\kappa)}\,Z$, on
+any grid. The Euler scheme for the same equation is biased, and unstable for $\kappa h>2$
+(\exref{ex:ps-ou-euler}).
+\end{example}
+
+\demo{07-path-simulation.ipynb}{move the volatility jump and the number of steps, and compare
+exact stepping with frozen parameters against the closed-form price.}
+
+\begin{incode}
+\coderef{code/src/mfe230d/paths.py}: \texttt{gbm\_paths(S0, t, r, y, sigma, n\_paths, seed)}
+implements \eqref{eq:ps-gbm-step}; \texttt{r}, \texttt{y}, \texttt{sigma} may be numbers,
+\texttt{PiecewiseConstant} curves or functions of time, and \texttt{effective\_parameters}
+returns the averages $\bar r_j$, $\bar y_j$, $\bar\sigma^2_j$ and the clock $\Theta(t_j)$.
+\texttt{ou\_paths} is the exact Ornstein--Uhlenbeck step. Every sampler accepts the normals
+\texttt{Z} instead of a seed, so that antithetic, stratified or quasi-random normals can be
+passed in (\cref{ch:08-antithetic-control,ch:10-stratification,ch:11-quasi-monte-carlo}).
+\end{incode}
+
+\section{Three ways to build a Brownian path}\label{sec:ps-brownian}
+
+By \cref{rem:ps-time-change}, the Gaussian part of a GBM path is a Brownian motion sampled
+on a grid (of the variance clock). Its covariance is $C_{ij}=\min(t_i,t_j)$, and each square root
+$A$ of $C$ gives a construction $W=AZ$. Three are in use.
+
+\emph{Increments.} $W_{t_j}=W_{t_{j-1}}+\sqrt{\Delta_j}\,Z_j$. The matrix $A$ is lower
+triangular with $A_{ij}=\sqrt{\Delta_j}$ for $j\le i$: the Cholesky factor of $C$. The
+normal $Z_j$ moves the path from $t_j$ on.
+
+\emph{Brownian bridge.} Sample the endpoint first, $W_T=\sqrt T\,Z_1$, then the midpoint
+given the two ends, then the quarter points given their neighbours, and so on. This rests
+on the law of a Brownian path between two known values.
+
+\begin{proposition}[Brownian bridge]\label{prop:ps-bridge}
+Let $0\le s<u<t$ and let $\mathcal G_{s,t}=\sigma(W_r:r\in[0,s]\cup[t,\infty))$.
+\begin{enumerate}[label=(\roman*)]
+  \item The variable
+    \[
+      B=W_u-\frac{(t-u)\,W_s+(u-s)\,W_t}{t-s}
+    \]
+    is independent of $\mathcal G_{s,t}$ and $B\sim\mathcal N\big(0,\frac{(u-s)(t-u)}{t-s}\big)$.
+  \item Consequently, given $\mathcal G_{s,t}$, $W_u$ is normal with mean
+    $\frac{(t-u)W_s+(u-s)W_t}{t-s}$ (linear interpolation) and variance
+    $\frac{(u-s)(t-u)}{t-s}$: it depends on the rest of the path only through the two
+    neighbouring values.
+  \item Let $0<t_1<\dots<t_m$ and fill the points in any order. When $t_i$ is filled, let
+    $t_l$ be the largest already-filled time below $t_i$ (or $0$, with $W_0=0$) and $t_r$
+    the smallest already-filled time above it. Set
+    $W_{t_i}=W_{t_l}+\sqrt{t_i-t_l}\,Z$ if there is no $t_r$, and otherwise
+    \begin{equation}\label{eq:ps-bridge-step}
+      W_{t_i}=\frac{(t_r-t_i)\,W_{t_l}+(t_i-t_l)\,W_{t_r}}{t_r-t_l}
+      +\sqrt{\frac{(t_i-t_l)(t_r-t_i)}{t_r-t_l}}\;Z ,
+    \end{equation}
+    with a fresh normal $Z$ at each step. The resulting vector has the law of
+    $(W_{t_1},\dots,W_{t_m})$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Write $a=u-s$, $b=t-u$, $D_1=W_u-W_s$ and $D_2=W_t-W_u$. Then
+$B=W_s+D_1-W_s-\frac{a}{a+b}(D_1+D_2)=\frac{bD_1-aD_2}{a+b}$. The increments $D_1$, $D_2$
+are independent with variances $a$, $b$, so $B$ is centered normal with variance
+$\frac{b^2a+a^2b}{(a+b)^2}=\frac{ab}{a+b}$, and
+$\Cov(B,D_1+D_2)=\frac{ba-ab}{a+b}=0$. As $(B,D_1+D_2)$ is Gaussian, $B$ is independent
+of $D_1+D_2=W_t-W_s$.
+
+Let $\mathcal H$ be generated by $(W_r)_{r\le s}$ and $(W_r-W_t)_{r\ge t}$. The pair
+$(D_1,D_2)$ is independent of $\mathcal H$ (independent increments), and $\mathcal G_{s,t}=\sigma(\mathcal H,W_t-W_s)$ because
+$W_r=W_s+(W_t-W_s)+(W_r-W_t)$ for $r\ge t$. For bounded measurable $f,g,k$,
+\[
+  \E\big[f(B)\,g(H)\,k(W_t-W_s)\big]=\E[g(H)]\,\E[f(B)]\,\E[k(W_t-W_s)]
+  =\E[f(B)]\,\E\big[g(H)\,k(W_t-W_s)\big],
+\]
+where $H$ is any finite vector of $\mathcal H$-measurable variables: the first equality
+uses that $(B,W_t-W_s)$ is a function of $(D_1,D_2)$, independent of $H$, and then the
+independence of $B$ and $W_t-W_s$; the second uses again that $W_t-W_s$ is independent of
+$H$. Such products determine independence from $\mathcal G_{s,t}$, by Dynkin's
+$\pi$--$\lambda$ theorem \citep[Section~2.1]{durrett}.
+
+(ii) $W_u$ is the sum of the $\mathcal G_{s,t}$-measurable interpolation and the
+independent variable $B$; condition with the independence lemma
+\citep[Lemma~2.3.4]{shreve2}.
+
+(iii) By induction on the number $k$ of filled points: the joint law of the first $k$
+values is that of the corresponding $W$'s. The $k$-th point $t_i$ is generated from its
+filled neighbours by \eqref{eq:ps-bridge-step}. All previously filled times lie outside
+$(t_l,t_r)$, so the $\sigma$-algebra $\mathcal F'$ they generate is contained in
+$\mathcal G_{t_l,t_r}$ and contains $W_{t_l}$, $W_{t_r}$. By (ii) and the tower property, the
+conditional law of $W_{t_i}$ given $\mathcal F'$ is the normal law in
+\eqref{eq:ps-bridge-step}; without a right neighbour it is $\mathcal N(W_{t_l},t_i-t_l)$ by
+independent increments. A joint law is determined by the law of the first $k-1$
+coordinates and the conditional law of the $k$-th given them.
+\end{proof}
+
+The conditional variance $\frac{(u-s)(t-u)}{t-s}$ vanishes at both ends and is largest,
+$\frac{t-s}4$, at the midpoint. The \emph{pinned} bridge $W_u-\frac uTW_T$, $u\in[0,T]$,
+is independent of $W_T$ with covariance $\min(u,v)-uv/T$. On a grid of $m=2^k$ steps the
+dyadic order (\texttt{bridge\_order} in the code) fills $T$, $T/2$, $T/4$ and $3T/4$, and
+so on; after $2^\ell$ normals the path is known exactly at the dyadic points of level
+$\ell$ (\cref{fig:ps-bridge}, left). The construction costs $O(m)$ per path, like the
+increments, and works for any grid, uniform or not.
+
+\emph{Principal components.} Diagonalise $C=V\Lambda V^\top$ with eigenvalues
+$\lambda_1\ge\dots\ge\lambda_m>0$ and orthonormal eigenvectors $v_i$, and take
+$A=V\Lambda^{1/2}$: $W=\sum_i\sqrt{\lambda_i}\,v_iZ_i$. This costs $O(m^2)$ per path.
+
+All three constructions produce exactly the same law, so for plain Monte Carlo they give
+estimators with the same variance; only their cost differs. They differ in how the
+variance is spread over the normals. Call
+\[
+  \pi_k(A)=\frac{\sum_{j\le k}\|a_j\|^2}{\operatorname{tr}C},\qquad a_j\text{ the $j$-th column of }A,
+\]
+the share of the total variance $\sum_i\Var(W_{t_i})=\operatorname{tr}C$ carried by the
+first $k$ normals.
+
+\begin{proposition}[Principal components carry the most variance]\label{prop:ps-pca}
+For every $m\times m$ matrix $A$ with $AA^\top=C$ and every $k\le m$,
+$\pi_k(A)\le\sum_{i\le k}\lambda_i/\operatorname{tr}C$, with equality for $A=V\Lambda^{1/2}$.
+\end{proposition}
+
+\begin{proof}
+$C$ is invertible (the increments over the grid are independent and nondegenerate), and
+$U=C^{-1/2}A$ satisfies $UU^\top=C^{-1/2}CC^{-1/2}=I$, so its columns $u_j$ are
+orthonormal and $a_j=C^{1/2}u_j$. Then
+$\sum_{j\le k}\|a_j\|^2=\sum_{j\le k}u_j^\top Cu_j=\sum_i\lambda_iw_i$ with
+$w_i=\sum_{j\le k}(v_i^\top u_j)^2$. Each $w_i$ is the squared length of the projection of
+$v_i$ on the span of $u_1,\dots,u_k$, so $0\le w_i\le1$, and $\sum_iw_i=k$. A weighted sum
+$\sum_i\lambda_iw_i$ with these constraints is largest when the weight $1$ sits on the $k$
+largest eigenvalues, which gives the bound. For $A=V\Lambda^{1/2}$,
+$\|a_j\|^2=\lambda_j$.
+\end{proof}
+
+For a uniform grid with $m=64$ steps, the shares are:
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+first $k$ normals & $k=1$ & $k=2$ & $k=4$ & $k=16$\\
+\midrule
+increments & $0.031$ & $0.061$ & $0.120$ & $0.435$\\
+Brownian bridge & $0.672$ & $0.836$ & $0.918$ & $0.981$\\
+principal components & $0.811$ & $0.901$ & $0.950$ & $0.988$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The first increment carries $2/(m+1)$ of the variance; the first bridge normal, which sets
+$W_T$, carries $\sum_it_i^2/(T\sum_it_i)=(2m+1)/(3m)\to\frac23$; the first principal
+component tends to $8/\pi^2\approx0.81$ (\exref{ex:ps-pca-eigen}). This ordering matters
+whenever the normals are not treated symmetrically: stratifying $Z_1$ stratifies $W_T$
+under the bridge construction (\cref{prop:st-bridge}), and quasi-Monte Carlo points are
+most uniform in their first coordinates, which is why the bridge and PCA lower the
+effective dimension of path-dependent integrands (\cref{rem:qmc-effective-dimension}). The
+bridge law (ii) also answers questions about the path between two grid dates; the
+probability that it crosses a barrier is \cref{prop:bar-bridge-crossing}.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch07-bridge}
+  \caption{Left: one Brownian path built by the bridge construction on $2^8$ steps, shown
+    after $1$, $2$, $4$, $16$ and $256$ normals (linear interpolation between the points
+    already built). Right: share $\pi_k$ of the variance carried by the first $k$ normals,
+    $m=64$ (\cref{prop:ps-pca}).}
+  \label{fig:ps-bridge}
+\end{figure}
+
+\demo{07-path-simulation.ipynb}{watch the bridge construction refine a path level by level,
+and compare the variance carried by the first normals under the three constructions.}
+
+\section{Discretising a stochastic differential equation}\label{sec:ps-schemes}
+
+Now let $X$ solve
+\begin{equation}\label{eq:ps-sde}
+  \dd X_t=a(t,X_t)\,\dd t+b(t,X_t)\,\dd W_t,\qquad X_0=x_0\in\R,
+\end{equation}
+for which no exact sampler is available. Take the uniform grid $t_k=kh$, $h=T/n$, and
+write $\Delta W_k=W_{t_{k+1}}-W_{t_k}$. Over one step,
+\[
+  X_{t_{k+1}}=X_{t_k}+\int_{t_k}^{t_{k+1}}a(s,X_s)\,\dd s+\int_{t_k}^{t_{k+1}}b(s,X_s)\,\dd W_s .
+\]
+Freezing both integrands at the left end gives the \emph{Euler} (Euler--Maruyama) scheme
+\begin{equation}\label{eq:ps-euler}
+  \bar X_0=x_0,\qquad \bar X_{k+1}=\bar X_k+a(t_k,\bar X_k)\,h+b(t_k,\bar X_k)\,\Delta W_k .
+\end{equation}
+The largest term it neglects comes from the variation of $b(s,X_s)$ inside the step. By
+It\^o's formula, $b(s,X_s)=b(t_k,X_{t_k})+\int_{t_k}^s(b\,\partial_xb)(r,X_r)\,\dd W_r+{}$a
+$\dd r$-integral, and freezing $b\,\partial_xb$ at $t_k$ leaves
+$\int_{t_k}^{t_{k+1}}(W_s-W_{t_k})\,\dd W_s=\frac12\big((\Delta W_k)^2-h\big)$ (It\^o's
+formula for $(W_s-W_{t_k})^2$). This term has standard deviation $h/\sqrt2$, while the
+other neglected terms are of order $h^{3/2}$. Keeping it gives the \emph{Milstein} scheme
+\begin{equation}\label{eq:ps-milstein}
+  \tilde X_{k+1}=\tilde X_k+a(t_k,\tilde X_k)\,h+b(t_k,\tilde X_k)\,\Delta W_k
+  +\tfrac12\,(b\,\partial_xb)(t_k,\tilde X_k)\big((\Delta W_k)^2-h\big).
+\end{equation}
+When $b$ does not depend on $x$ (additive noise) the two schemes coincide.
+
+\begin{definition}[Strong and weak order]\label{def:ps-orders}
+A scheme $Y^h$ with step $h$ has \emph{strong order} $\gamma>0$ if
+$\E|X_T-Y^h_T|\le C\,h^\gamma$ for all $h\le h_0$, and \emph{weak order} $\beta>0$ for a
+class of functions $f$ if $|\E f(Y^h_T)-\E f(X_T)|\le C_f\,h^\beta$ for all $h\le h_0$.
+\end{definition}
+
+The strong error compares the two paths driven by the same Brownian motion; it is what
+matters when the path itself is used, as in hedging simulations or the couplings of
+multilevel Monte Carlo. The weak error compares laws, and is the bias of a Monte Carlo
+price. Since $|\E f(Y^h_T)-\E f(X_T)|\le L\,\E|Y^h_T-X_T|$ for an $L$-Lipschitz $f$, strong
+order $\gamma$ implies weak order $\gamma$ for such $f$; the weak order is often higher.
+
+\begin{theorem}[Euler--Maruyama]\label{thm:ps-euler}
+Suppose there is $K$ such that, for all $s,t\in[0,T]$ and $x,z\in\R$,
+\begin{enumerate}[label=(A\arabic*)]
+  \item $|a(t,x)-a(t,z)|+|b(t,x)-b(t,z)|\le K|x-z|$;
+  \item $|a(t,x)|+|b(t,x)|\le K(1+|x|)$;
+  \item $|a(s,x)-a(t,x)|+|b(s,x)-b(t,x)|\le K(1+|x|)\,|s-t|^{1/2}$.
+\end{enumerate}
+\begin{enumerate}[label=(\roman*)]
+  \item The Euler scheme has strong order $\frac12$: $\E|X_T-\bar X^h_T|\le C\,h^{1/2}$
+    \citep[Theorem~10.2.2]{kloeden-platen}.
+  \item Suppose moreover that $a$ and $b$ are infinitely differentiable on $[0,T]\times\R$
+    with bounded partial derivatives of every order $\ge1$, and that $f$ is infinitely
+    differentiable with $f$ and all its derivatives of polynomial growth. Then
+    \begin{equation}\label{eq:ps-tt}
+      \E f(\bar X^h_T)-\E f(X_T)=C_f\,h+O(h^2)
+    \end{equation}
+    for a constant $C_f$ \citep{talay-tubaro}; in particular the weak order is $1$.
+    Weak order $1$ holds already when $a$, $b$, $f$ have four derivatives of polynomial
+    growth \citep[Theorem~14.5.1 with $\beta=1$]{kloeden-platen}.
+\end{enumerate}
+\end{theorem}
+
+\Citet{talay-tubaro} state (ii) for time-independent coefficients in several dimensions;
+the pair $(t,X_t)$ solves such an equation, and its Euler scheme is \eqref{eq:ps-euler}. The
+proof of (i) compares the scheme with the solution in mean square and closes with
+Gronwall's lemma. The proof of (ii) teaches more: it explains why the weak order of Euler is
+twice its strong order.
+
+\begin{proof}[Proof of (ii), sketch]
+Let $u(t,x)=\E[f(X_T)\mid X_t=x]$. Under the hypotheses, $u$ is smooth with derivatives of
+polynomial growth \citep{talay-tubaro}, and by the Markov property
+$\E u(t+h,X^{t,x}_{t+h})=u(t,x)$ for the solution $X^{t,x}$ started at $x$ at time $t$.
+Telescoping,
+\begin{gather*}
+  \E f(\bar X_n)-\E f(X_T)=\E u(t_n,\bar X_n)-u(0,x_0)=\sum_{k=0}^{n-1}\E\,\varepsilon(t_k,\bar X_k),\\
+  \varepsilon(t,x)=\E\big[u(t+h,x+\hat D)-u(t+h,x+D)\big],
+\end{gather*}
+where $\hat D=a(t,x)h+b(t,x)\Delta W$ is one Euler step and $D=X^{t,x}_{t+h}-x$ one exact
+step. Expand $u(t+h,\cdot)$ around $x$ to third order: $\varepsilon$ is a combination of the
+differences $\E\hat D^j-\E D^j$, $j=1,2,3$, plus a remainder of order $(1+|x|^q)h^2$,
+because $\partial_x^4u$ grows polynomially and both steps have fourth moments of order
+$h^2$. For the Euler step,
+$\E\hat D=ah$, $\E\hat D^2=b^2h+a^2h^2$, $\E\hat D^3=3ab^2h^2+a^3h^3$, $\E\hat D^4=O(h^2)$.
+For the exact step, It\^o's formula applied to $(X_s-x)^j$ gives $\E D=ah+O(h^2)$,
+$\E D^2=b^2h+O(h^2)$, $\E D^3=O(h^2)$, $\E D^4=O(h^2)$. So
+$|\varepsilon(t,x)|\le C(1+|x|^q)h^2$. The scheme has moments of all orders bounded uniformly
+in $h$ and $k$ (a discrete Gronwall argument using (A2)), and summing $n=T/h$ local errors of
+order $h^2$ gives an error of order $h$.
+\end{proof}
+
+The local errors of Euler have size $h$ in mean square but $h^2$ in mean. Over $n=T/h$ steps,
+errors with zero mean add up in quadrature, to $\sqrt n\,h=O(h^{1/2})$: the strong order. Their
+means add up linearly, to $n\,h^2=O(h)$: the weak order. The proof also shows that only the
+first three moments of the increments matter for the weak error, so $\Delta W_k$ can be replaced
+by $\pm\sqrt h$ coin flips without changing the weak order \citep[Section~14.1]{kloeden-platen}.
+
+\begin{theorem}[Milstein]\label{thm:ps-milstein}
+Suppose (A1)--(A3) hold, that $a$ and $b$ are regular enough for the functions $b\,\partial_xb$,
+$L^0a$, $L^1a$, $L^0b$, $L^0(b\,\partial_xb)$ and $L^1(b\,\partial_xb)$ to exist and be
+continuous, where $L^0=\partial_t+a\,\partial_x+\frac12b^2\partial_{xx}$ and
+$L^1=b\,\partial_x$, that $b\,\partial_xb$ is Lipschitz in $x$ uniformly in $t$, and that all
+these functions grow at most linearly in $x$, uniformly in $t$.
+\begin{enumerate}[label=(\roman*)]
+  \item The Milstein scheme has strong order $1$: $\E|X_T-\tilde X^h_T|\le C\,h$
+    \citep[Theorem~10.3.5, a case of Theorem~10.6.3]{kloeden-platen}.
+  \item Under the hypotheses of \cref{thm:ps-euler}(ii), its weak order is $1$, and no
+    better in general.
+\end{enumerate}
+The hypotheses hold, for example, when $a$ and $b$ are affine in $x$ with continuously
+differentiable coefficients in $t$ (Brownian motion with drift, GBM, Ornstein--Uhlenbeck).
+\end{theorem}
+
+For (ii), the proof of \cref{thm:ps-euler}(ii) applies verbatim: the extra term
+$\frac12b\,\partial_xb\,((\Delta W)^2-h)$ has mean zero and changes the second and third
+moments of the step by $O(h^2)$, so the local weak error is still of order $h^2$, and it is not
+smaller in general. Milstein improves the paths, not the order of the bias of prices.
+
+For GBM, $\dd S=\mu S\,\dd t+\sigma S\,\dd W$, both schemes multiply by a factor at each step:
+$1+\mu h+\sigma\Delta W_k$ for Euler, plus $\frac12\sigma^2((\Delta W_k)^2-h)$ for Milstein.
+The exact factor is
+$e^{(\mu-\sigma^2/2)h+\sigma\Delta W_k}=1+\mu h+\sigma\Delta W_k+\frac12\sigma^2((\Delta W_k)^2-h)+O(h^{3/2})$,
+so the Milstein term is precisely the leading local error of Euler. Since GBM has an exact
+solution on the same Brownian path, $S_0e^{(\mu-\sigma^2/2)T+\sigma W_T}$, it is the natural
+laboratory for both orders.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch07-orders}
+  \caption{Euler and Milstein for GBM with the test-case parameters ($\mu=r-y=-1\%$,
+    $\sigma=20\%$, $T=1$), $10^6$ paths, seed 2026. Left: strong error $\E|X_T-Y^h_T|$
+    against the exact solution on the same path. Right: weak error
+    $\E f(Y^h_T)-\E f(X_T)$ for $f(x)=5\log(1+e^{(x-100)/5})$, estimated from the
+    differences on the same paths ($\pm2$ standard errors), and the Richardson-extrapolated
+    Milstein error (absolute value) of \cref{prop:ps-richardson}; crosses: exact values.}
+  \label{fig:ps-orders}
+\end{figure}
+
+\Cref{fig:ps-orders} shows the measurement with $m=1,2,4,\dots,64$ steps, all schemes driven
+by the same $10^6$ Brownian paths (the coarse increments are sums of fine ones). At
+$h=1/64$ the strong errors are $0.279$ for Euler and $0.0047$ for Milstein; the fitted slopes
+over $m\ge4$ are $0.49$ and $0.99$. For the weak error we use the smooth call-like payoff
+$f(x)=5\log(1+e^{(x-K)/5})$, $K=100$, and estimate $\E f(Y^h_T)-\E f(X_T)$ by the average of
+$f(Y^h_T)-f(X_T)$ over the paths, which is unbiased for the difference and has a small
+variance because the two terms are close. For GBM the weak errors can also be computed
+without simulation, since $\log Y^h_T$ is a sum of $m$ \iid\ terms with an explicit law
+(\texttt{gbm\_scheme\_weak\_error} convolves it numerically). The exact values are
+$0.01059$, $0.00540$, $0.00273$ for Euler at $m=16$, $32$, $64$, and $0.00451$, $0.00221$,
+$0.00110$ for Milstein: both of order $h$, as the theorems predict, and the Monte Carlo
+estimates agree with them within $2.1$ standard errors (Euler's standard errors are $0.0005$,
+$0.0004$, $0.0003$; Milstein's are ten times smaller, because its strong error is smaller). The bias is small next to the price $\E f(X_T)=8.206$:
+at $\sigma=20\%$ a few steps per year are enough for this payoff.
+
+\begin{remark}[When the theorems do not apply]\label{rem:ps-failures}
+The hypotheses are not decoration.
+\begin{itemize}
+  \item \emph{Non-Lipschitz coefficients.} The square-root diffusion
+    $\dd v=\kappa(\theta-v)\,\dd t+\xi\sqrt v\,\dd W$ of the Heston model violates (A1) at
+    $v=0$, and the Euler step can make $v$ negative, after which $\sqrt v$ is undefined.
+    Fixes such as full truncation and Andersen's scheme are in \cref{ch:19-stochastic-vol}.
+  \item \emph{Superlinear growth.} For a large class of equations with superlinearly
+    growing coefficients and noise acting from the start, for example
+    $\dd X=-X^3\dd t+\dd W$, the moments of the Euler approximation at time $T$ diverge as
+    $h\to0$, although those of $X_T$ are finite \citep{hutzenthaler-jentzen-kloeden}. (Without
+    noise, Euler for $x'=-x^3$ started at $x_0$ stays bounded as soon as $hx_0^2\le2$; the
+    noise is what occasionally throws the scheme far enough to explode.)
+  \item \emph{Positivity.} The Euler factor $1+\mu h+\sigma\Delta W_k$ for GBM is negative
+    with probability $N\big(-(1+\mu h)/(\sigma\sqrt h)\big)$: negligible for moderate $h$,
+    fatal for a payoff such as $\log S_T$ (\exref{ex:ps-euler-moments}).
+  \item \emph{Nonsmooth functionals.} A digital payoff is not even continuous. The expansion
+    \eqref{eq:ps-tt}, hence weak order $1$, still holds for bounded measurable $f$ when the
+    coefficients are smooth and the diffusion satisfies a nondegeneracy condition of
+    H\"ormander type \citep{bally-talay}. For a barrier or a maximum the error is of order $h^{1/2}$, because
+    the path is only inspected on the grid; see \cref{prop:bar-bgk} (for GBM), \cref{rem:bar-general} (Euler for general diffusions) and
+    \exref{ex:ps-richardson-sqrt}.
+\end{itemize}
+\end{remark}
+
+\demo{07-path-simulation.ipynb}{measure the strong and weak errors of Euler and Milstein for
+GBM, for any volatility, drift and number of paths.}
+
+\section{Richardson extrapolation}\label{sec:ps-richardson}
+
+An error expansion such as \eqref{eq:ps-tt} can be used, not just bounded.
+
+\begin{proposition}[Richardson extrapolation]\label{prop:ps-richardson}
+Let $Y^h$ be a scheme and $f$ a payoff such that, for some $c\in\R$ and $0<p<q$,
+\begin{equation}\label{eq:ps-expansion}
+  \E f(Y^h_T)=\E f(X_T)+c\,h^p+O(h^q)\qquad(h\to0),
+\end{equation}
+and set $R^h=\big(2^pf(Y^h_T)-f(Y^{2h}_T)\big)/(2^p-1)$.
+\begin{enumerate}[label=(\roman*)]
+  \item $\E R^h=\E f(X_T)+O(h^q)$.
+  \item If $Y^h_T$ and $Y^{2h}_T$ are computed on the same Brownian path, $f$ is Lipschitz
+    and $\E|Y^h_T-X_T|^2\to0$, then $\Var R^h\to\Var f(X_T)$. If they are computed on
+    independent paths, $\Var R^h\to\frac{4^p+1}{(2^p-1)^2}\Var f(X_T)$, which is
+    $5\Var f(X_T)$ for $p=1$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\E R^h=\frac{2^p(\theta+ch^p)-(\theta+c2^ph^p)}{2^p-1}+O(h^q)=\theta+O(h^q)$, with
+$\theta=\E f(X_T)$; the constant $c$ cancels without being known.
+
+(ii) With a Lipschitz constant $L$ for $f$,
+\[
+  R^h-f(X_T)=\frac{2^p\big(f(Y^h_T)-f(X_T)\big)-\big(f(Y^{2h}_T)-f(X_T)\big)}{2^p-1},
+\]
+whose $L^2$ norm is at most
+$\frac{L}{2^p-1}\big(2^p\|Y^h_T-X_T\|_2+\|Y^{2h}_T-X_T\|_2\big)\to0$. Convergence in $L^2$
+implies convergence of variances. On independent paths,
+$\Var R^h=\big(4^p\Var f(Y^h_T)+\Var f(Y^{2h}_T)\big)/(2^p-1)^2$, and each variance tends to
+$\Var f(X_T)$ by the same $L^2$ convergence.
+\end{proof}
+
+The assumption is the expansion \eqref{eq:ps-expansion}, not merely an error bound: a bound
+$|\text{error}|\le Ch^p$ allows an oscillating error that extrapolation can make worse. For
+Euler, \eqref{eq:ps-expansion} with $p=1$, $q=2$ is \eqref{eq:ps-tt}; the mean-square
+convergence in (ii) holds under the hypotheses of \cref{thm:ps-euler,thm:ps-milstein},
+whose proofs bound $\E|X_T-Y^h_T|^2$. The coupling in (ii) is what makes extrapolation
+cheap: the pair costs $m+m/2$ steps and has the variance of one path, while independent
+pairs pay a factor $5$ in variance. The same coupling of a fine and a coarse path is the
+building block of multilevel Monte Carlo (\cref{prop:ml-variance-decay}).
+
+In the experiment of \cref{fig:ps-orders}, Richardson applied to Milstein has exact errors
+$-0.000329$, $-0.000083$, $-0.000021$ at $m=16$, $32$, $64$, against $0.00451$, $0.00221$,
+$0.00110$ before extrapolation: they fall by a factor $4$ per halving of $h$, so $q=2$, and
+the Monte Carlo estimates of the figure follow them. For Euler the extrapolated errors are
+$0.0162$, $0.0038$, $0.00091$, $0.00022$, $0.000055$ at $m=4,\dots,64$, also of order $h^2$;
+for $m\ge16$ they are below the noise of $10^6$ paths. If the error expansion is
+in powers of $h^{1/2}$, as for discretely monitored extremes, the exponent $p=1$ is wrong and
+the extrapolation must use $p=\frac12$ (\exref{ex:ps-richardson-sqrt}).
+
+\section{Time steps or paths?}\label{sec:ps-allocation}
+
+A discretised Monte Carlo estimator has two errors: the bias of the scheme, which falls with
+the step, and the statistical error, which falls with the number of paths. With a fixed
+computing budget, more steps per path means fewer paths. The mean-square error trades the two
+(\cref{prop:mc-mse}).
+
+Let $\hat\theta=\frac1n\sum_{i=1}^nf(Y^h_{T,i})$ be computed from $n$ independent paths with
+$m=T/h$ steps, each step costing $\kappa$, so that a budget $C$ buys $n=C/(\kappa m)$ paths
+(we ignore integer rounding). With bias $b(h)=\E f(Y^h_T)-\E f(X_T)$ and variance
+$v(h)=\Var f(Y^h_T)$,
+\begin{equation}\label{eq:ps-mse}
+  \mathrm{MSE}(h)=b(h)^2+\frac{v(h)}n=b(h)^2+\frac{v(h)\,\kappa T}{C\,h} .
+\end{equation}
+
+\begin{proposition}[Allocation of effort]\label{prop:ps-allocation}
+Suppose that $b(h)=c\,h^\beta(1+o(1))$ with $c\ne0$, $\beta>0$, that $v(h)\to v>0$ as $h\to0$,
+and that $|b|$ is bounded away from $0$ on $[\varepsilon,h_0]$ for every $\varepsilon>0$.
+\begin{enumerate}[label=(\roman*)]
+  \item For the model $c^2h^{2\beta}+v\kappa T/(Ch)$ of \eqref{eq:ps-mse}, the optimal step
+    is
+    \[
+      h^*=\Big(\frac{v\,\kappa\,T}{2\beta\,c^2\,C}\Big)^{1/(2\beta+1)},
+    \]
+    so the number of steps grows like $C^{1/(2\beta+1)}$ and the number of paths like
+    $C^{2\beta/(2\beta+1)}$. At the optimum the variance equals $2\beta$ times the squared
+    bias, and $\mathrm{MSE}^*=(1+2\beta)\,c^2(h^*)^{2\beta}=M^*C^{-2\beta/(2\beta+1)}$ with
+    $M^*=(1+2\beta)\,c^{2/(2\beta+1)}\big(v\kappa T/(2\beta)\big)^{2\beta/(2\beta+1)}$.
+  \item For every choice of steps $h_C\in(0,h_0]$,
+    $\liminf_{C\to\infty}C^{2\beta/(2\beta+1)}\,\mathrm{MSE}(h_C)\ge M^*$, and the choice
+    $h_C=h^*$ attains this limit. The root-mean-square error therefore cannot fall faster
+    than $C^{-\beta/(2\beta+1)}$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Let $g(h)=c^2h^{2\beta}+A/h$ with $A=v\kappa T/C$. Its derivative
+$g'(h)=h^{-2}\big(2\beta c^2h^{2\beta+1}-A\big)$ is negative for $h<h^*$ and positive for
+$h>h^*$, so $h^*$ is the global minimiser. At $h^*$, $A/h=2\beta c^2h^{2\beta}$; this equation says that the variance term is $2\beta$ times the squared bias, so
+$g(h^*)=(1+2\beta)c^2(h^*)^{2\beta}$, and substituting $h^*$ gives $M^*$. The paths number
+$n=Ch^*/(\kappa T)\propto C^{1-1/(2\beta+1)}$.
+
+(ii) Fix $\eta\in(0,1)$ and pass to a sequence $C_k\to\infty$ along which
+$C^{2\beta/(2\beta+1)}\mathrm{MSE}(h_C)$ converges to its liminf. Either
+$\liminf_kh_{C_k}>0$: then $h_{C_k}\ge\varepsilon$ for some $\varepsilon>0$ and all large $k$,
+the mean-square error is at least $\inf_{[\varepsilon,h_0]}b^2>0$, and the liminf is
+$+\infty$. Or a further subsequence has $h_{C_k}\to0$: along it, for $k$ large,
+$b(h_C)^2\ge(1-\eta)c^2h_C^{2\beta}$ and $v(h_C)\ge(1-\eta)v$, so
+$\mathrm{MSE}(h_C)\ge(1-\eta)\,g(h_C)\ge(1-\eta)\,g(h^*)=(1-\eta)M^*C^{-2\beta/(2\beta+1)}$.
+As $\eta$ is arbitrary, the liminf is at least $M^*$. With $h_C=h^*\to0$, the same
+expansions with $1+\eta$ give a matching upper bound.
+\end{proof}
+
+\Citet{duffie-glynn} derived this allocation rule; the mean-square version above follows
+\textcite{glasserman-mc}, Section~1.1.3, which also allows a cost per path growing like
+$h^{-\eta}$. The consequences, with the computing budget $C$:
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+method & bias order $\beta$ & root-mean-square error\\
+\midrule
+exact simulation (\cref{prop:ps-gbm-exact}) & none & $C^{-1/2}$\\
+Euler or Milstein, optimal allocation & $1$ & $C^{-1/3}$\\
+coupled Richardson extrapolation & $2$ & $C^{-2/5}$\\
+multilevel Monte Carlo (\cref{thm:ml-complexity}) & --- & $C^{-1/2}$, up to a logarithm for Euler\\
+\bottomrule
+\end{tabular}
+\end{center}
+For a first-order scheme, the rule of thumb is $n\propto m^2$: doubling the number of steps
+calls for four times as many paths. Spending the whole budget on paths with a fixed step
+leaves the bias in place, and the error stalls at $|b(h)|$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch07-allocation}
+  \caption{Allocation of effort for the payoff of \cref{fig:ps-orders} with Euler, using the
+    constants $c=0.17$ and $v=154$; cost in units of one step of one path. Left: squared bias,
+    variance and mean-square error against the number of steps for a budget of $10^6$
+    (dots: exact squared biases). Right: root-mean-square error against the budget for exact
+    simulation, Euler with the optimal allocation, and Euler with $4$ fixed steps (lines:
+    model; dots: $100$ independent replications each).}
+  \label{fig:ps-allocation}
+\end{figure}
+
+For the payoff of \cref{fig:ps-orders} the bias constant of Euler is $c\approx0.17$ ($m$
+times the exact weak error is $0.169$ and $0.173$ at $m=16$ and $32$; the limit $h\to0$ is
+$0.176$), and $v=\Var f(X_T)=154$. With a budget of
+$C=10^6$ steps the optimal allocation is $m^*\approx7$ steps and $n^*\approx1.4\times10^5$
+paths, for a root-mean-square error of $0.041$; exact simulation with $10^6$ paths at the same
+cost reaches $0.012$. At $C=10^8$, $m^*\approx33$, $n^*\approx3\times10^6$, and the errors are
+$0.0088$ against $0.0012$: the gap widens like $C^{1/6}$ (\cref{fig:ps-allocation}). When an
+exact sampler exists, it should be used.
+
+\demo{07-path-simulation.ipynb}{choose a budget and a bias constant and see the mean-square
+error split between bias and variance as the number of steps changes.}
+
+\furtherreading
+\textcite{glasserman-mc} is the reference for this chapter: Section~3.1 for the three
+constructions of Brownian paths, Section~3.2 for GBM, Sections~6.1--6.2 for the Euler and
+Milstein schemes, convergence orders and extrapolation (Section~6.2.4), and Section~1.1.3 for
+the allocation of effort. \textcite{kloeden-platen} prove the convergence theorems in full,
+with the stochastic Taylor expansions behind every scheme (Chapter~5) and higher-order strong
+and weak schemes (Chapters~10--15). \textcite{talay-tubaro} and \textcite{bally-talay} are the
+sources for the weak error expansion, and \textcite{milstein-1974} introduced the scheme that
+bears his name.

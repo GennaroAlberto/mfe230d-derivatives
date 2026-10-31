@@ -1,0 +1,129 @@
+% Exercises for Chapter 5 (Random numbers). Statements only: solutions are kept privately.
+% Throughout, U, U_1, U_2, ... are independent uniform on (0,1), and N, N' are the standard
+% normal distribution function and density.
+
+\begin{exercise}[Low-order bits]\label{ex:rng-low-bits}
+\easy Let $(x_i)$ be an LCG with modulus $m=2^e$, multiplier $a$ and increment $c$
+(\noteref{def:rng-lcg}), and let $1\le j\le e$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $y_i=x_i\bmod2^j$ satisfies $y_{i+1}=(ay_i+c)\bmod2^j$, and hence that its
+    period is at most $2^j$. What does the last bit $x_i\bmod2$ do when $a$ and $c$ are odd?
+  \item Write down $x_i\bmod2$ and $x_i\bmod4$ for the course's generator $m=16$, $a=9$,
+    $c=5$, $x_0=0$.
+  \item The uniforms $u_i=x_i/m$ are rarely affected by this. Why? A program picks one of
+    $k=2^j$ scenarios at step $i$ by the index $x_i\bmod k$. What goes wrong, and what index
+    should it use instead?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The Hull--Dobell conditions are necessary]\label{ex:rng-hull-dobell}
+\medium Consider an LCG with modulus $m\ge2$, multiplier $a$ and increment $c$. Show that
+it does not have full period in each of the following cases, by exhibiting a seed and a
+residue that the sequence never visits.
+\begin{enumerate}[label=(\alph*)]
+  \item $d=\gcd(c,m)>1$.
+  \item Some prime $p$ divides $m$ but not $a-1$. \emph{Hint:} look at the sequence modulo
+    $p$ and find a fixed point.
+  \item $4$ divides $m$, $a$ is odd and $4$ does not divide $a-1$. \emph{Hint:} modulo $4$.
+  \item Which of $(m,a,c)=(16,9,5)$, $(16,5,4)$, $(16,3,1)$, $(12,7,5)$, $(12,1,5)$ have
+    full period? (You may use \noteref{thm:rng-hull-dobell}.) Comment on the last one.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Inversion with atoms and flat stretches]\label{ex:rng-inversion-examples}
+\easy Use \noteref{prop:rng-inversion}.
+\begin{enumerate}[label=(\alph*)]
+  \item \emph{Pareto.} $F(x)=1-(x_0/x)^\alpha$ for $x\ge x_0>0$, with $\alpha>0$. Give a
+    sampler by inversion. For which $\alpha$ does the law have a finite mean, and a finite
+    variance?
+  \item \emph{Geometric.} $\Prob(X=k)=(1-p)^{k-1}p$ for $k=1,2,\dots$, with $p\in(0,1)$. Show
+    that $F^{-1}(u)=\lceil\log(1-u)/\log(1-p)\rceil$ and that
+    $\lceil\log U/\log(1-p)\rceil$ is also geometric with parameter $p$.
+  \item \emph{An atom.} A loss is $0$ with probability $0.3$ and otherwise exponential with
+    mean $1$. Compute its distribution function $F$ and $F^{-1}$, and check that $F^{-1}$
+    has a flat stretch where $F$ jumps.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Normal variates by rejection from the Laplace law]\label{ex:rng-laplace}
+\medium Let $g_\lambda(x)=\frac\lambda2e^{-\lambda|x|}$ ($\lambda>0$) be the Laplace density,
+and use \noteref{prop:rng-rejection} with target $N'$.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute $c(\lambda)=\sup_xN'(x)/g_\lambda(x)$, find the $\lambda$ that minimises it,
+    and give the resulting acceptance probability.
+  \item With the optimal $\lambda$, show that the acceptance test reduces to
+    $U\le\exp\big(-\frac12(|Y|-1)^2\big)$.
+  \item Sample $Y$ by inversion with one uniform. How many uniforms does the method use per
+    normal on average? Compare with Box--Muller and with the polar method.
+  \item Can one sample the Laplace law by rejection from a normal proposal? Why?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Ratio of uniforms]\label{ex:rng-ratio-uniforms}
+\hard Let $h\ge0$ be an integrable function on $\R$ with $\int h=Z>0$, and
+$C_h=\{(s,v)\in\R^2:\ 0<s\le\sqrt{h(v/s)}\}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $C_h$ has area $Z/2$. \emph{Hint:} change variables $(s,v)\mapsto(s,x)$
+    with $x=v/s$.
+  \item Show that if $(S,V)$ is uniform on $C_h$, then $X=V/S$ has density $h/Z$.
+  \item For $h(x)=e^{-x^2/2}$, show that $C_h$ is contained in the rectangle
+    $(0,1]\times[-\sqrt{2/e},\sqrt{2/e}]$, and write the acceptance condition for a point
+    of the rectangle without exponentials.
+  \item Deduce a rejection algorithm for $\mathcal N(0,1)$ that uses two uniforms per trial,
+    and compute its acceptance probability.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Square roots of covariance matrices]\label{ex:rng-cholesky}
+\easy Use \noteref{prop:rng-cholesky}.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $0<t_1<\dots<t_d$ and $\Sigma_{ij}=\min(t_i,t_j)$, the covariance of a Brownian
+    motion at these times. Show that the Cholesky factor is $L_{ij}=\sqrt{t_j-t_{j-1}}$ for
+    $j\le i$ and $0$ otherwise ($t_0=0$), and interpret $LZ$.
+  \item For the $2\times2$ correlation matrix with correlation $\rho\in(-1,1)$, compute the
+    Cholesky and the principal-components factors. What happens to each as $\rho\to\pm1$?
+  \item A desk quotes correlations $\rho_{12}=\rho_{13}=0.9$ and $\rho_{23}=-0.9$. Run the
+    recursion of \noteref{prop:rng-cholesky}(ii) by hand. Find a linear combination of the
+    three assets that would have negative variance, and explain the inconsistency in
+    words.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Testing moments]\label{ex:rng-moment-tests}
+\medium This is a computational exercise.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $x_1,x_2,\dots$ be independent and identically distributed with variance
+    $\sigma^2$ and finite fourth central moment $\mu_4$, and let
+    $s_n^2=\frac1n\sum_{i\le n}(x_i-\bar x_n)^2$. Show that
+    $\sqrt n(s_n^2-\sigma^2)\to\mathcal N(0,\mu_4-\sigma^4)$ in law. You may use the central
+    limit theorem, the strong law of large numbers and Slutsky's lemma. Deduce the
+    approximate standard errors of $\bar x_n$ and $s_n^2$ for $\mathcal U(0,1)$ and for
+    $\mathcal N(0,1)$ samples.
+  \item You may use that the sample skewness and excess kurtosis are asymptotically normal
+    with variances $6/n$ and $24/n$ for $\mathcal N(0,1)$ samples, and $\frac{72}{35}/n$ and
+    $\frac{1152}{875}/n$ (around $0$ and $-\frac65$) for $\mathcal U(0,1)$ samples. Draw
+    $10^6$ uniforms with \texttt{numpy.random.default\_rng(2024)} and Box--Muller normals from
+    them (both members of each pair). For the nested samples of the first $n=10^3,10^4,10^5,
+    10^6$ values, tabulate the four sample moments and their $z$-scores. Which deviations
+    are significant at the $5\%$ level? Is that surprising?
+  \item Repeat with RANDU (\texttt{uniforms(n, "randu", seed=1)} in the course code). Do the
+    moment tests detect its defect? Why?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Birthdays: resolution against period]\label{ex:rng-birthday}
+\medium This is a computational exercise.
+\begin{enumerate}[label=(\alph*)]
+  \item An ideal generator with resolution $2^{-b}$ outputs independent values, each
+    uniform on a set of $2^b$ points. Show that the expected number of pairs $i<j\le n$ with
+    $u_i=u_j$ is $\binom n2 2^{-b}$. Evaluate it for $n=2^{20}$ and $b=32$, and for $b=53$.
+  \item Count the colliding pairs among the first $2^{20}$ outputs of PCG32 (seed
+    \texttt{initstate=42}, \texttt{initseq=54}) and among the first $2^{20}$ outputs
+    $x_1,x_2,\dots$ of the full-period LCG modulo $2^{32}$ with $a=1664525$,
+    $c=1013904223$, $x_0=0$.
+  \item Explain the LCG's count, and why it is a failure. Assuming the number of collisions
+    is approximately Poisson for an ideal generator, give a $p$-value.
+  \item What does this say about \noteref{rem:rng-resolution}, and about simulations that
+    draw $10^7$ or more $32$-bit uniforms?
+\end{enumerate}
+\end{exercise}

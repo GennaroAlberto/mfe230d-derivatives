@@ -1,6 +1,582 @@
-\begin{planned}
-  \item the Carr--Madan formula and replication of smooth and discontinuous payoffs
-  \item power options and symmetry transformations
-  \item Euler homogeneity and the Greeks' conservation laws
-  \item the forward and backward Kolmogorov equations
-\end{planned}
+% Chapter 4: Static replication and the Kolmogorov equations.
+
+\Cref{ch:03-strike-arbitrage} read the risk-neutral law of $S_T$ off the prices of calls across
+strikes. This chapter runs the argument the other way. A European payoff $f(S_T)$ is a portfolio of
+bonds, forwards, puts, calls and digitals, bought today and held to maturity: each kink of $f$ is an
+option at one strike, each jump a digital, and the curvature a continuum of options with weights
+$f''(K)\,\dd K$. This is the Carr--Madan formula. Its price uses no model, only option prices, provided
+the strip of options has a finite price (\cref{sec:sr-carr-madan}).
+
+The rest of the chapter exploits structure. In the standard model a power $S^p$ of the stock is again
+a geometric Brownian motion, so payoffs written in terms of $S^p$, or $S^p$ times a payoff of $S$, are
+priced by the Black--Scholes formula after a change of inputs, which the course calls the
+\emph{pre-wash} (\cref{sec:sr-power}). When a price does not depend on the unit of account, Euler's
+theorem on homogeneous functions turns this invariance into identities between Greeks: the hedge
+splits into its parts, the gammas sum to zero, and the spot gamma is the risk-neutral density at the
+strike (\cref{sec:sr-euler}). Finally, the Arrow--Debreu price density of a diffusion solves two
+equations: the pricing equation in its initial point, and the adjoint equation in its final point
+(\cref{sec:sr-kolmogorov}). The first prices one payoff for every spot; the second prices every payoff,
+all strikes at once, for one spot.
+
+\paragraph{Setting.} As in \cref{ch:03-strike-arbitrage}, $T>0$ is a fixed maturity, $r,y\in\R$, $S_T\ge0$, and
+$\Q$ is a pricing measure: every traded payoff $X$ costs $e^{-rT}\EQ[X]$ at time $0$. The bond paying $1$
+costs $e^{-rT}$, the prepaid forward paying $S_T$ costs $S_0e^{-yT}$, and $F=S_0e^{(r-y)T}=\EQ[S_T]<\infty$.
+Calls, puts and digital calls with strike $K$ cost
+\[
+  C(K)=e^{-rT}\EQ[(S_T-K)^+],\qquad P(K)=e^{-rT}\EQ[(K-S_T)^+],\qquad D(K)=e^{-rT}\Q(S_T>K),
+\]
+and the digital paying $\1_{\{S_T\ge K\}}$ costs $\bar D(K)=e^{-rT}\Q(S_T\ge K)$. By
+\cref{thm:sk-breeden-litzenberger}(i), $D(K)=-\partial^+C(K)$ and $\bar D(K)=-\partial^-C(K)$: the two differ
+only if $S_T$ has an atom at $K$. A payoff built from infinitely many options is priced, like any other
+payoff, by $e^{-rT}\EQ$; it equals the superposition of the option prices when Fubini's theorem allows
+the exchange of $\EQ$ and the integral over strikes. \Cref{sec:sr-power,sec:sr-euler} work in the standard
+model of \cref{def:sm-model}.
+
+\section{Static replication}\label{sec:sr-carr-madan}
+
+A payoff that is piecewise linear in $S_T$ (a call spread, a collar, a range forward, most capital-protected
+notes sold to retail investors) is a finite portfolio of bonds, shares and calls, with one call at
+each kink weighted by the change of slope there; the IEOR 222 notes prove this. A general payoff is a
+limit of such payoffs, in which the changes of slope become $f''(K)\,\dd K$. The natural class is that
+of differences of convex functions, which contains the twice differentiable payoffs, the payoffs with
+kinks, and their sums.
+
+\paragraph{The second derivative as a measure.} Let $f$ be convex on $(0,\infty)$. At every point $f$ has
+finite one-sided derivatives $f'_-\le f'_+$, both nondecreasing; $f'_+$ is right-continuous; and $f$ is
+absolutely continuous on compact intervals, with $f(b)-f(a)=\int_a^bf'_+(u)\,\dd u$
+(\textcite{revuz-yor}, Appendix, Section~3). A nondecreasing right-continuous function is the distribution
+function of a unique measure (\textcite{durrett}, Section~1.1, applied on $[\varepsilon,\infty)$ for each
+$\varepsilon>0$), so there is a unique measure $\mu_f$ on
+$(0,\infty)$, finite on compact subintervals, with $\mu_f((a,b])=f'_+(b)-f'_+(a)$ for $0<a<b$; in particular
+$\mu_f(\{k\})=f'_+(k)-f'_-(k)$. If $f=f_1-f_2$ with $f_1,f_2$ convex, we set $\mu_f=\mu_{f_1}-\mu_{f_2}$, a
+signed measure that is finite on compact subintervals and depends on $f$ only through $f'_+$. We write
+$f''(\dd K)$ for $\mu_f(\dd K)$ and $|f''|(\dd K)$ for its total variation. If $f\in C^1$ and $f'$ is absolutely
+continuous on compact intervals (for instance $f\in C^2$), then $f$ is a difference of convex functions, since
+$f'=f'(1)+\int_1^\cdot(f'')^+-\int_1^\cdot(f'')^-$, and $f''(\dd K)=f''(K)\,\dd K$. A kink is an atom: $(x-k)^+$ and
+$(k-x)^+$ both have second derivative $\delta_k$, the unit mass at $k$. So a payoff that is $C^2$ on each of the closed
+intervals $(0,k_1],[k_1,k_2],\dots,[k_n,\infty)$ (one-sided derivatives at the ends), with kinks at $k_1<\dots<k_n$, has $f''(\dd K)=f''(K)\,\dd K+\sum_i\big(f'(k_i+)-f'(k_i-)\big)\delta_{k_i}(\dd K)$.
+
+\begin{theorem}[Carr--Madan]\label{thm:sr-carr-madan}
+Let $g:(0,\infty)\to\R$ be a difference of convex functions and $\kappa>0$.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Spanning}) For every $x>0$,
+    \begin{equation}\label{eq:sr-cm}
+      g(x)=g(\kappa)+g'_+(\kappa)(x-\kappa)+\int_{(0,\kappa]}(K-x)^+\,g''(\dd K)+\int_{(\kappa,\infty)}(x-K)^+\,g''(\dd K).
+    \end{equation}
+    For each $x$ at most one of the integrals is nonzero, and it extends over the bounded interval between
+    $x$ and $\kappa$.
+  \item (\emph{Jumps}) Let $f=g+\sum_{j=1}^mJ_jH_j$ with $J_j\in\R$ and $H_j=\1_{(a_j,\infty)}$ or
+    $H_j=\1_{[a_j,\infty)}$, $a_j>0$. Then $f(x)$ is the right side of \eqref{eq:sr-cm} plus
+    $\sum_jJ_jH_j(x)$, for every $x>0$.
+  \item (\emph{Edges}) (a) If $\int_{(0,\kappa]}K\,|g''|(\dd K)<\infty$, then $g(0+)=\lim_{x\downarrow0}g(x)$
+    exists, and \eqref{eq:sr-cm} holds at $x=0$ with $g(0)=g(0+)$.
+    (b) If $|g''|((0,\kappa])<\infty$, then $g(0+)$ and $g'_+(0+)$ exist and, for every $x\ge0$,
+    $g(x)=g(0+)+g'_+(0+)\,x+\int_{(0,\infty)}(x-K)^+\,g''(\dd K)$: bonds, shares and calls.
+    (c) If $\int_{[\kappa,\infty)}K\,|g''|(\dd K)<\infty$, then $B=\lim_{k\to\infty}g'_+(k)$ and
+    $A=\lim_{k\to\infty}\big(g(k)-k\,g'_+(k)\big)$ exist and, for every $x>0$,
+    $g(x)=A+Bx+\int_{(0,\infty)}(K-x)^+\,g''(\dd K)$: bonds, shares and puts.
+  \item (\emph{Prices}) Let $f$ be as in (ii), and assume
+    \begin{equation}\label{eq:sr-cm-integrable}
+      \int_{(0,\kappa]}P(K)\,|g''|(\dd K)+\int_{(\kappa,\infty)}C(K)\,|g''|(\dd K)<\infty,
+    \end{equation}
+    and $f(0)=g(0+)$ if $\Q(S_T=0)>0$. Then $f(S_T)$ is
+    $\Q$-integrable and its price is
+    \begin{equation}\label{eq:sr-cm-price}
+      e^{-rT}g(\kappa)+g'_+(\kappa)\big(S_0e^{-yT}-\kappa e^{-rT}\big)+\int_{(0,\kappa]}P(K)\,g''(\dd K)
+      +\int_{(\kappa,\infty)}C(K)\,g''(\dd K)+\sum_{j=1}^mJ_jD_j,
+    \end{equation}
+    with $D_j=D(a_j)$ if $H_j=\1_{(a_j,\infty)}$ and $D_j=\bar D(a_j)$ otherwise. If $g$ is convex or concave
+    and $\Q(S_T=0)=0$, \eqref{eq:sr-cm-integrable} is also necessary for $f(S_T)$ to be integrable.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) This is Taylor's formula with integral remainder, with the remainder written in options. Let
+$x>\kappa$. For $K\in(\kappa,x]$, $x-K=\int_\kappa^x\1_{\{u>K\}}\,\dd u$, and Fubini's theorem (the
+integrand is bounded and $|g''|((\kappa,x])<\infty$) gives
+\[
+  \int_{(\kappa,\infty)}(x-K)^+\,g''(\dd K)=\int_{(\kappa,x]}(x-K)\,g''(\dd K)
+  =\int_\kappa^xg''\big((\kappa,u)\big)\,\dd u=\int_\kappa^x\big(g'_+(u)-g'_+(\kappa)\big)\,\dd u .
+\]
+In the last step $g''((\kappa,u))=g''((\kappa,u])$ except at the countably many atoms of $g''$, a Lebesgue
+null set. The right side is $g(x)-g(\kappa)-g'_+(\kappa)(x-\kappa)$, and the put integral vanishes
+because $(K-x)^+=0$ for $K\le\kappa<x$. For $x<\kappa$, in the same way,
+$\int_{(0,\kappa]}(K-x)^+g''(\dd K)=\int_{(x,\kappa]}\int_x^\kappa\1_{\{u<K\}}\,\dd u\,g''(\dd K)
+=\int_x^\kappa\big(g'_+(\kappa)-g'_+(u)\big)\,\dd u=g'_+(\kappa)(\kappa-x)-g(\kappa)+g(x)$, and the call integral
+vanishes. For $x=\kappa$ both integrals vanish.
+
+(ii) Apply (i) to $g$ and add the steps.
+
+(iii) (a) For $0<x<\kappa$, \eqref{eq:sr-cm} reads $g(x)=g(\kappa)+g'_+(\kappa)(x-\kappa)+\int_{(0,\kappa]}(K-x)^+g''(\dd K)$.
+As $x\downarrow0$ the integrand converges to $K$ and is bounded by $K$, which is $|g''|$-integrable on
+$(0,\kappa]$; dominated convergence gives the limit, which is the right side of \eqref{eq:sr-cm} at $x=0$.
+(b) $g'_+$ has bounded variation on $(0,\kappa]$, so $g'_+(0+)$ exists, $g'_+$ is bounded near $0$, and
+$g(0+)$ exists. Fix $x>0$ and let $\kappa'\downarrow0$ in \eqref{eq:sr-cm} written with $\kappa'$ in place of
+$\kappa$: $g(\kappa')\to g(0+)$, $g'_+(\kappa')\to g'_+(0+)$, the put integral is at most
+$\kappa'|g''|((0,\kappa'])\to0$, and the call integral converges by dominated convergence, since
+$(x-K)^+\le x\1_{\{K<x\}}$ and $|g''|((0,x))<\infty$. At $x=0$ the identity reads $g(0+)=g(0+)$.
+(c) The hypothesis gives $|g''|([\kappa,\infty))<\infty$, so $B$ exists. For $k>\kappa$, (i) at $x=k$ and
+$g'_+(k)=g'_+(\kappa)+g''((\kappa,k])$ give $g(k)-kg'_+(k)=g(\kappa)-\kappa g'_+(\kappa)-\int_{(\kappa,k]}K\,g''(\dd K)$,
+which converges. Fix $x>0$ and let
+$k\to\infty$ in \eqref{eq:sr-cm} written with $k$ in place of $\kappa$: the call integral vanishes as soon as
+$k>x$; $g(k)+g'_+(k)(x-k)\to A+Bx$; and the put integral converges by dominated convergence, with the bound
+$(K-x)^+\le K$ on $[\kappa,\infty)$.
+
+(iv) Write $X=S_T$. By Tonelli's theorem,
+\[
+  \EQ\Big[\int_{(0,\kappa]}(K-X)^+\,|g''|(\dd K)\Big]=e^{rT}\int_{(0,\kappa]}P(K)\,|g''|(\dd K)<\infty,
+\]
+and likewise for the call integral. So both integrals in \eqref{eq:sr-cm}, evaluated at $x=X$, are integrable, and by Fubini's
+theorem their expectations are $e^{rT}$ times the strike integrals in \eqref{eq:sr-cm-price}. The terms
+$g(\kappa)+g'_+(\kappa)(X-\kappa)$ are integrable because $\EQ[X]=F<\infty$, and the steps are bounded. On
+$\{X>0\}$, (ii) expresses $f(X)$ as the sum of these terms. If $\Q(X=0)>0$, then
+$P(K)\ge e^{-rT}K\,\Q(X=0)$, so \eqref{eq:sr-cm-integrable} gives the condition of (iii)(a), and on $\{X=0\}$ we
+use (iii)(a). Taking
+expectations and multiplying by $e^{-rT}$ gives \eqref{eq:sr-cm-price}, with
+$e^{-rT}\EQ[g'_+(\kappa)(X-\kappa)]=g'_+(\kappa)(S_0e^{-yT}-\kappa e^{-rT})$. If $g$ is convex, both integrals in
+\eqref{eq:sr-cm} are nonnegative, and almost surely their sum is $f(X)$ minus an integrable variable; if $f(X)$ is
+integrable, so is the sum, and by Tonelli's theorem its expectation is $e^{rT}$ times the left side of
+\eqref{eq:sr-cm-integrable}. For concave $g$, apply this to $-f$.
+\end{proof}
+
+\begin{remark}[Reading the formula]\label{rem:sr-cm-reading}
+\leavevmode
+\begin{enumerate}[label=(\alph*),leftmargin=*]
+  \item \emph{The portfolio.} The payoff is replicated by $g(\kappa)$ bonds, $g'_+(\kappa)$ forwards struck at
+    $\kappa$, puts with strikes $K\le\kappa$ and calls with strikes $K>\kappa$ in the quantities
+    $g''(\dd K)$, and $J_j$ digitals. The options are all out of the money with respect to $\kappa$. With
+    $\kappa=F$ the forwards cost nothing. An atom of $g''$ at $\kappa$ is held as a put; using $g'_-(\kappa)$
+    instead of $g'_+(\kappa)$ moves it to the calls, and put--call parity shows that the two portfolios
+    agree.
+  \item \emph{Payoffs that vanish on one side.} If $g=0$ on $(0,\kappa]$, then $g'_+(\kappa)=g''(\{\kappa\})$,
+    and the forward together with the put at $\kappa$ is a call:
+    \begin{equation}\label{eq:sr-cm-calls}
+      g(x)=g'_+(\kappa)\,(x-\kappa)^++\int_{(\kappa,\infty)}(x-K)^+\,g''(\dd K),\qquad x>0 .
+    \end{equation}
+    Symmetrically, if $g=0$ on $[\kappa,\infty)$, then $g(x)=-g'_-(\kappa)(\kappa-x)^++\int_{(0,\kappa)}(K-x)^+g''(\dd K)$.
+  \item \emph{Integrability.} \eqref{eq:sr-cm-integrable} holds in every model if $|g''|$ has finite mass near
+    $0$ and $\infty$ ($P(K)\le e^{-rT}K$, $C$ is nonincreasing); otherwise it depends on the tails of $S_T$
+    (\exref{ex:sr-log-put}).
+\end{enumerate}
+\end{remark}
+
+\begin{example}[The square-root call]\label{exa:sr-sqrt}
+The course replicates $f(x)=(\sqrt x-\sqrt K)^+$. It vanishes on $(0,K]$, has the right derivative
+$1/(2\sqrt K)$ at the kink, and is concave above it, with
+$f''(\dd k)=\frac1{2\sqrt K}\delta_K(\dd k)-\frac14k^{-3/2}\1_{\{k>K\}}\dd k$. By \eqref{eq:sr-cm-calls},
+\[
+  (\sqrt x-\sqrt K)^+=\frac{(x-K)^+}{2\sqrt K}-\frac14\int_K^\infty k^{-3/2}\,(x-k)^+\,\dd k :
+\]
+the tangent call at the kink, minus a strip of calls with higher strikes. Since $C(k)\le C(K)$ for $k\ge K$,
+the strip costs at most $C(K)/(2\sqrt K)$, so \eqref{eq:sr-cm-integrable} holds in every model, and
+\[
+  \text{price}=\frac{C(K)}{2\sqrt K}-\frac14\int_K^\infty k^{-3/2}\,C(k)\,\dd k .
+\]
+With the course's inputs $S_0=K=10^4$, $T=1$, $r=1\%$, $y=-1\%$, $\sigma=40\%$ and Black--Scholes call prices,
+the tangent call costs $8.43615$ and the strip $1.07186$ (Gauss--Legendre quadrature in $\log k$), so the
+square-root call costs $7.36429$. That this is the test-case price is no accident (\cref{exa:sr-prewash}).
+\end{example}
+
+\paragraph{Finitely many strikes.} Markets list finitely many strikes $k_0<k_1<\dots<k_m$. The
+continuous piecewise-linear interpolant $f_h$ of $f$ at these strikes, extended linearly beyond them, is
+a finite portfolio: bonds, shares, and calls at $k_1,\dots,k_{m-1}$, weighted by the changes of slope. For
+spacing $h$ the weight at $k_i$ is $\big(f(k_{i+1})-2f(k_i)+f(k_{i-1})\big)/h\approx f''(k_i)\,h$, a Riemann sum
+for the strip. Where $f$ is $C^2$, $|f-f_h|\le\frac{h^2}8\max|f''|$ between neighbouring strikes (the IEOR 222
+notes prove this), so the price error is of order $h^2$, plus whatever the linear extrapolation outside
+$[k_0,k_m]$ costs. A jump behaves differently, because no continuous interpolant reproduces it. If $f$ jumps
+by $J>0$ at a listed strike $a$, the interpolant replaces $J\1_{[a,\infty)}$ by a call spread rising from $0$ at
+$a-h$ to $J$ at $a$, and the price error is
+\begin{equation}\label{eq:sr-jump-error}
+  J\,e^{-rT}\EQ\Big[\Big(1-\frac{a-S_T}{h}\Big)\1_{\{a-h<S_T<a\}}\Big]
+  =Jh\int_0^1(1-u)\,G(a-hu)\,\dd u=\tfrac12JhG(a)+o(h),
+\end{equation}
+if $S_T$ has a density $q$ near $a$; here $G=e^{-rT}q$ is the Arrow--Debreu price density (\cref{prop:sm-green}),
+and the last step assumes that $G$ is continuous at $a$. The error is of first order in $h$. Holding the digital itself, as in
+\cref{thm:sr-carr-madan}(ii), restores the second order (\cref{fig:sr-replication}).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch04-replication}
+  \caption{Static replication of a square-root call with a digital bonus,
+    $f(x)=(\sqrt x-10)^++\1_{\{x\ge120\}}$, in the test case ($S_0=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$),
+    where it costs $0.488321$. Left: $f$ and two portfolios on the strikes $90,100,\dots,400$: the
+    interpolant of $f$, in which the jump becomes a call spread on $[110,120]$, and the interpolant of the
+    square-root call plus one digital. Right: absolute price error of the two portfolios against the
+    spacing $h$ of the strikes $100-h,100,\dots,400$, with the first-order prediction $\frac12hG(120)$ of
+    \eqref{eq:sr-jump-error} (dashed) and a line of slope $2$ (dotted).}
+  \label{fig:sr-replication}
+\end{figure}
+
+\demo{04-static-replication.ipynb}{replicate a payoff with kinks and jumps on a strike grid of your choice,
+and watch the price error with and without the digitals.}
+
+\section{Power payoffs and the pre-wash}\label{sec:sr-power}
+
+In this section and the next the stock follows the standard model of \cref{def:sm-model}: under $\Q$,
+$S_t=S_0\exp(\nu t+\sigma W_t)$ with $\nu=r-y-\frac{\sigma^2}2$ and $W$ a $\Q$-Brownian motion. For $t<T$ we
+write $\tau=T-t$, and $\mathrm{BS}(x,K,\tau;r,y,\sigma)$ and $\mathrm{BSP}(x,K,\tau;r,y,\sigma)$ for the call
+and put prices of \cref{thm:bsf-formula} at spot $x$. For a Borel $g$, $v_g(t,x;r,y,\sigma)$ is the price
+function \eqref{eq:sm-price-function} of the payoff $g(S_T)$ in the standard model with inputs $r,y,\sigma$.
+For $p\in\R$ let
+\begin{equation}\label{eq:sr-prewash}
+  y_p=r-p\,(r-y)-\tfrac12p(p-1)\sigma^2,\qquad \sigma_p=|p|\,\sigma .
+\end{equation}
+
+\begin{proposition}[Power payoffs and the pre-wash]\label{prop:sr-power}
+In the standard model, let $p\in\R$.
+\begin{enumerate}[label=(\roman*)]
+  \item The process $S^p$ satisfies $S^p_t=S_0^p\exp\big((r-y_p-\frac12\sigma_p^2)t+\sigma_pW^{(p)}_t\big)$, where
+    $W^{(p)}=W$ if $p\ge0$ and $W^{(p)}=-W$ if $p<0$ is a $\Q$-Brownian motion. So $S^p$ moves like the
+    stock of a standard model with rate $r$, yield $y_p$ and volatility $\sigma_p$, and
+    $\EQ[S^p_T\mid\F_t]=S^p_te^{(r-y_p)\tau}$.
+  \item (\emph{Pre-wash}) Let $p\ne0$ and let $g$ be Borel with $\EQ|g(S_T^p)|<\infty$. The price at time $t$ of
+    $g(S_T^p)$ is $v_g(t,S_t^p;r,y_p,\sigma_p)$. In particular $(S^p_T-K)^+$ and $(K-S^p_T)^+$ cost
+    \[
+      \mathrm{BS}(S_t^p,K,\tau;r,y_p,\sigma_p)\qquad\text{and}\qquad \mathrm{BSP}(S_t^p,K,\tau;r,y_p,\sigma_p).
+    \]
+  \item (\emph{Leveraged payoffs}) Let $g$ be Borel with $\EQ|S_T^pg(S_T)|<\infty$, and let
+    \begin{equation}\label{eq:sr-leveraged}
+      r'_p=y_p,\qquad y'_p=y-p\big(r-y+\tfrac12(p+1)\sigma^2\big).
+    \end{equation}
+    The price at time $t$ of $S_T^pg(S_T)$ is $S_t^p\,v_g(t,S_t;r'_p,y'_p,\sigma)$. In particular $S_T^p(S_T-K)^+$
+    costs $S_t^p\,\mathrm{BS}(S_t,K,\tau;r'_p,y'_p,\sigma)$.
+\end{enumerate}
+At the edges: $p=1$ gives $y_1=y$ and $\sigma_1=\sigma$ in (ii), and $p=0$ gives $r'_0=r$ and $y'_0=y$ in (iii);
+for $p=0$ in (ii) the payoff is the constant $g(1)$, worth $e^{-r\tau}g(1)$, which is what the
+Black--Scholes formula gives as $\sigma_p\downarrow0$ with forward $1$. For $K=0$, (ii) prices $S_T^p$ itself
+at $S_t^pe^{-y_p\tau}$. For $p<0$ the call $(S_T^p-K)^+$ pays when $S_T$ is small: it is a put-like payoff on
+$S$.
+\end{proposition}
+
+\begin{proof}
+(i) $S^p_t=S_0^p\exp(p\nu t+p\sigma W_t)$, with $p\sigma W_t=\sigma_pW^{(p)}_t$ and
+$p\nu=p(r-y)-\frac12p\sigma^2=r-y_p-\frac12\sigma_p^2$ by \eqref{eq:sr-prewash}. $-W$ is a Brownian motion, and
+\eqref{eq:sm-moments} with $q=p$ gives the conditional mean.
+
+(ii) Write $S^p_T=S^p_tR$ with $R=\exp\big(p\nu\tau+\sigma_p(W^{(p)}_T-W^{(p)}_t)\big)$, independent of $\F_t$ and
+distributed as $\exp\big((r-y_p-\frac12\sigma_p^2)\tau+\sigma_p\sqrt\tau Z\big)$, $Z\sim\mathcal N(0,1)$. This is the
+law of the gross return of the stock with inputs $(r,y_p,\sigma_p)$, and the proof of
+\cref{prop:sm-risk-neutral}(i), with $S^p$ in place of $S$, gives $e^{-r\tau}\EQ[g(S^p_T)\mid\F_t]=v_g(t,S^p_t;r,y_p,\sigma_p)$.
+
+(iii) Let $M_t=\exp(p\sigma W_t-\frac12p^2\sigma^2t)$, a positive $\Q$-martingale with $M_0=1$, and let
+$\dd\Q^p=M_T\,\dd\Q$ on $\F_T$. Since $p\nu+\frac12p^2\sigma^2=r-y_p$,
+\[
+  S^p_T=S^p_t\,e^{(r-y_p)\tau}\,\frac{M_T}{M_t}.
+\]
+By Bayes' rule for conditional expectations (\textcite{shreve2}, Lemma~5.2.2),
+$\EQ[M_TX\mid\F_t]=M_t\,\E^{\Q^p}[X\mid\F_t]$ for every $X\ge0$, or $X$ with $\EQ|M_TX|<\infty$. Hence
+$e^{-r\tau}\EQ[S^p_Tg(S_T)\mid\F_t]=S^p_t\,e^{-y_p\tau}\,\E^{\Q^p}[g(S_T)\mid\F_t]$. By Girsanov's theorem
+(\textcite{karatzas-shreve}, Theorem~3.5.1), $W^p_t=W_t-p\sigma t$ is a $\Q^p$-Brownian motion, and
+$S_T=S_t\exp\big((\nu+p\sigma^2)\tau+\sigma(W^p_T-W^p_t)\big)$. Under $\Q^p$ the stock therefore moves like
+that of a standard model with volatility $\sigma$ and any rate and yield whose difference is
+$r-y+p\sigma^2$, in particular $r'_p=y_p$ and $y'_p=y_p-(r-y+p\sigma^2)$, which is \eqref{eq:sr-leveraged}.
+With that rate, $e^{-y_p\tau}\E^{\Q^p}[g(S_T)\mid\F_t]=e^{-r'_p\tau}\E^{\Q^p}[g(S_T)\mid\F_t]=v_g(t,S_t;r'_p,y'_p,\sigma)$,
+by the argument of (ii).
+\end{proof}
+
+The point is practical. A Black--Scholes routine discounts at its rate and grows the forward at rate minus
+yield; for a power payoff the yield $y_p$ is chosen so that the routine finds the forward
+$S_t^pe^{(r-y_p)\tau}$ while still discounting at $r$, and a leveraged payoff also changes the discount rate.
+Feeding these inputs to the routine is the pre-wash; the same device prices geometric averages
+(\cref{prop:as-geometric}) and exchange options (\cref{thm:ma-margrabe}).
+
+\begin{example}[The square-root call, again]\label{exa:sr-prewash}
+For $p=\frac12$, $\sigma_{1/2}=\sigma/2$ and $y_{1/2}=\frac12\big(r+y+\frac14\sigma^2\big)$, so by
+\cref{prop:sr-power}(ii) the call $(\sqrt{S_T}-\sqrt K)^+$ costs
+$\mathrm{BS}\big(\sqrt{S_0},\sqrt K,T;r,\frac12(r+y+\frac14\sigma^2),\frac\sigma2\big)$. With the inputs of
+\cref{exa:sr-sqrt}, $\sqrt{S_0}=\sqrt K=100$, $\sigma/2=20\%$ and $y_{1/2}=\frac12(0+0.04)=2\%$: the call on
+$\sqrt S$ is exactly the test case, and costs $7.36429$, as
+the strip of \cref{exa:sr-sqrt} found. \Cref{ch:08-antithetic-control} uses this payoff as a test bed for
+control variates (\cref{eg:cv-sqrt}).
+\end{example}
+
+\paragraph{Post-wash.} The Greeks returned by the routine are derivatives with respect to the washed
+inputs. The chain rule converts them back: with primes for the Greeks at $(S^p,K,\tau;r,y_p,\sigma_p)$,
+\begin{gather*}
+  \Delta=pS^{p-1}\Delta',\qquad \Gamma=p(p-1)S^{p-2}\Delta'+p^2S^{2p-2}\Gamma',\\
+  \mathcal V=|p|\mathcal V'-p(p-1)\sigma\rho_y',\qquad \rho_r=\rho_r'+(1-p)\rho_y',\qquad \rho_y=p\rho_y',
+\end{gather*}
+and $\Theta=\Theta'$, since $\partial y_p/\partial\sigma=-p(p-1)\sigma$, $\partial y_p/\partial r=1-p$ and
+$\partial y_p/\partial y=p$.
+
+The share measure $\Q^1$ of the proof, under which the stock is the numeraire, also gives a symmetry
+between calls and puts.
+
+\begin{corollary}[Put--call symmetry]\label{cor:sr-pcs}
+In the standard model, for $t<T$ and $K>0$, with $F_t=S_te^{(r-y)\tau}$,
+\[
+  \mathrm{BS}(S_t,K,\tau;r,y,\sigma)=\frac K{F_t}\,\mathrm{BSP}\Big(S_t,\frac{F_t^2}K,\tau;r,y,\sigma\Big).
+\]
+A call struck at $K$ is worth $K/F_t$ puts struck at the reflected strike $F_t^2/K$, the reflection of $K$
+in $F_t$ on a logarithmic scale.
+\end{corollary}
+
+\begin{proof}
+Let $X=S_T/F_t$. Given $\F_t$, $\log X\sim\mathcal N(-\frac12\sigma^2\tau,\sigma^2\tau)$ under $\Q$ and, by the
+proof of \cref{prop:sr-power}(iii) with $p=1$, $\log X\sim\mathcal N(+\frac12\sigma^2\tau,\sigma^2\tau)$ under
+$\Q^1$, where $\EQ[M_T\varphi\mid\F_t]=M_t\E^{\Q^1}[\varphi\mid\F_t]$ and $M_T/M_t=X$. So $1/X$ has under $\Q^1$ the
+law that $X$ has under $\Q$, and
+\begin{align*}
+  \EQ[(S_T-K)^+\mid\F_t]&=F_t\,\E^{\Q^1}\Big[\Big(1-\frac K{F_t}\frac1X\Big)^+\Big|\F_t\Big]
+  =F_t\,\EQ\Big[\Big(1-\frac K{F_t}X\Big)^+\Big|\F_t\Big]\\
+  &=\frac K{F_t}\,\EQ\Big[\Big(\frac{F_t^2}K-S_T\Big)^+\Big|\F_t\Big].
+\end{align*}
+Multiply by $e^{-r\tau}$.
+\end{proof}
+
+Put--call symmetry is the basis of the static hedges of barrier options of \textcite{bowie-carr} and
+\textcite{carr-chou}. If $r=y$, the forward equals the spot, and at the moment the stock touches a barrier
+$H$ a call struck at $K$ is worth $K/H$ puts struck at $H^2/K$. For a down-and-in call with $0<H\le K$ and
+$S_0>H$, these puts are struck at $H^2/K\le H$, so they expire worthless if the barrier is never touched, and
+holding them and exchanging them for the call, at no cost, when it is touched replicates the option
+(\exref{ex:sr-barrier}); for $K<H$ the hedge needs further pieces. With $r\ne y$, \textcite{carr-chou} apply the
+symmetry to a power of $S$ with zero drift (\textcite{carr-lee-pcs}, Example~6.11), \textcite{carr-ellis-gupta}
+bound the price by hedges with flat barriers on the forward, and \textcite{carr-lee-pcs} extend put--call symmetry
+beyond the standard model. \Cref{ch:17-multi-asset} develops changes of numeraire in general.
+
+\demo{04-static-replication.ipynb}{price $(S_T^p-K)^+$ for any power $p$ by the pre-wash, and compare with a
+Monte Carlo estimate from the same model.}
+
+\section{Homogeneity and the Greeks' conservation laws}\label{sec:sr-euler}
+
+Changing the unit of account, from dollars to cents say, multiplies every price and every input measured
+in money by the same factor $\lambda=100$; rates, yields, volatilities and times are unchanged. If a price
+is written as a function $V(z)$ of its money-valued inputs $z=(z_1,\dots,z_m)$ (spot, strike, barrier, cash
+dividend, \dots), this says $V(\lambda z)=\lambda V(z)$. In the standard model the only money-valued inputs of a
+call are $S$ and $K$, so $V(\lambda S,\lambda K)=\lambda V(S,K)$. A set $U\subseteq\R^m$ is a \emph{cone} if $\lambda
+z\in U$ for all $z\in U$ and $\lambda>0$, and $V:U\to\R$ is \emph{positively homogeneous of degree $k\in\R$} if
+$V(\lambda z)=\lambda^kV(z)$ for all $z\in U$ and $\lambda>0$.
+
+\begin{proposition}[Homogeneity and conservation laws]\label{prop:sr-euler}
+Let $U\subseteq\R^m$ be an open cone and $V:U\to\R$.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Euler's theorem}) If $V$ is differentiable and positively homogeneous of degree $k$, then
+    \begin{equation}\label{eq:sr-euler}
+      \sum_{i=1}^mz_i\,\partial_iV(z)=k\,V(z)\qquad\text{for all }z\in U.
+    \end{equation}
+    Conversely, if $V$ is differentiable on $U$ and satisfies \eqref{eq:sr-euler}, then $V$ is positively
+    homogeneous of degree $k$.
+  \item (\emph{Gamma sum rule}) Let $V$ be differentiable and homogeneous of degree $1$. Each $\partial_jV$ is
+    homogeneous of degree $0$, and if $\partial_jV$ is differentiable, $\sum_iz_i\,\partial_i\partial_jV(z)=0$. If
+    $V\in C^2(U)$, the Hessian of $V$ at $z$ is symmetric and maps $z$ to $0$; in particular it is singular.
+  \item (\emph{Conservation laws}) Let $V(z;\eta)$ depend on a real parameter $\eta$ (a time, a volatility, a
+    rate) and be differentiable and homogeneous of degree $1$ in $z$ for each $\eta$. If each $\partial_iV(z;\cdot)$
+    is differentiable at $\eta$, then $V(z;\cdot)$ is too, and
+    \begin{equation}\label{eq:sr-conservation}
+      \partial_\eta V(z;\eta)=\sum_{i=1}^mz_i\,\partial_\eta\partial_iV(z;\eta).
+    \end{equation}
+  \item (\emph{Spot and strike}) If $V(S,K)$ is homogeneous of degree $1$ and $C^2$ on $(0,\infty)^2$, then
+    \[
+      S\,\partial_SV+K\,\partial_KV=V,\qquad S\,\partial_{SS}V+K\,\partial_{SK}V=0,\qquad S\,\partial_{SK}V+K\,\partial_{KK}V=0,
+    \]
+    and hence $S^2\,\partial_{SS}V=-SK\,\partial_{SK}V=K^2\,\partial_{KK}V$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Fix $z$. The function $\lambda\mapsto V(\lambda z)$ is differentiable by the chain rule, with derivative
+$\sum_iz_i\partial_iV(\lambda z)$; differentiating $V(\lambda z)=\lambda^kV(z)$ at $\lambda=1$ gives \eqref{eq:sr-euler}.
+Conversely, $\phi(\lambda)=\lambda^{-k}V(\lambda z)$ has
+$\phi'(\lambda)=\lambda^{-k-1}\big(\sum_i\lambda z_i\,\partial_iV(\lambda z)-kV(\lambda z)\big)=0$ by \eqref{eq:sr-euler} at
+$\lambda z\in U$, so $\phi(\lambda)=\phi(1)$ for all $\lambda>0$.
+(ii) Differentiating $V(\lambda z)=\lambda V(z)$ in $z_j$ gives $\lambda\,\partial_jV(\lambda z)=\lambda\,\partial_jV(z)$. Then (i)
+with $k=0$, applied to $\partial_jV$, gives the sum rule; for $V\in C^2$ the Hessian is symmetric (Schwarz),
+and the sum rule says that it maps $z$ to $0$.
+(iii) By (i), $V(z;\eta)=\sum_iz_i\,\partial_iV(z;\eta)$ for every $\eta$; differentiate in $\eta$.
+(iv) is (i) and (ii) with $z=(S,K)$; multiplying the second identity by $S$ and the third by $K$ gives the last.
+\end{proof}
+
+\begin{remark}[When is a price homogeneous in spot and strike?]\label{rem:sr-homogeneous}
+Suppose the time-$t$ price of $f(S_T,K)$ is $V(S,K)=e^{-r\tau}\EQ[f(SR,K)]$, where the gross return
+$R=S_T/S_t\ge0$ has a law that depends neither on $S$ nor on $K$, and $f$ is positively homogeneous of degree
+$1$, like $(s-K)^+$, $(K-s)^+$ or $|s-K|$. Then $V(\lambda S,\lambda K)=e^{-r\tau}\EQ[\lambda f(SR,K)]=\lambda V(S,K)$. This
+covers the standard model, stochastic volatility models whose variance does not depend on the level of the
+stock (\cref{ch:19-stochastic-vol}), and, with $R$ the vector of returns, path-dependent payoffs such as Asian
+options. It fails when the law of returns depends on the level: in local-volatility models
+$\dd S_t=(r-y)S_t\,\dd t+\sigma(t,S_t)S_t\,\dd W_t$ with $\sigma$ not constant in $S$, in the constant-elasticity model
+$\sigma(S)=\sigma_0S^{\beta-1}$, $\beta\ne1$, and in the Bachelier model. The price is still homogeneous in \emph{all} its
+money-valued inputs (changing currency is always a symmetry), but these now include the local volatility
+(scaling $S$ and $K$ by $\lambda$ replaces $\sigma(t,s)$ by $\sigma(t,s/\lambda)$) or a normal volatility, and
+\eqref{eq:sr-euler} in $(S,K)$ alone acquires an extra term (\exref{ex:sr-homogeneity}). For the local volatility
+of \cref{fig:sr-kolmogorov} and $S=K=100$, $T=1$, the call costs $9.297$ but $S\,\partial_SC+K\,\partial_KC=1.815$:
+Euler's identity in $(S,K)$ misses by $80\%$ of the price.
+\end{remark}
+
+Three consequences for hedging hold in every model whose call price $C(S,K)$ is homogeneous of degree one
+and $C^2$; in the standard model the Greeks are those of \cref{prop:bsf-greeks}.
+
+\paragraph{The call in its parts.} $C=S\,\partial_SC+K\,\partial_KC$, and $-\partial_KC$ is the digital call
+(\cref{thm:sk-breeden-litzenberger}). Since $(S_T-K)^+=S_T\1_{\{S_T>K\}}-K\1_{\{S_T>K\}}$, the asset-or-nothing call
+costs $C-K\partial_KC=S\,\partial_SC$: the value of the delta position. In the standard model the replicating
+portfolio holds $\partial_SC=e^{-y\tau}N(d_+)$ shares and $K\partial_KC=-Ke^{-r\tau}N(d_-)$ in cash, and Euler's
+identity says that it is worth the call. In the test case, $50.9643-43.6000=7.3643$.
+
+\paragraph{Gamma is the density.} By \cref{prop:sr-euler}(iv) and the Breeden--Litzenberger formula
+(\cref{thm:sk-breeden-litzenberger}(iii)),
+\[
+  e^{-r\tau}q(K)=\partial_{KK}C=(S/K)^2\,\partial_{SS}C :
+\]
+the spot gamma of the call struck at $K$, scaled by $(S/K)^2$, is the risk-neutral density at $K$. A trader's gamma across strikes is the market's density. In
+the test case $S=K$, and both equal $0.0195277$ (\cref{prop:sm-green}). The gamma sum rule
+$S\,\partial_S(\partial_SC)+K\,\partial_S(\partial_KC)=0$ says that, to first order in the move of the spot at a fixed time, rebalancing pays for itself: the shares
+bought, $S\,\dd(\partial_SC)$, are paid for by the cash, $K\,\dd(\partial_KC)$; the second-order remainder is the
+gamma profit $\frac12\partial_{SS}C\,(\dd S)^2$. In the standard model it
+reads $Se^{-y\tau}\partial_SN(d_+)=Ke^{-r\tau}\partial_SN(d_-)$, which is \cref{prop:bsf-greeks}(i) because
+$\partial_Sd_+=\partial_Sd_-$.
+
+\paragraph{Conservation laws.} By \eqref{eq:sr-conservation} every sensitivity to a parameter splits into
+the sensitivities of the two hedge ratios. With $\eta=\sigma$, the vega is $S$ times the vanna
+$\partial_\sigma\partial_SC$ plus $K$ times $\partial_\sigma\partial_KC$; in the test case the two terms are $29.2916$ and
+$9.7639$, and they add up to the vega $39.0554$ up to rounding. With
+$\eta=t$, the theta is $S$ times the charm $\partial_t\partial_SC$ plus $K\,\partial_t\partial_KC$:
+$-3.32226=0.04290-3.36516$.
+
+\demo{04-static-replication.ipynb}{check Euler's identity and ``gamma is the density'' across strikes in the
+standard model, and watch both fail in the local-volatility model of \cref{fig:sr-kolmogorov}.}
+
+\section{The Kolmogorov equations}\label{sec:sr-kolmogorov}
+
+\Cref{prop:sm-green} showed that the Arrow--Debreu price density of the standard model solves the pricing
+equation in its initial point and an adjoint equation in its final point. Both facts hold for diffusions in
+general; this section states them, and proves the second, which explains where the adjoint comes from.
+Let $\bar T>0$ and let $b,a,r:[0,\bar T]\times\R\to\R$ be a drift, a volatility and a discount rate. For $0\le t\le\bar T$ and $x\in\R$, let $X^{t,x}$ solve
+$X_s=x+\int_t^sb(u,X_u)\,\dd u+\int_t^sa(u,X_u)\,\dd W_u$ on $[t,\bar T]$, with $W$ a $\Q$-Brownian motion, and let
+$D^{t,x}_s=\exp\big(-\int_t^sr(u,X^{t,x}_u)\,\dd u\big)$. Write $\mathcal L_t\varphi=b(t,\cdot)\varphi'+\frac12a(t,\cdot)^2\varphi''$.
+For prices, $X=\log S$; in a local-volatility model $b=r-y-\frac12\sigma^2$ and $a=\sigma$, evaluated at $(t,e^x)$.
+Hypothesis (H) is: \emph{$b$, $a$ and $r$ are bounded with bounded continuous partial derivatives of all
+orders on $[0,\bar T]\times\R$, and $a^2\ge\lambda$ for a constant $\lambda>0$ (uniform ellipticity)}. Then $b$ and $a$
+are Lipschitz in $x$, and $X^{t,x}$ exists and is unique (\textcite{karatzas-shreve}, Section~5.2).
+
+\begin{theorem}[Kolmogorov's equations]\label{thm:sr-kolmogorov}
+Assume (H). There is a continuous function $G(t,x;T,\xi)\ge0$, for $0\le t<T\le\bar T$ and $x,\xi\in\R$, with the
+following properties.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Discounted transition density}) For every bounded Borel $f$,
+    $\EQ\big[D^{t,x}_Tf(X^{t,x}_T)\big]=\int_\R G(t,x;T,\xi)f(\xi)\,\dd\xi$, and for $t<s<T$ the
+    Chapman--Kolmogorov identity holds:
+    \begin{equation}\label{eq:sr-ck}
+      \int_\R G(t,x;T,\xi)f(\xi)\,\dd\xi=\int_\R G(t,x;s,\eta)\Big(\int_\R G(s,\eta;T,\xi)f(\xi)\,\dd\xi\Big)\dd\eta .
+    \end{equation}
+    For $r=0$, $G$ is the transition density of $X$.
+  \item (\emph{Backward equation}) For fixed $(T,\xi)$, $G$ is $C^{1,2}$ in $(t,x)$ on $[0,T)\times\R$ and
+    \begin{equation}\label{eq:sr-backward}
+      \partial_tG+b(t,x)\,\partial_xG+\tfrac12a(t,x)^2\,\partial_{xx}G-r(t,x)\,G=0 .
+    \end{equation}
+    For every bounded continuous $f$, $u(t,x)=\int G(t,x;T,\xi)f(\xi)\,\dd\xi$ tends to $f(x_0)$ as
+    $(t,x)\to(T,x_0)$: $G$ is the solution with terminal value $\delta_\xi$.
+  \item (\emph{Forward, or Fokker--Planck, equation}) For fixed $(t,x)$, $G$ is $C^{1,2}$ in $(T,\xi)$ on $(t,\bar T]\times\R$ and
+    \begin{equation}\label{eq:sr-forward}
+      \partial_TG=\tfrac12\,\partial_{\xi\xi}\big(a(T,\xi)^2\,G\big)-\partial_\xi\big(b(T,\xi)\,G\big)-r(T,\xi)\,G .
+    \end{equation}
+    For every bounded continuous $h$, $\int G(t,x;T,\xi)h(\xi)\,\dd\xi\to h(x)$ as $T\downarrow t$: $G$ is the solution
+    with initial value $\delta_x$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+\emph{Existence.} Under (H), \textcite{friedman-parabolic}, Chapter~1, constructs by the parametrix method a
+fundamental solution $\Gamma$ of the backward equation: a continuous function, $C^{1,2}$ in $(t,x)$ for $t<T$,
+that solves \eqref{eq:sr-backward}, such that for every bounded continuous $f$ the function
+$u(t,x)=\int\Gamma(t,x;T,\xi)f(\xi)\,\dd\xi$ is bounded, solves \eqref{eq:sr-backward} and tends to $f(x_0)$ as
+$(t,x)\to(T,x_0)$. The same chapter constructs the fundamental solution of the adjoint equation and shows that
+it is $\Gamma$ with its two pairs of variables exchanged; in particular $\Gamma$ is $C^{1,2}$ in $(T,\xi)$ for $T>t$.
+(Friedman writes the equations forward in time; reverse time to match.)
+
+\emph{Identification, (i) and (ii).} Let $f$ be bounded and continuous, and $u$ as above. The Feynman--Kac formula
+(\cref{thm:sm-feynman-kac}, case (b) with $\psi\equiv1$, applied to $X^{t,x}$) gives
+$u(t,x)=\EQ[D^{t,x}_Tf(X^{t,x}_T)]$. The finite measures $A\mapsto\EQ[D^{t,x}_T\1_A(X^{t,x}_T)]$ and
+$\Gamma(t,x;T,\xi)\,\dd\xi$ give the same integral to every bounded continuous function, so they are equal; hence
+$G=\Gamma$ is the discounted transition density, $G\ge0$, and (ii) holds. For \eqref{eq:sr-ck}, the conditional form
+\eqref{eq:sm-fk-conditional} of the Feynman--Kac formula gives
+$\EQ[D^{t,x}_Tf(X_T)\mid\F_s]=D^{t,x}_s\,u(s,X^{t,x}_s)$; take expectations, and use (i) at time $s$ for the bounded
+continuous function $u(s,\cdot)$. Both sides of \eqref{eq:sr-ck} define finite measures in $f$, so the identity
+extends from bounded continuous to bounded Borel $f$.
+
+\emph{The forward equation, (iii).} Given the regularity of $G$ in $(T,\xi)$, the equation follows from It\^o's
+formula, and the argument shows where the adjoint comes from. Fix $(t,x)$, write $X=X^{t,x}$, $D=D^{t,x}$, and
+let $\varphi\in C^2(\R)$
+vanish outside a bounded interval. By It\^o's formula and the product rule, for $s\ge t$,
+\[
+  \dd\big(D_s\varphi(X_s)\big)=D_s\big(\mathcal L_s\varphi-r(s,\cdot)\varphi\big)(X_s)\,\dd s+D_s\,a(s,X_s)\,\varphi'(X_s)\,\dd W_s .
+\]
+The integrand of the $\dd W$ term is bounded, because $D_s\le e^{\|r\|_\infty\bar T}$ and $a$, $\varphi'$ are bounded,
+so it is a martingale, and with $\psi_s=\mathcal L_s\varphi-r(s,\cdot)\varphi$,
+\[
+  m(T):=\EQ[D_T\varphi(X_T)]=\varphi(x)+\int_t^T\EQ\big[D_s\psi_s(X_s)\big]\,\dd s .
+\]
+The integrand is continuous in $s$, by dominated convergence along the continuous paths, so $m$ is
+differentiable with $m'(T)=\EQ[D_T\psi_T(X_T)]=\int G(t,x;T,\xi)\psi_T(\xi)\,\dd\xi$, by (i). On the other hand
+$m(T)=\int G(t,x;T,\xi)\varphi(\xi)\,\dd\xi$, and since $\partial_TG$ is continuous and $\varphi$ has compact support,
+$m'(T)=\int\partial_TG\,\varphi\,\dd\xi$. Integrating by parts, twice in the second-order term and once in the
+first-order term, with no boundary terms because $\varphi$ vanishes outside a bounded interval,
+\[
+  \int\partial_TG\,\varphi\,\dd\xi=\int G\Big(\tfrac12a^2\varphi''+b\varphi'-r\varphi\Big)\dd\xi
+  =\int\Big(\tfrac12\partial_{\xi\xi}(a^2G)-\partial_\xi(bG)-rG\Big)\varphi\,\dd\xi .
+\]
+This holds for every such $\varphi$, and both brackets are continuous in $\xi$, so they are equal: this is
+\eqref{eq:sr-forward}. Finally, $\int G(t,x;T,\xi)h(\xi)\,\dd\xi=\EQ[D_Th(X_T)]\to h(x)$ as $T\downarrow t$, by
+dominated convergence and the continuity of the paths.
+\end{proof}
+
+\begin{remark}[The course's derivation]\label{rem:sr-ck-derivation}
+The course differentiates \eqref{eq:sr-ck} in the intermediate time $s$, replaces $\partial_sG(s,\eta;T,\xi)$ by the
+backward equation, integrates by parts twice in $\eta$, and lets $T\downarrow s$ so that $G(s,\eta;T,\xi)$ becomes
+$\delta_\xi(\eta)$. As written this is heuristic: the boundary terms at $\eta\to\pm\infty$ must vanish and the limit
+must commute with the integral, which hold under (H) by Friedman's Gaussian bounds. The proof above uses a
+test function with compact support instead, which has no boundary terms.
+\end{remark}
+
+\begin{remark}[The standard model and beyond (H)]\label{rem:sr-kolmogorov-scope}
+For the standard model in $x=\log S$, $b=\nu$, $a=\sigma$ and $r$ are constants, (H) holds, and
+$G(t,x;T,\eta)=e^{-r\tau}k(\sigma^2\tau,\eta-x-\nu\tau)$ with the heat kernel $k$ of \eqref{eq:sm-heat-kernel}. In the
+price variable the density acquires the Jacobian $1/\xi$, and the two equations become \eqref{eq:sm-backward} and
+\eqref{eq:sm-forward}, verified directly in \cref{prop:sm-green}. Hypothesis (H) is sufficient, not necessary, but cannot simply be
+dropped: in the constant-elasticity model $\dd S=\sigma_0S^\beta\,\dd W$, $0<\beta<1$, absorbed at zero, the volatility of
+$\log S$ is unbounded and $\Q(S_T=0)>0$, so the density on $(0,\infty)$ integrates to less than one.
+\end{remark}
+
+\paragraph{Backward and forward, numerically.} On a uniform grid in $x$, replace $\mathcal L_t-r$ by central
+differences, a tridiagonal matrix $L_h$, and step in time with Crank--Nicolson, with two implicit steps at each
+end to damp the irregular data (\cref{ch:20-grids}). One backward solve from a payoff gives its price at every
+spot; one forward solve with $L_h^\top$ from $\delta_{x_0}/h$ gives the density, hence the price of every payoff,
+for one spot. The two discretizations are exactly adjoint, so they agree up to rounding. In the test case, a grid of $801$ points
+spanning eight standard deviations each way and $400$ time steps price the call at $7.36386$ from either side,
+an error of $4.3\times10^{-4}$ that falls by a factor of four when the grid and the time steps are doubled.
+\Cref{fig:sr-kolmogorov} uses one forward solve to price all strikes in a local-volatility model, the starting
+point of Dupire's construction of local volatilities from option prices (\exref{ex:sr-dupire}).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch04-kolmogorov}
+  \caption{One forward solve in the local-volatility model $\sigma(S)=0.25-0.10\tanh\big(2\log(S/100)\big)$, with
+    $S_0=100$, $T=1$, $r=1\%$, $y=2\%$ (grid of $801$ points in $\log S$, $400$ time steps). Left: the discounted
+    density of $S_T$ from the forward equation, against a histogram of $2\times10^5$ Euler paths with $250$ steps
+    (our implementation, numpy \texttt{default\_rng}, seed $4$), and the lognormal density of the test case.
+    Right: Black--Scholes implied volatilities of the calls priced from that one density, for all strikes, the
+    implied volatilities of the Monte Carlo prices with $95\%$ confidence bars, and the local volatility at the
+    strike. Near the money the implied skew is about half as steep as the local one.}
+  \label{fig:sr-kolmogorov}
+\end{figure}
+
+\begin{incode}
+\coderef{code/src/mfe230d/replication.py}: \texttt{carr\_madan\_price} evaluates \eqref{eq:sr-cm-price} by
+Gauss--Legendre quadrature in log-strike; \texttt{grid\_replication} and \texttt{grid\_price} build and price the
+finite strip; \texttt{power\_call}, \texttt{power\_greeks} and \texttt{leveraged\_call} implement
+\cref{prop:sr-power} and the post-wash on top of \coderef{code/src/mfe230d/bs.py}; \texttt{put\_call\_symmetry} is
+\cref{cor:sr-pcs}; \texttt{bs\_second\_order}, \texttt{bachelier\_call} and \texttt{call\_euler\_terms} test
+\cref{prop:sr-euler}; \texttt{backward\_solve} and \texttt{forward\_solve} are the two discretizations of
+\cref{sec:sr-kolmogorov}. \coderef{code/tests/test_replication.py} checks every number quoted in this chapter.
+\end{incode}
+
+\demo{04-static-replication.ipynb}{change the local volatility and watch the density and the implied
+volatilities from one forward solve; check that a backward solve gives the same prices.}
+
+\furtherreading
+\textcite{carr-madan} state the spanning formula and use it to trade volatility; \textcite{breeden-litzenberger}
+is the source of the density formula it inverts. \textcite{bowie-carr}, \textcite{carr-chou},
+\textcite{carr-ellis-gupta} and \textcite{carr-lee-pcs} develop static hedging with put--call symmetry.
+\textcite{merton1973} first proved that option prices are homogeneous in the stock price and the strike when
+returns do not depend on the price level. \textcite{kolmogorov-1931} introduced the two equations;
+\textcite{friedman-parabolic} constructs their fundamental solutions, and \textcite{karatzas-shreve},
+Section~5.7, connects them with diffusions. \textcite{dupire} turns the forward equation into a formula for the
+local volatility, and \textcite{gatheral-volatility-surface}, Chapter~1, derives it.

@@ -1,0 +1,149 @@
+% Exercises for Chapter 9 (importance sampling). Statements only: solutions are kept privately.
+\providecommand{\Qt}{\widetilde{\mathbb Q}}
+\providecommand{\Et}{\widetilde{\mathbb E}}
+Throughout, $\Q$ is the target law, $\Qt$ the sampling law, $\Et$ its expectation, and
+$L=q/\tilde q$ the weight, as in \noteref{sec:is-lr}. You may use the results of the notes,
+quoting them.
+
+\begin{exercise}[Higher moments of the Gaussian weight]\label{ex:is-moments}
+\easy Let the target be $\mathcal N(0,1)$ and the sampling law $\mathcal N(c,\beta^2)$, with
+$\beta>0$, and let $n\ge2$ be an integer.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\Et[L^n]<\infty$ if and only if $\beta^2>1-1/n$, and that then
+    \[
+      \Et[L^n]=\frac{\beta^n}{\sqrt{\gamma_n}}\exp\Big(\frac{n(n-1)c^2}{2\gamma_n}\Big),\qquad
+      \gamma_n=n\beta^2-n+1 .
+    \]
+    Check that $n=2$ gives \noteref{prop:is-gaussian}(i).
+  \item Deduce that every moment of the weight is finite when $\beta\ge1$, and find the range
+    of $\beta$ for which the sample variance of the weights itself has finite variance.
+  \item Fix $c\ne0$. Find the scale $\beta^*$ that minimises $\Et[L^2]$, show that $\beta^*>1$,
+    and compute $\beta^*$ and $\Et[L^2]$ at $\beta^*$ and at $\beta=1$ for $c=1$. What does this
+    say about pairing a mean shift with a scale?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Exponential tilts of common laws]\label{ex:is-tilts}
+\easy For each law, find the cumulant generating function $\psi$, the interval where it is
+finite, and the tilted law (\noteref{def:is-tilting}):
+\begin{enumerate}[label=(\alph*)]
+  \item the exponential law with rate $\lambda$, and the gamma law with shape $k$ and rate $\lambda$;
+  \item the Bernoulli law with parameter $p$; write the weight of the tilt of $m$ independent
+    Bernoulli variables as a function of their sum, and identify the law of the sum under the
+    tilt;
+  \item the lognormal law of $S_T=S\exp(\nu T+\sigma\sqrt T Z)$, $Z\sim\mathcal N(0,1)$, $\sigma>0$:
+    show that $\E[e^{\theta S_T}]=\infty$ for every $\theta>0$. \emph{Hint:} compare $e^{\theta S_T}$
+    with $(\theta S_T)^j/j!$ and use $\E[S_T^j]$. Explain why the course tilts $\log S_T$
+    rather than $S_T$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[An exponential tail]\label{ex:is-exponential}
+\medium Let $X$ be exponential with rate $1$ and $p_t=\Q(X>t)=e^{-t}$, $t>0$. Estimate $p_t$ by
+sampling $X$ from the exponential law with rate $\lambda>0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute the second moment $M_t(\lambda)$ of the estimator, and show that it is infinite for
+    $\lambda\ge2$. Which sampling laws are ``thinner-tailed'' than the target?
+  \item Find the rate $\lambda^*_t$ that minimises $M_t$, and show that $t\lambda_t^*\to1$: the
+    sampling mean is placed at the threshold.
+  \item Show that $M_t(\lambda^*_t)/p_t^2\sim et/2$ as $t\to\infty$. Is the estimator
+    logarithmically efficient? Does it have bounded relative error (\noteref{def:is-efficiency})?
+  \item Now let $S=X_1+X_2$ with $X_1,X_2$ independent exponential with rate $1$, so that
+    $\Q(S>t)=(1+t)e^{-t}$. Tilt both summands to rate $\lambda=2/t$, which puts the tilted
+    mean of $S$ at $t$, and show that the relative second moment of the estimator of
+    $\Q(S>t)$ is asymptotic to $e^2t/8$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Self-normalised importance sampling]\label{ex:is-self-normalized}
+\medium Let $\tilde q>0$ wherever $q>0$, let $X_1,X_2,\dots$ be independent with density
+$\tilde q$, and assume $\Et[L^2]<\infty$ and $\Et[f^2L^2]<\infty$. Let
+$\hat\mu^{\mathrm{sn}}_n=\sum_if(X_i)L(X_i)/\sum_iL(X_i)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\hat\mu^{\mathrm{sn}}_n\to\mu$ almost surely, and that $\hat\mu^{\mathrm{sn}}_n$
+    is unchanged if $L$ is multiplied by a constant. Why does this matter outside pricing?
+  \item Using \noteref{prop:mc-delta}(i), show that
+    $\sqrt n(\hat\mu^{\mathrm{sn}}_n-\mu)\Rightarrow\mathcal N\big(0,\Et[L^2(f-\mu)^2]\big)$.
+  \item Let $f=\1_A$ with $p=\Q(A)$, and write $M=\Et[L^2\1_A]$ and $W=\Et[L^2]$. Show that the
+    self-normalised estimator has the smaller asymptotic variance if and only if $2M>p(1+W)$.
+    Evaluate both variances for the target $\mathcal N(0,1)$, the sampling law $\mathcal N(1,1)$
+    and $A=\{Z>1\}$, and explain why self-normalising is a bad idea for rare events.
+  \item Assuming that the expansion of \noteref{prop:mc-delta}(iii) applies (it requires a weight
+    bounded away from zero, which is not the case here), show that the bias of
+    $\hat\mu^{\mathrm{sn}}_n$ is $(\mu W-\Et[fL^2])/n+O(n^{-3/2})$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Deep out-of-the-money calls]\label{ex:is-call-asymptotics}
+\hard Fix $s>0$ and, for $u>0$, let $G_u(z)=\big(e^{s(z-u)}-1\big)^+$: the payoff of a call,
+divided by its strike, when $S_T=Ke^{s(Z-u)}$ and $Z\sim\mathcal N(0,1)$. Let $d\to\infty$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that for $k\in\{1,2\}$,
+    $\E[G_u(Z)^k]=k!\,s^kN'(u)\,u^{-k-1}(1+o(1))$ as $u\to\infty$. \emph{Hint:} substitute
+    $z=u+w/u$, use $N'(u+w/u)=N'(u)e^{-w-w^2/(2u^2)}$, and justify the limit by dominated
+    convergence for $u\ge2ks$.
+  \item Deduce that plain Monte Carlo for $p_d=\E[G_d(Z)]$ has
+    $\E[G_d^2]/p_d^2\sim2\sqrt{2\pi}\,d\,e^{d^2/2}$.
+  \item With the mean shift to the strike, $Z\sim\mathcal N(d,1)$ under $\Qt$, use the mirror formula
+    \noteref{eq:is-mirror} to show that $\Et[Y^2]/p_d^2\sim\sqrt{\pi/8}\,d$, where $Y$ is the
+    weighted payoff. Compare with the digital in \noteref{prop:is-rare}.
+  \item Explain in words why neither limit depends on $s$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Credit losses by exponential tilting]\label{ex:is-credit}
+\medium \emph{Computational.} A portfolio has $m=100$ independent obligors, each of which
+defaults over the horizon with probability $0.01$ and then loses one unit. Let $N$ be the number
+of defaults and $p_\ell=\Q(N\ge\ell)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Compute $p_\ell$ exactly for $\ell=5,10,15,20$, and the relative error per sample of plain
+    Monte Carlo.
+  \item Find the tilt $\theta_\ell$ of the default indicators for which the tilted mean of $N$ is
+    $\ell$, the default probability under the tilt, and the bound
+    $e^{-\theta_\ell\ell+m\psi(\theta_\ell)}$ on the estimator (\noteref{prop:is-tilting}).
+  \item Implement the tilted estimator with $10^5$ samples for each $\ell$, report estimates with
+    standard errors and relative errors per sample, and compare with (a). State your seed.
+  \item How do the relative errors behave as $\ell$ grows? With $m$ fixed, the asymptotics in
+    $m$ of \noteref{prop:is-tilting} do not apply as such; instead compare the ratio of the bound
+    in (b) to $p_\ell$ with the lattice Bahadur--Rao prefactor
+    $\sigma_\ell\sqrt{2\pi m}\,(1-e^{-\theta_\ell})$, where $\sigma_\ell^2$ is the variance of one
+    tilted indicator.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The GHS drift for a geometric Asian call]\label{ex:is-geometric}
+\hard \emph{Partly computational.} In the test case of the notes, with $m=16$ fixings
+$t_j=j/16$, the geometric average is $G=\exp\big(\frac1m\sum_j\log S_{t_j}\big)$ with
+$S_{t_j}=S\exp\big(\nu t_j+\sigma\sqrt{\Delta t}\sum_{i\le j}Z_i\big)$, $\Delta t=1/m$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\log G=\kappa+b^\top Z$ with $\kappa=\log S+\nu\bar t$,
+    $\bar t=\frac1m\sum_jt_j$, and $b_i=\sigma\sqrt{\Delta t}\,(m-i+1)/m$, and compute $|b|^2$.
+  \item Show that the GHS drift (\noteref{prop:is-optimal-drift}) for the payoff $(G-K)^+$ is
+    $\mu=\lambda b$, where $\lambda$ is the unique root of
+    $\lambda\big(e^{\kappa+\lambda|b|^2}-K\big)=e^{\kappa+\lambda|b|^2}$ with
+    $\kappa+\lambda|b|^2>\log K$. Why is the problem one-dimensional?
+  \item Using \noteref{prop:is-optimal-drift}(iii), give an upper bound on the relative second
+    moment of the importance-sampling estimator, and compute it for $K=100,140,160$.
+  \item Implement the estimator with $10^5$ paths for these strikes; compare with the exact price
+    of the geometric Asian call (the law of $\log G$ is normal) and compute the exact variance
+    reduction factors with the mirror formula. Compare your drift with the arithmetic drift of
+    \noteref{exa:is-asian}.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A first-passage probability]\label{ex:is-first-passage}
+\hard Let $\tilde W$ be a Brownian motion under $\Q$, $b,T>0$, $x=b/\sqrt T$, and
+$p=\Q\big(\max_{t\le T}\tilde W_t\ge b\big)$, which equals $2N(-x)$ by the reflection
+principle. Under $\Qt$, let $\tilde W_t=B_t+\theta t$ with $B$ a $\Qt$-Brownian motion and
+$\theta\in\R$ a constant, and let $\tau=\inf\{t:\tilde W_t=b\}$. You may use
+\noteref{thm:is-girsanov} and the optional sampling theorem for bounded stopping times.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $p=\Et\big[\1_{\{\tau\le T\}}\exp(-\theta b+\theta^2\tau/2)\big]$: the weight
+    can be evaluated at the hitting time instead of at $T$.
+  \item For $\theta=b/T$, show that the estimator is bounded by $e^{-x^2/2}$ surely.
+  \item Deduce that its relative second moment is at most $\sqrt{\pi/2}\,(1+x^2)/x$, and conclude
+    that it is logarithmically efficient as $x\to\infty$.
+  \item Show that using the weight at $T$ instead, $\exp(-\theta\tilde W_T+\theta^2T/2)$, gives
+    another unbiased estimator. Which is better, and why? (Think of conditional expectation.)
+\end{enumerate}
+\end{exercise}

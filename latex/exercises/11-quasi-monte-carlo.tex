@@ -1,0 +1,163 @@
+% Exercises for Chapter 11 (Quasi-Monte Carlo). Statements only: solutions are kept privately.
+% Throughout, D*_n is the star discrepancy, delta_P the local discrepancy and V_HK the
+% Hardy--Krause variation of the notes; N is the standard normal distribution function and
+% N' its density.
+
+\begin{exercise}[Discrepancy in one dimension]\label{ex:qmc-one-dim}
+\easy Let $0\le x_{(1)}\le x_{(2)}\le\dots\le x_{(n)}<1$ be $n$ points sorted in increasing order.
+\begin{enumerate}[label=(\alph*)]
+  \item Prove the formula
+    $D^*_n=\max_{1\le i\le n}\max\big(\frac in-x_{(i)},\,x_{(i)}-\frac{i-1}n\big)$, used for the
+    Kolmogorov--Smirnov statistic in \noteref{ch:05-random-numbers}, and deduce that
+    $D^*_n=\frac1{2n}+\max_{1\le i\le n}\big|x_{(i)}-\frac{2i-1}{2n}\big|$.
+  \item Deduce that $D^*_n\ge\frac1{2n}$, with equality if and only if
+    $x_{(i)}=\frac{2i-1}{2n}$ for every $i$. Show that in dimension $d$, too, every set of $n$
+    points has $D^*_n\ge\frac1{2n}$.
+  \item Compute $D^*_n$ for the first $n=2^m$ points of the van der Corput sequence in base $2$
+    after adding $2^{-m-1}$ to each of them. Compute $D^*_3$ for the first three points of the
+    unshifted sequence and compare it with the bound of \noteref{prop:qmc-van-der-corput}(ii).
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The $L^2$ discrepancy and Warnock's formula]\label{ex:qmc-warnock}
+\medium For points $P=(x_1,\dots,x_n)$ of $[0,1)^d$, the \emph{$L^2$ star discrepancy} is
+$T_n(P)=\big(\int_{[0,1]^d}\delta_P(a)^2\,\dd a\big)^{1/2}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $T_n(P)\le D^*_n(P)$.
+  \item Prove Warnock's formula
+    \[
+      T_n(P)^2=3^{-d}-\frac{2^{1-d}}n\sum_{i=1}^n\prod_{j=1}^d\big(1-x_{ij}^2\big)
+      +\frac1{n^2}\sum_{i,k=1}^n\prod_{j=1}^d\big(1-\max(x_{ij},x_{kj})\big).
+    \]
+    Hint: expand the square and integrate each term coordinate by coordinate.
+  \item Let $x_1,\dots,x_n$ be independent and uniform on $[0,1)^d$. Show that
+    $\E[T_n^2]=(2^{-d}-3^{-d})/n$.
+  \item Implement the formula in (b) (it costs $O(n^2d)$ operations) and compute $T_n$ for
+    $n=2^{10}$ points in $d=2$ and $d=8$: pseudo-random points (state your seed), the Halton
+    points (\texttt{qmc.halton}) and the Sobol' points (\texttt{qmc.sobol}). Compare with
+    $\sqrt{(2^{-d}-3^{-d})/n}$. What do you conclude in $d=8$?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Computing and losing the variation]\label{ex:qmc-variation}
+\medium Use the formula \noteref{eq:qmc-vhk} for smooth functions.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $f(x)=\prod_{j=1}^dg_j(x_j)$ with each $g_j$ continuously differentiable on
+    $[0,1]$. Show that
+    $V_{HK}(f)=\prod_{j=1}^d\big(|g_j(1)|+\int_0^1|g_j'|\big)-\prod_{j=1}^d|g_j(1)|$.
+  \item For the product of sines $f(x)=\prod_{j=1}^d\frac\pi2\sin(\pi x_j)$, show that
+    $V_{HK}(f)=\pi^d$. Using \exref{ex:qmc-one-dim}(b), show that for $d=5$ and $n=2^{16}$
+    the Koksma--Hlawka bound is at least $2.3\times10^{-3}$ whatever the points, and compare
+    it with the error $1.9\times10^{-4}$ of the Sobol' rule reported in the notes.
+  \item For a function $f$ on $[0,1]^2$, the \emph{Vitali variation} is the supremum, over all
+    grids $0=s_0<\dots<s_k=1$ and $0=r_0<\dots<r_l=1$, of
+    $\sum_{i,j}\big|f(s_{i+1},r_{j+1})-f(s_i,r_{j+1})-f(s_{i+1},r_j)+f(s_i,r_j)\big|$; the
+    Hardy--Krause variation of a non-smooth $f$ is at least its Vitali variation. Show that the
+    Vitali variation of $f=\1\{x_1+x_2\le1\}$ is infinite. Hint: use the uniform grid with
+    $k=l$ and look at the cells crossed by the anti-diagonal.
+  \item Show that the Vitali variation of $(x_1+x_2-1)^+$ is finite, but that the
+    three-dimensional analogue of the sum in (c), with third differences over the cells of a
+    grid of $[0,1]^3$, is unbounded for $f=(x_1+x_2+x_3-1)^+$. Hint: on the uniform grid of
+    side $h=1/k$, the third difference of $x\mapsto g(x_1+x_2+x_3)$ over a cell with lower
+    corner $x$ is $g(s+3h)-3g(s+2h)+3g(s+h)-g(s)$ with $s=x_1+x_2+x_3$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[An unbounded integrand in one dimension]\label{ex:qmc-unbounded}
+\hard Let $F:(0,1)\to[0,\infty)$ be nondecreasing, continuous and integrable, possibly
+unbounded near $1$, and let $Q_n(F)=\frac1n\sum_{i=1}^nF\big(\frac{2i-1}{2n}\big)$ be the rule
+with the centred points. You may use Koksma's inequality: if $G$ has bounded total variation
+$V(G)$ on $[0,1]$, then $|Q_P(G)-I(G)|\le V(G)\,D^*_n(P)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $x_n=1-\frac1{2n}$ and $G=\min(F,F(x_n))$. Show that $Q_n(F)=Q_n(G)$ and deduce
+    \[
+      |Q_n(F)-I(F)|\le\frac{F(x_n)-F(0+)}{2n}+\int_{x_n}^1F(u)\,\dd u .
+    \]
+  \item Let $F(u)=e^{-rT}\big(Se^{\nu T+sN^{-1}(u)}-K\big)^+$ with $s=\sigma\sqrt T>0$, the
+    call of \noteref{eq:qmc-cube}. Show that $z_n=N^{-1}(x_n)\le\sqrt{2\log n}$, using
+    $1-N(z)\le\frac12e^{-z^2/2}$ for $z\ge0$, and that both terms of (a) are
+    $O\big(n^{-1}e^{sz_n}\big)$. Hint: $\int_z^\infty e^{sx}N'(x)\,\dd x=e^{s^2/2}\big(1-N(z-s)\big)$,
+    and $1-N(z-s)\le(1-N(z))\,e^{sz}\,\frac{z}{z-s}$ for $z>s$. Conclude that the error is
+    $O(n^{-1+\varepsilon})$ for every $\varepsilon>0$, although $V_{HK}(F)=\infty$.
+  \item For the test case ($S=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$), compute the error
+    and the bound of (a) for $n=10,10^2,\dots,10^6$. What is the actual rate, and how pessimistic
+    is the bound?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Halton points in high dimension]\label{ex:qmc-halton-lines}
+\easy Let $p<q$ be primes, and consider the Halton coordinates in bases $p$ and $q$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that for $0\le i<p$ the points are $(i/p,i/q)$, which lie on the line $y=\frac pqx$.
+  \item For $p=47$, $q=53$, count the first $47$ points in the box $[0,\frac12)^2$ and deduce
+    a lower bound on $D^*_{47}$. Compare it with the star discrepancy of $47$ independent
+    uniform points, which is about $0.17$ on average.
+  \item Show that a random shift modulo $1$ (\noteref{prop:qmc-rqmc}) maps the points of (a)
+    onto at most three segments with slope $p/q$, so that it does not remove the problem. What
+    does a random permutation of the base-$p$ digits $\{0,\dots,p-1\}$, applied to the first
+    digit of the first coordinate, do to these points?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Scrambled van der Corput points]\label{ex:qmc-scrambled-vdc}
+\medium Let $y_0,y_1,\dots$ be the nested uniform scramble in base $2$
+(\noteref{prop:qmc-rqmc}, (c)) of the van der Corput sequence in base $2$, let $f(x)=x$, and
+let $\hat\mu_n=\frac1n\sum_{i<n}y_i$.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $N=2^m$. Show that the set $\{y_0,\dots,y_{N-1}\}$ has the law of a stratified
+    sample with $N$ strata: exactly one point in each interval $[\frac lN,\frac{l+1}N)$, uniformly
+    distributed there and independent of the points in the other intervals.
+  \item Deduce that $\Var\hat\mu_N=\frac1{12N^3}$, and compare with Monte Carlo.
+  \item Show that $y_N$ lies in the same interval of length $\frac1N$ as $y_0$, uniformly
+    distributed in the half of it that does not contain $y_0$, and that
+    \[
+      \Var\hat\mu_{N+1}=\frac{2N^2+2N-3}{24N^2(N+1)^2}\approx\frac1{12(N+1)^2}.
+    \]
+    So one extra point turns a variance of order $n^{-3}$ into one of order $n^{-2}$.
+  \item Check (b) and (c) by simulation for $m=6$ and $m=10$, using \texttt{qmc.owen\_scramble}
+    on the integer points \texttt{qmc.sobol\_integers(N + 1, 1)} (the first Sobol' coordinate is
+    the van der Corput sequence). Report the number of scrambles and the seeds.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Ridge payoffs and Hermite polynomials]\label{ex:qmc-ridge}
+\hard Let $He_k$ be the Hermite polynomials, defined by
+$e^{tx-t^2/2}=\sum_{k\ge0}He_k(x)\,t^k/k!$, and $h_k=He_k/\sqrt{k!}$. You may use that
+$(h_k)_{k\ge0}$ is an orthonormal basis of $L^2$ for the standard normal law. Let $X,Y$ be
+independent standard normal variables, $c\in[0,1]$ and $X'=cX+\sqrt{1-c^2}\,Y$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E[h_k(X')\mid X]=c^kh_k(X)$ for every $k$.
+  \item Let $g=\sum_ka_kh_k$ be in $L^2$ and not constant. Show that
+    $\Cov(g(X),g(X'))=\sum_{k\ge1}a_k^2c^k$, so that the function $\kappa_g$ of
+    \noteref{eq:qmc-ridge} is $\kappa_g(c)=\sum_{k\ge1}a_k^2c^k/\sum_{k\ge1}a_k^2$. Deduce that
+    $\kappa_g(c)\le c$ for $c\in[0,1]$, with equality at some $c\in(0,1)$ if and only if $g$ is
+    affine.
+  \item For the digital payoff $g(x)=\1\{x>\theta\}$, show that
+    $a_k=N'(\theta)He_{k-1}(\theta)/\sqrt{k!}$ for $k\ge1$. Hint:
+    $\frac{\dd}{\dd x}\big(He_{k-1}(x)N'(x)\big)=-He_k(x)N'(x)$.
+  \item For $\theta=0$, use Sheppard's formula
+    $\Prob(X>0,X'>0)=\frac14+\frac{\arcsin c}{2\pi}$ to show that $\kappa_g(c)=\frac2\pi\arcsin c$.
+    A digital option on the geometric average with $m=64$ dates, struck at the median of the
+    average, is such a ridge payoff. Using the values of $w_1^2$ in \noteref{tab:qmc-shares},
+    compute the share of its variance carried by the first normal under the three
+    constructions, and compare with the call.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A payoff that sees only the first date]\label{ex:qmc-first-date}
+\easy Take the uniform grid $t_i=i/8$, $i=1,\dots,8$, and a payoff that depends on the path
+only through $W_{t_1}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Under each of the three constructions of \noteref{prop:ps-bridge} and the discussion
+    after it (increments; Brownian bridge in the dyadic order; principal components), write
+    $W_{t_1}=\sum_ja_{1j}Z_j$ and compute the shares $a_{1j}^2/t_1$ of $\Var W_{t_1}$ carried by
+    each normal. For the bridge, do it by hand; for principal components, use
+    \texttt{paths.construction\_matrix}.
+  \item For a payoff $g(W_{t_1})$, express the share of the variance carried by the first $k$
+    normals in terms of these numbers and the function $\kappa_g$ of \noteref{eq:qmc-ridge}.
+    Which construction should be used with QMC, and what is the truncation dimension (with
+    $p=0.99$) under each?
+  \item Principal components carry the largest share of the variance of the whole path in their
+    first normals. Why is there no contradiction with (a)?
+\end{enumerate}
+\end{exercise}

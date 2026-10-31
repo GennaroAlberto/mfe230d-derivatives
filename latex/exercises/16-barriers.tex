@@ -1,0 +1,162 @@
+% Exercises for Chapter 16 (Barriers, lookbacks and the Brownian bridge). Statements only:
+% solutions are kept privately.
+% Throughout, S_t = S_0 exp(X_t) with X_t = nu t + sigma W_t, nu = r - y - sigma^2/2,
+% lambda = 2 nu / sigma^2, p_T is the N(nu T, sigma^2 T) density, and the test case is
+% S_0 = K = 100, T = 1, r = 1%, y = 2%, sigma = 20%.
+
+Throughout, $S_t=S_0e^{X_t}$ with $X_t=\nu t+\sigma W_t$ for a Brownian motion $W$ under $\Q$,
+$\nu=r-y-\frac12\sigma^2$, $\lambda=2\nu/\sigma^2$; $\overline X_T$ and $\underline X_T$ are the maximum and
+minimum of $X$ on $[0,T]$, and $p_T$ is the $\mathcal N(\nu T,\sigma^2T)$ density. The test case is
+$S_0=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, and $h=T/m$ for $m$ equally spaced monitoring dates
+$t_j=jh$, $j=1,\dots,m$.
+
+\begin{exercise}[Degenerate cases]\label{ex:bar-degenerate}
+\easy Use the test case and a down-and-out call with barrier $B$ unless stated otherwise.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $S_0=B=100$. Explain why the continuously monitored option is worthless while the
+    option monitored at $t_1=\frac12$ and $t_2=1$ is not. Write the latter's price with the
+    bivariate normal distribution function $N_2(\cdot,\cdot;\rho)$ and evaluate it.
+  \item With $B=95$, the continuously monitored down-and-out call costs $3.75412$ and the
+    monthly one $5.32979$. What does a portfolio of the continuously monitored down-and-out call
+    and the monthly down-and-in call cost, and why is it not the vanilla call?
+  \item By \noteref{prop:bar-images} and \noteref{prop:bar-bridge-crossing}(i), the down-and-out
+    price is
+    \[
+      e^{-rT}\EQ\Big[g(S_T)\1_{\{S_T>B\}}\Big(1-e^{-2\log(S_0/B)\log(S_T/B)/(\sigma^2T)}\Big)\Big].
+    \]
+    Let $\sigma\downarrow0$ with $r$, $y$ fixed, and let $F=S_0e^{(r-y)T}\ne B$. Show that the price
+    tends to the discounted payoff of the deterministic path $S_0e^{(r-y)t}$, knocked out if that
+    path reaches $B$. Evaluate the limit for $B=95$ with $K=100$ and with $K=90$.
+  \item Show that, for $S_0>B$, the price tends to $(S_0-K)^+$ as $T\downarrow0$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The image density and the forward equation]\label{ex:bar-pde}
+\easy Let $b<0$ and $q_T(x)=p_T(x)-c\,p_T(x-2b)$ for $x>b$, with a constant $c$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $q$ solves the forward equation $\partial_Tq=\frac12\sigma^2\partial_x^2q-\nu\,\partial_xq$
+    for $T>0$, whatever $c$.
+  \item Show that $q_T(b)=0$ for all $T>0$ if and only if $c=e^{\lambda b}$. Why does the weight
+    $c=1$ of the driftless case fail when $\nu\ne0$?
+  \item Show that $\int_b^\infty\varphi(x)q_T(x)\,\dd x\to\varphi(0)$ as $T\downarrow0$ for every bounded continuous
+    $\varphi$. Does the formula depend on whether the barrier is above or below the spot, or on
+    whether $x$ is above or below $b$?
+  \item With $c=e^{\lambda b}$, show that $\frac12\sigma^2\partial_xq_T(b)=\frac{|b|}{T}\,p_T(b)$, and that this is
+    the density at $T$ of the first time $X$ reaches $b$. (Differentiate
+    $\Q(\underline X_T>b)=\int_b^\infty q_T$ in $T$.)
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Exponential barriers]\label{ex:bar-moving}
+\medium A down-and-out call is knocked out if $S_t\le Be^{\gamma t}$ for some $t\le T$, with $B<S_0$
+and a constant $\gamma$ (continuous monitoring).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that its price is $\widetilde G(S_0)-(B/S_0)^{2(\nu-\gamma)/\sigma^2}\,\widetilde G(B^2/S_0)$, where
+    $\widetilde G(x)$ is the Black--Scholes price of $(S_T-K)^+\1_{\{S_T>Be^{\gamma T}\}}$ for the spot $x$. You may use
+    \noteref{thm:bar-reflection}.
+  \item Evaluate it for the test case with $B=95$ and $\gamma=r-y$ (a barrier that moves with the
+    forward), and compare with the constant barrier.
+  \item For which $\gamma$ is the image weight equal to $1$? Interpret.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Rebates paid at the hit]\label{ex:bar-one-touch}
+\medium Let $B<S_0$, $b=\log(B/S_0)$, $\tau=\inf\{t:X_t=b\}$, and assume $\nu^2+2r\sigma^2\ge0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\tau$ has the density $f(t)=\frac{|b|}{\sigma\sqrt{2\pi t^3}}\exp\big(-\frac{(b-\nu t)^2}{2\sigma^2t}\big)$
+    on $(0,\infty)$ (\exref{ex:bar-pde}(d) or \noteref{thm:bar-reflection}(iii)).
+  \item Show that a claim paying $1$ at $\tau$ if $\tau\le T$ costs
+    \[
+      \EQ\big[e^{-r\tau}\1_{\{\tau\le T\}}\big]=\Big(\frac B{S_0}\Big)^{\frac{\nu-\hat\mu}{\sigma^2}}N\Big(\frac{b-\hat\mu T}{\sigma\sqrt T}\Big)
+      +\Big(\frac B{S_0}\Big)^{\frac{\nu+\hat\mu}{\sigma^2}}N\Big(\frac{b+\hat\mu T}{\sigma\sqrt T}\Big),\qquad
+      \hat\mu=\sqrt{\nu^2+2r\sigma^2}.
+    \]
+    \emph{Hint:} complete the square in $e^{-rt}f(t)$ to obtain the first-passage density of a
+    Brownian motion with drift $\pm\hat\mu$.
+  \item Check the cases $r=0$ and $T\to\infty$.
+  \item For the test case with $B=95$, price the down-and-out call with a rebate of $5$ paid at
+    the hit, and with the same rebate paid at $T$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Images or eigenfunctions]\label{ex:bar-sine}
+\hard Take $\nu=0$, $\sigma=1$, barriers $a<0<u$, $w=u-a$, and the image series
+$q(x)=\sum_{k\in\Z}\big[\varphi_T(x-2kw)-\varphi_T(x-2u-2kw)\big]$ of \noteref{prop:bar-double}, with $\varphi_T$
+the $\mathcal N(0,T)$ density. You may use the Poisson summation formula
+$\sum_{k\in\Z}f(x+kP)=\frac1P\sum_{n\in\Z}\hat f(2\pi n/P)e^{2\pi inx/P}$ for $f=\varphi_T$, whose Fourier
+transform is $\hat\varphi_T(\xi)=e^{-\xi^2T/2}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that
+    $q(x)=\frac2w\sum_{n\ge1}e^{-n^2\pi^2T/(2w^2)}\sin\big(\frac{n\pi(-a)}w\big)\sin\big(\frac{n\pi(x-a)}w\big)$ on $(a,u)$.
+  \item Estimate the number of terms each series needs for a relative accuracy $\varepsilon$, as a
+    function of $T/w^2$. For which $T$ are they equal?
+  \item For the test case with $L=80$, $U=120$ (put back $\sigma$ and the drift; \texttt{mfe230d.barriers} has both
+    series), find the number of terms each needs for a maximum error below $10^{-10}$ times the
+    maximum of the density, for $T=0.1$, $1$ and $10$.
+  \item Deduce from (a) the exponential rate at which the double knock-out call price decays as
+    $T\to\infty$, and check it numerically.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Where the continuity correction fails]\label{ex:bar-bgk-limits}
+\medium This is a computational exercise. Use the test case, the recursion of
+\noteref{prop:bar-discrete} for exact discrete prices (\texttt{mfe230d.barriers} implements it) and
+\noteref{prop:bar-bgk}.
+\begin{enumerate}[label=(\alph*)]
+  \item For the down-and-out call with $m=12$, $52$ and $252$ dates, compute the relative error of
+    the corrected price for barriers at a distance $\delta=\log(S_0/B)/(\sigma\sqrt h)$ of
+    $0.25,0.5,1,1.5,2,3$. What do you observe, and what rule of thumb follows?
+  \item For the up-and-out call with $B=115$, estimate the order in $h$ of the error of the corrected
+    price from $m=12,52,252$, and compare with the down-and-out call at $B=85$. Why is the
+    up-and-out call harder?
+  \item Correct the down-and-in call through in-out parity. Is its relative error larger or smaller
+    than the down-and-out call's, and why?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Lookbacks by simulation]\label{ex:bar-lookback-mc}
+\medium This is a computational exercise. Simulate the test case on a monthly grid ($m=12$) with
+$10^6$ paths.
+\begin{enumerate}[label=(\alph*)]
+  \item Estimate the continuously monitored floating-strike lookback put and the fixed-strike lookback
+    call with $K=110$, drawing the maximum of the bridge on every step
+    (\noteref{prop:bar-bridge-crossing}(iii)). Compare with \noteref{prop:bar-lookback}.
+  \item On the same paths, estimate the discretely monitored versions (maximum over the $13$ dates
+    $t_0,\dots,t_{12}$). Compare the fixed-strike call with the prediction of
+    \noteref{prop:bar-bgk}(iii).
+  \item Use the continuous payoff as a control variate for the discrete one. What variance reduction
+    do you get, and why is it so large?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A shifted control]\label{ex:bar-shifted-cv}
+\medium This is a computational exercise. In \noteref{tab:bar-mc} the continuous down-and-out call,
+weighted by the bridge survival probabilities, controls the monthly down-and-out call ($B=95$) with
+a variance reduction factor near $6$.
+\begin{enumerate}[label=(\alph*)]
+  \item Replace the control by the same bridge-weighted payoff with the barrier moved to
+    $B'=95e^{-\beta\sigma\sqrt h}$, whose mean is the closed form at $B'$. With $10^6$ paths, estimate the
+    price, the correlation, the optimal coefficient and the variance reduction factor, with and
+    without the vanilla call as a second control.
+  \item Explain the improvement with \noteref{prop:bar-bgk}. Is the estimator unbiased?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Bridges in a corridor]\label{ex:bar-corridor}
+\hard Let $\ell<0<u$, $w=u-\ell$, and $x,z\in(\ell,u)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that, given $X_s=x$ and $X_{s+h}=z$, the probability that $X$ stays in $(\ell,u)$ on
+    $[s,s+h]$ is
+    \[
+      \sum_{k\in\Z}\Big[\exp\Big(-\frac{2kw\,(kw-(z-x))}{\sigma^2h}\Big)
+      -\exp\Big(-\frac{2(u-x+kw)(u-x+kw-(z-x))}{\sigma^2h}\Big)\Big],
+    \]
+    that it does not depend on $\nu$, and that it reduces to \noteref{prop:bar-bridge-crossing}(i) as
+    $\ell\to-\infty$. You may use \noteref{prop:bar-double}.
+  \item Write the bridge-corrected estimator of a continuously monitored double knock-out call from
+    exact grid values, and prove that it is unbiased.
+  \item For the test case with $L=80$, $U=120$, run it with $m=1$ and $m=12$ steps ($4\times10^5$
+    paths each) and compare with \noteref{prop:bar-double}. Which $m$ gives the smaller variance, and
+    why? Compare also with checking the corridor at the $12$ dates only.
+\end{enumerate}
+\end{exercise}

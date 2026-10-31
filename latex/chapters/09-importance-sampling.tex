@@ -1,0 +1,778 @@
+% Chapter 9: Importance sampling.
+\providecommand{\Qt}{\widetilde{\mathbb Q}}
+\providecommand{\Et}{\widetilde{\mathbb E}}
+
+A Monte Carlo estimator spends its samples where the pricing measure puts its mass. For an
+at-the-money call that is roughly the right place. For a call struck three standard
+deviations out of the money, more than $99.8\%$ of the paths pay nothing, and the price is
+decided by the few that do. \emph{Importance sampling} draws the samples from another law,
+chosen to put them where the payoff lives, and removes the bias by weighting each sample
+with the likelihood ratio of the two laws. The same ratio drives the likelihood-ratio Greeks
+of \cref{ch:13-mc-greeks}; here it is used the other way round.
+
+The method can cut the variance by orders of magnitude, and it can also make it infinite
+while the estimator still looks well behaved; every gain below therefore comes with its
+failure mode. The code is \coderef{code/src/mfe230d/importance.py}.
+
+Throughout, the test case is $S=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, with
+$\log(S_T/S)\sim\mathcal N(\nu T,\sigma^2T)$ under $\Q$, $\nu=r-y-\sigma^2/2=-0.03$, and
+call price $7.36429$. In standard units $S_T=S\exp(\nu T+sZ)$ with $s=\sigma\sqrt T$ and
+$Z\sim\mathcal N(0,1)$, and the call pays exactly when $Z>d$, where
+\[
+  d=\frac{\log(K/S)-\nu T}{\sigma\sqrt T}=-d_-
+\]
+is the distance from the centre of the law of $Z$ to the strike, in standard deviations.
+
+\section{The likelihood ratio}\label{sec:is-lr}
+
+Let $X$ be a random vector in $\R^k$ with density $q$ under $\Q$, and let $f:\R^k\to\R$ be
+Borel measurable with $\EQ|f(X)|<\infty$; we want $\mu=\EQ[f(X)]$. In pricing, $X$ is the
+terminal log-price or the vector of normals that drives a simulated path, and $f$ includes
+the discount factor. Let $\tilde q$ be another probability density on $\R^k$, the
+\emph{sampling density}, and write $\Qt$ and $\Et$ for probabilities and expectations when
+$X$ has density $\tilde q$. The \emph{likelihood ratio}, or \emph{weight}, is the Borel
+function
+\[
+  L(x)=\frac{q(x)}{\tilde q(x)}\ \text{ if }\tilde q(x)>0,\qquad L(x)=0\ \text{ otherwise}.
+\]
+Everything below holds verbatim for discrete laws, with densities with respect to counting
+measure (probability mass functions).
+
+\begin{proposition}[The importance-sampling estimator]\label{prop:is-likelihood-ratio}
+Assume the \emph{support condition}
+\begin{equation}\label{eq:is-support}
+  \tilde q(x)>0\quad\text{for every }x\text{ with }f(x)q(x)\neq0 .
+\end{equation}
+\begin{enumerate}[label=(\roman*)]
+  \item $f(X)L(X)$ is $\Qt$-integrable and $\Et[f(X)L(X)]=\EQ[f(X)]=\mu$.
+  \item If $X_1,X_2,\dots$ are independent with density $\tilde q$, the
+    \emph{importance-sampling estimator}
+    $\hat\mu^{\mathrm{is}}_n=\frac1n\sum_{i=1}^nf(X_i)L(X_i)$ is unbiased and converges to
+    $\mu$ almost surely.
+  \item Its variance is $\sigma_{\mathrm{is}}^2/n$, where
+    \begin{equation}\label{eq:is-variance}
+      \sigma_{\mathrm{is}}^2+\mu^2=\Et\big[f(X)^2L(X)^2\big]=\EQ\big[f(X)^2L(X)\big]
+      =\int_{\R^k}\frac{f(x)^2q(x)^2}{\tilde q(x)}\,\dd x\ \in[0,\infty],
+    \end{equation}
+    with the integral taken over $\{\tilde q>0\}$.
+  \item Without \eqref{eq:is-support}, $\Et[f(X)L(X)]=\EQ\big[f(X)\1_{\{\tilde q(X)>0\}}\big]$:
+    the estimator converges to the wrong number, and nothing in the samples reveals it.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+For any Borel $g\ge0$, or $g$ with $\EQ|g(X)|<\infty$,
+\[
+  \Et[g(X)L(X)]=\int_{\{\tilde q>0\}}g(x)\frac{q(x)}{\tilde q(x)}\,\tilde q(x)\,\dd x
+  =\int_{\{\tilde q>0\}}g(x)q(x)\,\dd x=\EQ\big[g(X)\1_{\{\tilde q(X)>0\}}\big].
+\]
+With $g=|f|$ this shows integrability, and with $g=f$ it gives (iv). Under
+\eqref{eq:is-support}, $f(x)q(x)=0$ on $\{\tilde q=0\}$, so the indicator can be dropped:
+this is (i). (ii) follows from (i) and the strong law of large numbers for the i.i.d.\
+integrable variables $f(X_i)L(X_i)$. For (iii), apply the display to $g=f^2L\ge0$ (Tonelli):
+$\Et[f^2L^2]=\EQ[f^2L\,\1_{\{\tilde q>0\}}]=\EQ[f^2L]$, since $L=0$ off $\{\tilde q>0\}$;
+both sides may be infinite. Subtract $\mu^2$.
+\end{proof}
+
+If $0<\sigma^2_{\mathrm{is}}<\infty$, \cref{thm:mc-clt} gives confidence intervals with the
+sample standard deviation $\hat s_n$ of the weighted samples; if $\sigma^2_{\mathrm{is}}=0$,
+every sample equals $\mu$; if $\sigma^2_{\mathrm{is}}=\infty$, the estimator still converges,
+but $\hat s_n\to\infty$ almost surely and the intervals mean nothing
+(\cref{rem:mc-heavy-tails}). The weight is always integrable, $\Et[L]=\Q(\tilde q(X)>0)\le1$
+($g=1$ in the proof), but its variance can be infinite.
+
+The middle expression in \eqref{eq:is-variance} is the key to everything that follows: the
+second moment of the payoff under the target law, weighted by $L$. Where the sampling
+density is much smaller than the target density, $L$ is large and the payoff is punished;
+where it is larger, $L<1$ and the payoff is discounted. A good sampling density is large
+where $|f|q$ is large. The extra cost of a sample is one evaluation of $L$, usually one
+exponential, so the efficiency gain over plain Monte Carlo (\cref{def:mc-efficiency}) is
+close to the variance ratio $\sigma^2/\sigma^2_{\mathrm{is}}$. Under $\Qt$, discounted prices
+are not martingales: the sampling law is a computational device, not a pricing measure.
+
+\begin{proposition}[The zero-variance law]\label{prop:is-zero-variance}
+Assume $0<\EQ|f(X)|<\infty$. For every sampling density satisfying \eqref{eq:is-support},
+\[
+  \sigma^2_{\mathrm{is}}\ \ge\ \big(\EQ|f(X)|\big)^2-\mu^2 ,
+\]
+with equality if and only if $\tilde q=|f|q/\EQ|f(X)|$ almost everywhere. In particular, if
+$f\ge0$, the density $\tilde q^*=fq/\mu$ gives $f(X)L(X)=\mu$ for $\Qt$-almost every sample,
+and it is the only sampling density with zero variance.
+\end{proposition}
+
+\begin{proof}
+By Cauchy--Schwarz and \cref{prop:is-likelihood-ratio}(i) applied to $|f|$,
+$\Et[(fL)^2]\ge\big(\Et|fL|\big)^2=\big(\EQ|f|\big)^2$, which is the inequality. Equality
+holds if and only if $|f(X)|L(X)$ is $\Qt$-almost surely equal to a constant $c$, and then
+$c=\Et|fL|=\EQ|f|>0$. On $\{\tilde q>0,\ fq=0\}$ we would have $|f|L=0\ne c$, so this set
+has $\Qt$-probability zero; on $\{fq\ne0\}$, which lies in $\{\tilde q>0\}$ by
+\eqref{eq:is-support}, $|f|q/\tilde q=c$, that is $\tilde q=|f|q/c$. Hence
+$\tilde q=|f|q/c$ almost everywhere; conversely this density gives $|f|L=c$. For $f\ge0$,
+$\EQ|f|=\mu$ and the bound is $0$.
+\end{proof}
+
+The zero-variance density needs $\mu$, the number we are computing, so it is never used as
+such. What it gives is the shape to aim for: \emph{sample in proportion to payoff times
+density}. For a call it is the risk-neutral density of $S_T$ on $\{S_T>K\}$, multiplied by
+$S_T-K$ (\cref{fig:is-densities}). A payoff that changes sign cannot be estimated with zero
+variance by one sampling law; writing $f=f^+-f^-$ and estimating the two parts with two laws
+removes the obstruction.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.85\textwidth]{ch09-densities}
+  \caption{The course's experiment at $K=100$. (a) The risk-neutral density of $S_T$ and the
+    sampling densities with drift shifts $\alpha=0.1,0.2,0.3$ ($\beta=1$); dashed, the
+    zero-variance density of \cref{prop:is-zero-variance}. (b) The weighted payoff
+    $e^{-rT}(S_T-K)^+L$, whose $\Qt$-mean is the price $7.36$ (dotted) in every case: the
+    shift turns the unbounded payoff into a bounded hump, much flatter under the sampling law.}
+  \label{fig:is-densities}
+\end{figure}
+
+\section{Shifting and scaling the Gaussian}\label{sec:is-gaussian}
+
+In lecture the target is the law of the terminal log-return $x_T=\log(S_T/S)$, which is
+$\mathcal N(\nu T,\sigma^2T)$ under $\Q$, and the sampling law is
+$\mathcal N\big((\nu+\alpha)T,\beta^2\sigma^2T\big)$: $\alpha$ shifts the drift of the
+log-price and $\beta$ rescales its volatility. For $\beta=1$ the weight is
+\begin{equation}\label{eq:is-weight-course}
+  L(x_T)=\exp\Big(\frac{\alpha\,[(\alpha+2\nu)T-2x_T]}{2\sigma^2}\Big),
+\end{equation}
+as one checks by expanding the two Gaussian exponents. In standard units the target is
+$\mathcal N(m,s^2)$ with $m=\nu T$, $s=\sigma\sqrt T$, and the sampling law is
+$\mathcal N(m+a,\beta^2s^2)$ with $a=\alpha T$, a shift of $c=a/s$ standard deviations.
+
+\begin{proposition}[Mean shift and scale]\label{prop:is-gaussian}
+Let the target law be $\mathcal N(m,s^2)$ and the sampling law $\mathcal N(m+a,\beta^2s^2)$,
+with $s>0$, $\beta>0$, $a\in\R$, and $c=a/s$.
+\begin{enumerate}[label=(\roman*)]
+  \item The weight has second moment
+    \[
+      \Et[L^2]=\EQ[L]=\frac{\beta^2}{\sqrt{2\beta^2-1}}\exp\Big(\frac{c^2}{2\beta^2-1}\Big)
+      \quad\text{if }\beta>\tfrac1{\sqrt2},\qquad \Et[L^2]=\infty\quad\text{if }\beta\le\tfrac1{\sqrt2}.
+    \]
+    For $\beta=1$ this is $e^{c^2}$.
+  \item (Mirror formula.) If $\beta>1/\sqrt2$, then for every Borel $f$,
+    \begin{equation}\label{eq:is-mirror}
+      \Et\big[f(X)^2L(X)^2\big]=\Et[L^2]\;\E\big[f(\tilde X)^2\big],\qquad
+      \tilde X\sim\mathcal N\Big(m-\frac{a}{2\beta^2-1},\ \frac{\beta^2s^2}{2\beta^2-1}\Big).
+    \end{equation}
+  \item The importance-sampling estimator of $\EQ[f(X)]$ has finite variance for every $f$
+    of at most exponential growth ($|f(x)|\le Ce^{\kappa|x|}$ for some constants $C,\kappa$)
+    if and only if $\beta>1/\sqrt2$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Write $u=x-m$ and $\gamma=2\beta^2-1$. The target density is
+$(2\pi s^2)^{-1/2}e^{-u^2/(2s^2)}$ and the sampling density
+$(2\pi\beta^2s^2)^{-1/2}e^{-(u-a)^2/(2\beta^2s^2)}$, so
+\[
+  \frac{q(x)^2}{\tilde q(x)}=\frac{\beta}{s\sqrt{2\pi}}\exp\Big(-\frac{u^2}{s^2}+\frac{(u-a)^2}{2\beta^2s^2}\Big)
+  =\frac{\beta}{s\sqrt{2\pi}}\exp\Big(-\frac{\gamma u^2+2au-a^2}{2\beta^2s^2}\Big).
+\]
+If $\gamma>0$, complete the square, $\gamma u^2+2au=\gamma(u+a/\gamma)^2-a^2/\gamma$, and use
+$1+1/\gamma=2\beta^2/\gamma$:
+\[
+  \frac{q(x)^2}{\tilde q(x)}=\frac{\beta}{s\sqrt{2\pi}}\,e^{c^2/\gamma}
+  \exp\Big(-\frac{(x-m+a/\gamma)^2}{2\beta^2s^2/\gamma}\Big)
+  =\frac{\beta^2}{\sqrt\gamma}\,e^{c^2/\gamma}\;\tilde p(x),
+\]
+where $\tilde p$ is the density of $\tilde X$. By \eqref{eq:is-variance},
+$\Et[f^2L^2]=\int f^2q^2/\tilde q\,\dd x$; taking $f\equiv1$ gives (i) and a general $f$ gives
+(ii). If $\gamma<0$ the exponent tends to $+\infty$ quadratically as $|u|\to\infty$, and if
+$\gamma=0$ it is affine in $u$, $(a^2-2au)/(2\beta^2s^2)$, whose exponential is not integrable
+over $\R$; in both cases $\Et[L^2]=\infty$.
+(iii) If $\beta>1/\sqrt2$, then $\E[f(\tilde X)^2]\le C^2\E[e^{2\kappa|\tilde X|}]<\infty$
+for a Gaussian $\tilde X$, so (ii) gives a finite variance. If $\beta\le1/\sqrt2$, the payoff
+$f\equiv1$, of exponential growth with $\kappa=0$, has infinite variance by (i).
+\end{proof}
+
+The mirror formula has a simple reading for $\beta=1$:
+$\Et[(fL)^2]=e^{c^2}\,\EQ\big[f(X-a)^2\big]$. Shifting the sampling law by $a$ towards the
+payoff costs the factor $e^{c^2}$, and in exchange the second moment is that of the payoff
+evaluated at the target shifted by $a$ \emph{the other way}, where a call or a digital is
+much smaller. The best shift balances the two. For the call,
+$\E[((Se^{Y}-K)^+)^2]$ with $Y\sim\mathcal N(\mu_Y,v)$ equals
+\[
+  S^2e^{2\mu_Y+2v}N(\delta_2)-2KSe^{\mu_Y+v/2}N(\delta_1)+K^2N(\delta_0),\qquad
+  \delta_j=\frac{\mu_Y+jv-\log(K/S)}{\sqrt v},
+\]
+so the variance of the importance-sampling estimator is an explicit function of $(\alpha,\beta)$,
+although its minimiser is not. \Cref{fig:is-contours} reproduces the variance-ratio contours of
+the course. With $\beta=1$, the optimal shift and the variance ratio are $\alpha^*=0.206$ and
+$9.03$ at $K=90$, $\alpha^*=0.258$ and $10.58$ at $K=100$, and $\alpha^*=0.314$ and $14.29$
+at $K=110$: an order of magnitude even at the money, and more the further out of the money
+the strike. With $\beta$ free at $K=100$, the ratio keeps increasing as $\beta$ decreases,
+to $30.9$ at $\beta=0.75$ and $34.6$ as $\beta\downarrow1/\sqrt2$ (with $\alpha^*\approx0.270$):
+the best scale sits on the edge of the region where the weight has finite variance.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.85\textwidth]{ch09-contours}
+  \caption{Variance of plain Monte Carlo over variance of importance sampling for the test-case
+    call, computed exactly from \cref{prop:is-gaussian}. (a) Against the strike and the drift
+    shift, $\beta=1$, with the optimal shift $\alpha^*(K)$. (b) Against the scale and the shift
+    at $K=100$; to the left of $\beta=1/\sqrt2$ the variance is infinite.}
+  \label{fig:is-contours}
+\end{figure}
+
+\begin{remark}[The share measure and the limits of $\alpha^*$]\label{rem:is-share}
+With $\alpha=\sigma^2$ and $\beta=1$, \eqref{eq:is-weight-course} gives
+$S_TL=S\exp\big(x_T+(\sigma^2/2+\nu)T-x_T\big)=Se^{(r-y)T}$ for every sample: the forward is
+estimated with zero variance. The sampling law, under which $\log S_T$ has drift
+$r-y+\sigma^2/2$, is the share measure of \cref{prop:ma-numeraire}, and its density with
+respect to $\Q$ is $S_T/\EQ[S_T]$, the zero-variance density of \cref{prop:is-zero-variance}
+for $f(x)=Se^x$. Numerically $\alpha^*\to\sigma^2$ as $K\to0$
+($\alpha^*=0.0501$ at $K=20$, $0.0404$ at $K=1$), and as $K\to\infty$, heuristically,
+$c^*=d+\frac{3}{2d}+o(1/d)$ (checked numerically in our code), the leading terms of the
+lecture's expansion.
+\end{remark}
+
+\begin{remark}[Thin tails are dangerous, fat tails are safe]\label{rem:is-tails}
+For every $\beta<1$ the weight $L(x)$ grows like $\exp(\kappa x^2)$, $\kappa>0$, in both tails,
+while $L\tilde q=q$ always decays. What fails for $\beta<1/\sqrt2$ is the integrand of the
+second moment, $L^2\tilde q=q^2/\tilde q$, which then grows like $\exp(\kappa'x^2)$. At
+$\beta=1/\sqrt2$ exactly, the weight has infinite variance, but the call does not: $q^2/\tilde q$ is then the exponential of an affine function
+of $x$, and $\Et[(fL)^2]<\infty$ if and only if $\alpha>\sigma^2$ (compare the growth $e^{2x}$
+of $f^2$ with the decay of $q^2/\tilde q$). For $\beta>1$, on the other hand, the exponent $-u^2/(2s^2)+(u-a)^2/(2\beta^2s^2)$ of $L$
+(with $u=x-m$) is a concave quadratic in $u$, so the weight is \emph{bounded}, and
+$\sigma^2_{\mathrm{is}}+\mu^2=\EQ[f^2L]\le\sup L\,\EQ[f^2]$: whatever is finite under $\Q$
+stays finite. (For $\beta=1$ the exponent is affine and $L$ is bounded on a half-line only.)
+The same computation with $q^4/\tilde q^3$ shows
+that the fourth moment of the call estimator is infinite whenever $\beta^2<3/4$ (and, for the
+$n$-th moment of the weight, $\beta^2>1-1/n$; \exref{ex:is-moments}). For
+$1/\sqrt2<\beta<\sqrt3/2$, then, $\hat s_n$ converges, but its own fluctuations have infinite
+variance, and the error bars are least trustworthy exactly where the course's optimum lies.
+\Cref{fig:is-degeneracy}(b) shows the running $\hat s_n$ for $\beta=1$, $0.75$ and $0.55$:
+the first two settle at their exact values $3.88$ and $2.27$ (against $12.57$ for plain
+Monte Carlo), the third never does.
+\end{remark}
+
+
+\demo{09-importance-sampling.ipynb}{move $\alpha$, $\beta$ and $K$; watch an infinite variance.}
+
+\section{Exponential tilting and large deviations}\label{sec:is-tilting}
+
+The mean shift is a special case of a general recipe. Let $X$ be a real random variable whose
+cumulant generating function $\psi(\theta)=\log\EQ[e^{\theta X}]$ is finite on an open
+interval $\Theta\ni0$.
+
+\begin{definition}[Exponential tilting]\label{def:is-tilting}
+For $\theta\in\Theta$, the \emph{exponentially tilted} (or \emph{Esscher}) law of $X$ has
+density $q_\theta(x)=e^{\theta x-\psi(\theta)}q(x)$; its weight is
+$L=e^{-\theta X+\psi(\theta)}$. For a sum $S_n=X_1+\dots+X_n$ of independent copies, each
+tilted, the weight is $e^{-\theta S_n+n\psi(\theta)}$.
+\end{definition}
+
+On $\Theta$, $\psi$ is infinitely differentiable, with $\psi'(\theta)=\E_\theta[X]$ and
+$\psi''(\theta)=\Var_\theta(X)$, the mean and variance under the tilted law: for $\theta$ in
+$\Theta$ and $\varepsilon>0$ with $\theta\pm\varepsilon\in\Theta$,
+$|x|^je^{\theta x}\le C_j(e^{(\theta+\varepsilon)x}+e^{(\theta-\varepsilon)x})$, so dominated
+convergence allows differentiation under $\EQ$. If $X$ is not almost surely constant,
+$\psi''>0$ and $\psi'$ is strictly increasing: tilting with $\theta>0$ raises the mean.
+Examples: for $\mathcal N(m,s^2)$, $\psi(\theta)=m\theta+s^2\theta^2/2$ and the tilted law is
+$\mathcal N(m+\theta s^2,s^2)$, the mean shift of \cref{sec:is-gaussian} with $a=\theta s^2$;
+for a Poisson count with mean $\lambda$, $\psi(\theta)=\lambda(e^\theta-1)$ and the tilted
+law is Poisson with mean $\lambda e^\theta$. Other families, and a law that cannot be tilted,
+are in \exref{ex:is-tilts}.
+
+\begin{proposition}[The saddle-point tilt for sums]\label{prop:is-tilting}
+Let $X_1,X_2,\dots$ be i.i.d.\ copies of a non-constant $X$ with $\psi$ finite on an open
+interval $\Theta\ni0$. Let $a>\EQ[X]$, and suppose that $\psi'(\theta_a)=a$ for some
+$\theta_a\in\Theta$. Set $I(a)=a\theta_a-\psi(\theta_a)$ and $p_n=\Q(S_n\ge na)$. Then
+$\theta_a>0$ and $I(a)>0$, and:
+\begin{enumerate}[label=(\roman*)]
+  \item (Chernoff bound.) $p_n\le e^{-nI(a)}$.
+  \item The estimator $Y=\1_{\{S_n\ge na\}}e^{-\theta_aS_n+n\psi(\theta_a)}$, with $S_n$
+    sampled under the tilted law, satisfies $0\le Y\le e^{-nI(a)}$ surely, and
+    $\Et[Y^2]\le e^{-nI(a)}p_n\le e^{-2nI(a)}$.
+  \item $\frac1n\log p_n\to-I(a)$, and
+    $\log\Et[Y^2]/\log(p_n^2)\to1$, while plain Monte Carlo has relative variance
+    $(1-p_n)/p_n=e^{nI(a)+o(n)}$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+$\psi'$ is strictly increasing and $\psi'(\theta_a)=a>\EQ[X]=\psi'(0)$, so $\theta_a>0$. By
+strict convexity, $0=\psi(0)>\psi(\theta_a)-\theta_a\psi'(\theta_a)=-I(a)$.
+(ii) On $\{S_n\ge na\}$, $\theta_a>0$ gives $e^{-\theta_aS_n}\le e^{-n\theta_aa}$, so
+$Y\le e^{-n(a\theta_a-\psi(\theta_a))}=e^{-nI(a)}$; hence $Y^2\le e^{-nI(a)}Y$ and
+$\Et[Y^2]\le e^{-nI(a)}\Et[Y]=e^{-nI(a)}p_n$, by \cref{prop:is-likelihood-ratio}(i).
+(i) $p_n=\Et[Y]\le e^{-nI(a)}$.
+(iii) The function $\theta\mapsto a\theta-\psi(\theta)$ is concave with a critical point at
+$\theta_a$, so $I(a)=\sup_\theta(a\theta-\psi(\theta))$, the Legendre transform of $\psi$ at
+$a$. By Cramér's theorem \citep[Theorem~2.2.3]{dembo-zeitouni},
+$\liminf_n\frac1n\log\Q(S_n/n>a)\ge-\inf_{x>a}I(x)$. The function $I$ is convex, $I\ge0$ (take $\theta=0$) and
+$I(\EQ X)=0$ (Jensen: $\psi(\theta)\ge\theta\,\EQ X$), so $I$ is nondecreasing on
+$[\EQ X,\infty)$; it is finite near $a$ (every $x=\psi'(\theta)$ with $\theta$ near $\theta_a$
+is attained), hence continuous at $a$. So $\inf_{x>a}I(x)=I(a)$ and the right side is $-I(a)$; with (i), $\frac1n\log p_n\to-I(a)$. Jensen's inequality
+gives $\Et[Y^2]\ge p_n^2$, and (ii) gives $\Et[Y^2]\le e^{-nI(a)}p_n$; dividing the logarithms
+by $\log p_n^2<0$,
+\[
+  1\ \ge\ \frac{\log\Et[Y^2]}{\log p_n^2}\ \ge\ \frac{-nI(a)+\log p_n}{2\log p_n}\ \longrightarrow\ 1 .\qedhere
+\]
+\end{proof}
+
+The tilt $\theta_a$ is a \emph{saddle point}: it makes the rare level the mean of the
+sampling law, $\E_{\theta_a}[S_n/n]=a$, and no more. Given the rare event, the summands behave approximately like tilted
+variables (\citealp{asmussen-glynn}, Sections~VI.2 and~VI.5). As a jump-count example, let $S_n$ be the
+number of jumps of a Poisson process with intensity $2$ per year over $n=10$ years, and
+$p_n=\Q(S_n\ge40)=5.32\times10^{-5}$. Then $\theta_a=\log2$, $I(a)=4\log2-2=0.773$, the bound
+is $e^{-nI(a)}=4.41\times10^{-4}$, and plain Monte Carlo has relative error $137$ per sample.
+Tilted counts (Poisson with mean $4$ per year) give $2.17$ (our implementation,
+\texttt{default\_rng}, seed $7$, $10^5$ samples): $(137/2.17)^2\approx4000$ times fewer samples.
+
+\section{Path space: Girsanov's theorem and the optimal drift}\label{sec:is-path}
+
+A simulated path is a function of a vector $Z\in\R^m$ of independent normals, one per date
+(or one per date and factor). Shifting $Z$ to $\mathcal N(\mu,I_m)$ multiplies $m$
+independent one-dimensional weights, so by \cref{prop:is-gaussian} with $\beta=1$
+\begin{equation}\label{eq:is-path-weight}
+  L(Z)=\exp\big(-\mu^\top Z+\tfrac12|\mu|^2\big),\qquad \Et[L^2]=e^{|\mu|^2}.
+\end{equation}
+The continuous-time meaning of this weight is Girsanov's theorem.
+
+\begin{theorem}[Path-space importance sampling]\label{thm:is-girsanov}
+Let $B$ be a standard Brownian motion on $[0,T]$ under $\Qt$, with a filtration for it, and let
+$\theta$ be an adapted process that is either bounded or deterministic with
+$\int_0^T\theta_t^2\,\dd t<\infty$. Set
+\[
+  \tilde W_t=B_t+\int_0^t\theta_u\,\dd u,\qquad
+  L_T=\exp\Big(-\int_0^T\theta_u\,\dd B_u-\frac12\int_0^T\theta_u^2\,\dd u\Big).
+\]
+\begin{enumerate}[label=(\roman*)]
+  \item For every Borel functional $G$ on $C[0,T]$ with $\EQ|G(W)|<\infty$ for a
+    $\Q$-Brownian motion $W$: $\ \EQ[G(W)]=\Et\big[G(\tilde W)\,L_T\big]$.
+  \item If $\theta$ is deterministic, $\Et[L_T^2]=\exp\big(\int_0^T\theta_u^2\,\dd u\big)$.
+  \item If $\theta_u=\mu_j/\sqrt{\Delta t}$ on $(t_{j-1},t_j]$, $t_j=j\Delta t$, $\Delta t=T/m$,
+    then $L_T=\exp(-\mu^\top Z+\frac12|\mu|^2)$ with
+    $Z_j=(\tilde W_{t_j}-\tilde W_{t_{j-1}})/\sqrt{\Delta t}$, and the $Z_j$ are independent
+    $\mathcal N(\mu_j,1)$ under $\Qt$: the discrete mean shift \eqref{eq:is-path-weight} is
+    this change of measure exactly, with no discretisation error in the weight.
+  \item Under $\Qt$, $S_t=S\exp(\nu t+\sigma\tilde W_t)$ solves
+    $\dd S_t=(r-y+\sigma\theta_t)S_t\,\dd t+\sigma S_t\,\dd B_t$.
+\end{enumerate}
+\end{theorem}
+
+A feedback drift $\theta_t=h(t,\tilde W_t)$ makes $\tilde W$ the solution of
+$\dd\tilde W=h(t,\tilde W)\,\dd t+\dd B$, and $\theta$ is adapted only if this equation has a
+strong solution, for instance when $h$ is Lipschitz in $x$; if $h$ is also bounded, the theorem
+applies.
+
+\begin{proof}
+(i) We use Girsanov's theorem in the form of \textcite{shreve2}, Theorem~5.2.3, with
+$\Theta=\theta$ and $W=B$: if $\Et\int_0^T\theta_u^2L_u^2\,\dd u<\infty$, where $L_u$ is the
+same exponential on $[0,u]$, then $\Et[L_T]=1$ and $\tilde W$ is a Brownian motion under the
+probability $\hat\Q$ with $\dd\hat\Q=L_T\,\dd\Qt$. The hypothesis holds: if $|\theta|\le C$,
+then $L_u^2=M_u\exp(\int_0^u\theta^2)\le M_ue^{C^2u}$ with
+$M_u=\exp(-2\int_0^u\theta\,\dd B-2\int_0^u\theta^2)$ a positive local martingale, hence a
+supermartingale with $\Et M_u\le1$; if $\theta$ is deterministic, (ii) below on $[0,u]$ gives
+$\Et L_u^2=e^{\int_0^u\theta^2}$. The law of a Brownian motion on $C[0,T]$ is determined by
+its finite-dimensional distributions, so $G(\tilde W)$ has the same law under $\hat\Q$ as
+$G(W)$ under $\Q$, and $\EQ[G(W)]=\E_{\hat\Q}[G(\tilde W)]=\Et[L_TG(\tilde W)]$.
+(ii) For deterministic $\theta$, $\int_0^T\theta\,\dd B\sim\mathcal N(0,v)$ with
+$v=\int_0^T\theta^2$ \citep[Theorem~4.4.9]{shreve2}, so
+$\Et[L_T^2]=\Et[e^{-2\int\theta\,\dd B}]e^{-v}=e^{2v}e^{-v}$.
+(iii) $\int_0^T\theta\,\dd B=\sum_j\mu_j(B_{t_j}-B_{t_{j-1}})/\sqrt{\Delta t}=\sum_j\mu_j(Z_j-\mu_j)$,
+because $\tilde W_{t_j}-\tilde W_{t_{j-1}}=B_{t_j}-B_{t_{j-1}}+\mu_j\sqrt{\Delta t}$, and
+$\frac12\int\theta^2=\frac12|\mu|^2$; so $L_T=\exp(-\mu^\top Z+|\mu|^2-\frac12|\mu|^2)$. The
+Brownian increments are independent $\mathcal N(0,\Delta t)$ under $\Qt$.
+(iv) It\^o's formula: $\dd S=S\big((\nu+\frac{\sigma^2}2)\,\dd t+\sigma\,\dd\tilde W\big)$ and
+$\dd\tilde W=\dd B+\theta\,\dd t$.
+\end{proof}
+
+So a drift added to the Brownian motion is a drift $\sigma\theta$ added to the asset: to price
+an out-of-the-money call, simulate a market that rallies, and weight. A volatility cannot be
+changed this way. If each of $m$ increments is rescaled by $\beta\ne1$, the weight has
+$\Et[L^2]=\big(\beta^2/\sqrt{2\beta^2-1}\big)^m$ by \cref{prop:is-gaussian}, and
+$\beta^4>2\beta^2-1$ makes this explode as the grid is refined; in the limit the two path
+laws are mutually singular, because the realised quadratic variation of $\log S$ is
+$\sigma^2T$ almost surely under one and $\beta^2\sigma^2T$ under the other. The course's
+$\beta$ is a device for one coordinate, such as the terminal value.
+
+\begin{remark}[The zero-variance law in path space is a feedback drift]\label{rem:is-feedback}
+Let $\dd X_t=b(t,X_t)\,\dd t+\sigma(t,X_t)\,\dd W_t$ under $\Q$, with $b$ and $\sigma$
+continuous, let $g>0$, and suppose that $u\in C^{1,2}([0,T)\times\R)$ is positive, continuous
+on $[0,T]\times\R$, solves $u_t+bu_x+\frac12\sigma^2u_{xx}=0$ with $u(T,\cdot)=g$, and
+that $\int\sigma u_x(t,X_t)\,\dd W_t$ is a martingale. It\^o's formula and the equation give
+$\dd u(t,X_t)=\sigma u_x\,\dd W_t$, so $u(t,X_t)=\EQ[g(X_T)\mid\F_t]$ is the price process (the
+Feynman--Kac representation of \cref{thm:sm-feynman-kac}, with zero rate), and It\^o's formula
+for $\log u$ gives
+\[
+  g(X_T)=u(0,X_0)\exp\Big(\int_0^T\theta^*_t\,\dd W_t-\frac12\int_0^T(\theta^*_t)^2\,\dd t\Big),\qquad
+  \theta^*_t=\sigma(t,X_t)\,\partial_x\log u(t,X_t).
+\]
+The exponential is the martingale $u(t,X_t)/u(0,X_0)$, so Girsanov's theorem for a martingale
+density \citep[Theorem~3.5.1]{karatzas-shreve} applies: the zero-variance law of
+\cref{prop:is-zero-variance}, with density $g(X_T)/u(0,X_0)$ with respect to $\Q$, is the
+change of measure under which $W$ acquires the drift $\theta^*$. It needs $u$, the price
+function itself; the drift of the next proposition freezes it along a single path.
+\end{remark}
+
+\begin{proposition}[The Glasserman--Heidelberger--Shahabuddin drift]\label{prop:is-optimal-drift}
+Let $G:\R^m\to[0,\infty)$ be Borel with $p=\E[G(Z)]\in(0,\infty)$ for $Z\sim\mathcal N(0,I_m)$,
+let $F=\log G$ (with $F=-\infty$ where $G=0$), and $H(z)=F(z)-\frac12|z|^2$. For $\mu\in\R^m$
+let $Y_\mu=G(Z)\exp(-\mu^\top Z+\frac12|\mu|^2)$ with $Z\sim\mathcal N(\mu,I_m)$ under $\Qt$.
+\begin{enumerate}[label=(\roman*)]
+  \item $\Et[Y_\mu]=p$ and $\Et[Y_\mu^2]=\E\big[G(Z)^2e^{-\mu^\top Z+|\mu|^2/2}\big]$ for
+    $Z\sim\mathcal N(0,I_m)$.
+  \item If $G(z)=e^{\kappa+v^\top z}$, then $v$ is the unique maximiser of $H$ and
+    $Y_v=p$ surely: zero variance.
+  \item If $F$ is concave and $\mu$ maximises $H$, then $F(z)\le F(\mu)+\mu^\top(z-\mu)$ for
+    all $z$. Consequently $0\le Y_\mu\le e^{H(\mu)}$ surely, $p\le e^{H(\mu)}$, and
+    $\Et[Y_\mu^2]/p^2\le e^{H(\mu)}/p$.
+\end{enumerate}
+At a maximiser where $G$ is positive and differentiable, $\nabla F(\mu)=\mu$, that is
+$\nabla G(\mu)=G(\mu)\,\mu$.
+\end{proposition}
+
+\begin{proof}
+(i) is \cref{prop:is-likelihood-ratio} with \eqref{eq:is-path-weight}.
+(ii) $H(z)=\kappa+\frac12|v|^2-\frac12|z-v|^2$ is uniquely maximised at $v$, and
+$Y_v=e^{\kappa+v^\top Z-v^\top Z+|v|^2/2}=e^{\kappa+|v|^2/2}=\E[e^{\kappa+v^\top Z}]=p$.
+(iii) $H(\mu)$ is finite since $p>0$ forces $G>0$ somewhere. Fix $z$ with $F(z)>-\infty$
+(otherwise there is nothing to prove) and $t\in(0,1]$. Concavity gives
+$F(\mu+t(z-\mu))\ge(1-t)F(\mu)+tF(z)$, and maximality gives
+$H(\mu+t(z-\mu))\le H(\mu)$. Together,
+\[
+  t\big(F(z)-F(\mu)\big)\le\tfrac12|\mu+t(z-\mu)|^2-\tfrac12|\mu|^2=t\,\mu^\top(z-\mu)+\tfrac{t^2}2|z-\mu|^2 .
+\]
+Divide by $t$ and let $t\downarrow0$. Then
+$Y_\mu=\exp\big(F(Z)-\mu^\top Z+\frac12|\mu|^2\big)\le\exp\big(F(\mu)-\frac12|\mu|^2\big)=e^{H(\mu)}$,
+so $p=\Et[Y_\mu]\le e^{H(\mu)}$ and $\Et[Y_\mu^2]\le e^{H(\mu)}\Et[Y_\mu]=e^{H(\mu)}p$.
+The first-order condition is $\nabla H(\mu)=0$.
+\end{proof}
+
+The drift $\mu$ is the \emph{most important path}: the point that maximises payoff times
+density, $G(z)e^{-|z|^2/2}$. Writing
+$Y_\mu=e^{H(\mu)}\exp\big(F(Z)-F(\mu)-\nabla F(\mu)^\top(Z-\mu)\big)$ shows what the shift
+achieves: the linear part of $\log G$ around $\mu$ is removed exactly, and only its curvature
+contributes variance. The drift is asymptotically optimal in a small-noise limit
+(\cref{rem:is-small-noise}); \textcite{glasserman-heidelberger-shahabuddin} combine it with
+stratification along the directions where the curvature is largest (\cref{ch:10-stratification}). A call on a lognormal asset has a concave $\log G$,
+since $u\mapsto\log(e^u-K)$ is concave on $\{e^u>K\}$; so do a digital on a convex set and the
+geometric Asian call (\exref{ex:is-geometric}). For the arithmetic Asian, $\log G$ need not be
+concave, and the drift is found numerically.
+
+\begin{remark}[Small-noise optimality]\label{rem:is-small-noise}
+For $\varepsilon>0$ let $p_\varepsilon=\E\big[\exp\big(F(\sqrt\varepsilon Z)/\varepsilon\big)\big]$,
+$Z\sim\mathcal N(0,I_m)$: noise of size $\sqrt\varepsilon$ and a log-payoff of order
+$1/\varepsilon$, the large-deviations regime. Sample with the drift $\mu/\sqrt\varepsilon$, where
+$\mu$ maximises $H$, and call the estimator $Y_\varepsilon$. \emph{Assume} that $F$ is concave
+and finite and continuous at $\mu$. Then $\varepsilon\log p_\varepsilon\to H(\mu)$ and
+$\varepsilon\log\Et[Y_\varepsilon^2]\to2H(\mu)$: the estimator is logarithmically efficient in
+$\varepsilon$. Indeed $F_\varepsilon(z)=F(\sqrt\varepsilon z)/\varepsilon$ is concave with
+$F_\varepsilon(z)-\frac12|z|^2=H(\sqrt\varepsilon z)/\varepsilon$, maximised at $\mu/\sqrt\varepsilon$, so
+(iii) gives $p_\varepsilon\le e^{H(\mu)/\varepsilon}$ and $\Et[Y_\varepsilon^2]\le e^{H(\mu)/\varepsilon}p_\varepsilon$.
+Conversely, given $\delta>0$ take $r\in(0,\delta]$ with $F\ge F(\mu)-\delta$ on the ball
+$B(\mu,r)$; shifting $Z$ by $\mu/\sqrt\varepsilon$ as in \eqref{eq:is-path-weight},
+$\Q(\sqrt\varepsilon Z\in B(\mu,r))\ge e^{-(|\mu|^2/2+|\mu|r)/\varepsilon}\,\Q(|Z|<r/\sqrt\varepsilon)$, so
+$\liminf\varepsilon\log p_\varepsilon\ge H(\mu)-\delta(1+|\mu|)$. Jensen's inequality
+$\Et[Y_\varepsilon^2]\ge p_\varepsilon^2$ closes the argument. \textcite{glasserman-heidelberger-shahabuddin}
+establish this kind of optimality for smooth payoffs that need not be log-concave; see
+\textcite{glasserman-mc}, Section~4.6.2, for the statement and its hypotheses.
+\end{remark}
+
+\begin{example}[Arithmetic Asian call]\label{exa:is-asian}
+Take the test case with $m=16$ equally spaced fixings $t_j=j/16$ and payoff
+$e^{-rT}\big(\frac1{16}\sum_jS_{t_j}-K\big)^+$. Maximising $H$ by a quasi-Newton method from a
+point where the payoff is positive gives the drifts of \cref{fig:is-asian}(a): they decrease
+along the path, because an early normal moves every later fixing of the average, and their
+size $|\mu|$ is $1.10$, $2.11$, $3.17$ and $4.13$ for $K=100$, $120$, $140$, $160$. The
+variance falls by factors $9.2$, $42$, $618$ and $1.9\times10^4$ (\cref{tab:is-lab}).
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.85\textwidth]{ch09-asian}
+  \caption{Arithmetic Asian call, test case, $16$ fixings. (a) The GHS drift
+    (lines) and the cross-entropy drift after $8$ iterations of $10^4$ paths (dots;
+    \cref{sec:is-ce}). (b) Variance reduction factors of the control variate, of importance
+    sampling and of both together (\cref{tab:is-lab}).}
+  \label{fig:is-asian}
+\end{figure}
+
+\section{Rare events and relative error}\label{sec:is-rare}
+
+When the price $p$ is small, the absolute error says little; what matters is the
+\emph{relative error per sample} $\sqrt{\Var(Y)}/p=\sqrt{\Et[Y^2]/p^2-1}$. A relative
+precision $\varepsilon$ at $95\%$ confidence needs about $(1.96/\varepsilon)^2\,\Et[Y^2]/p^2$
+samples. For plain Monte Carlo of a probability, $\Et[Y^2]/p^2=1/p$.
+
+\begin{definition}[Efficiency for rare events]\label{def:is-efficiency}
+Let $Y_d$ be unbiased estimators of $p_d$, with $p_d\to0$ as $d\to\infty$. The family has
+\emph{bounded relative error} if $\limsup_{d\to\infty}\Et[Y_d^2]/p_d^2<\infty$, and is
+\emph{logarithmically efficient} if $\log\Et[Y_d^2]/\log(p_d^2)\to1$
+\citep[Section~VI.1]{asmussen-glynn}.
+\end{definition}
+
+Since $\Et[Y_d^2]\ge p_d^2$, the ratio of logarithms never exceeds $1$ once $p_d<1$:
+logarithmic efficiency says that the second moment decays at the best possible exponential
+rate, while the relative error may still grow, but more slowly than any power of $1/p_d$.
+\Cref{prop:is-tilting} is an example.
+
+\begin{lemma}[Mills ratio]\label{lem:is-mills}
+For $x>0$, $\ \dfrac{x}{1+x^2}N'(x)\le N(-x)\le\dfrac{N'(x)}{x}$.
+\end{lemma}
+
+\begin{proof}
+$N(-x)=\int_x^\infty N'(t)\,\dd t\le\int_x^\infty\frac tx N'(t)\,\dd t=\frac{N'(x)}x$, since
+$(N')'(t)=-tN'(t)$. And $\frac{\dd}{\dd t}\big(-N'(t)/t\big)=(1+t^{-2})N'(t)$, so
+$N'(x)/x=\int_x^\infty(1+t^{-2})N'(t)\,\dd t\le(1+x^{-2})N(-x)$.
+\end{proof}
+
+\begin{proposition}[Deep out-of-the-money digitals]\label{prop:is-rare}
+Let $d>0$ and $p_d=\Q(Z>d)=N(-d)$: the undiscounted value of a digital call with
+$d=-d_-$.
+\begin{enumerate}[label=(\roman*)]
+  \item Plain Monte Carlo has $\Et[Y^2]/p_d^2=1/p_d$, between $\sqrt{2\pi}\,de^{d^2/2}$ and
+    $\sqrt{2\pi}\,\frac{1+d^2}{d}e^{d^2/2}$: exponential growth in $d^2$.
+  \item The mean shift to the strike, $Z\sim\mathcal N(d,1)$ under $\Qt$, has
+    \[
+      \frac{2\sqrt{2\pi}\,d^3}{1+4d^2}\ \le\ \frac{\Et[Y^2]}{p_d^2}=\frac{e^{d^2}N(-2d)}{N(-d)^2}\ \le\ \frac{\sqrt{2\pi}\,(1+d^2)^2}{2d^3},
+    \]
+    both bounds being $\sqrt{\pi/2}\,d\,(1+o(1))$: logarithmically efficient, but the relative
+    error grows like $(\pi/2)^{1/4}\sqrt d$.
+  \item Sampling $Z=d+E/d$ with $E$ standard exponential gives $Y\le N'(d)/d$ surely and
+    $\Et[Y^2]/p_d^2\le(1+d^2)/d^2$: the relative error per sample is at most $1/d$, so it
+    vanishes as $d\to\infty$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) is \cref{lem:is-mills} applied to $1/p_d$. (ii) By the mirror formula with $\beta=1$ and
+$a=c=d$, $\Et[Y^2]=e^{d^2}\Q(Z-d>d)=e^{d^2}N(-2d)$. \Cref{lem:is-mills} at $2d$ and at $d$,
+with $e^{d^2}N'(2d)=e^{-d^2}/\sqrt{2\pi}$ and $N'(d)^2=e^{-d^2}/(2\pi)$, gives
+\[
+  \frac{e^{d^2}N(-2d)}{N(-d)^2}\le\frac{e^{-d^2}/(2d\sqrt{2\pi})}{d^2e^{-d^2}/(2\pi(1+d^2)^2)},\qquad
+  \frac{e^{d^2}N(-2d)}{N(-d)^2}\ge\frac{2d\,e^{-d^2}/((1+4d^2)\sqrt{2\pi})}{e^{-d^2}/(2\pi d^2)},
+\]
+which simplify to the stated bounds. Logarithmic efficiency follows because
+$\log p_d^2=-d^2+O(\log d)$ and $\log\Et[Y^2]=-d^2+O(\log d)$.
+(iii) The sampling density is $\tilde q(z)=de^{-d(z-d)}$ on $(d,\infty)$, which contains the
+support of $f=\1_{(d,\infty)}$. Since $N'(z)=N'(d)e^{-d(z-d)-(z-d)^2/2}$, the weight is
+$L(z)=N'(d)e^{-(z-d)^2/2}/d\le N'(d)/d$, and $Y=L(Z)$. Then
+$\Et[Y^2]\le\frac{N'(d)}d\Et[Y]=\frac{N'(d)}dp_d$, and \cref{lem:is-mills} gives
+$N'(d)/(dp_d)\le(1+d^2)/d^2$.
+\end{proof}
+
+The exponential law in (iii) is, to first order, the conditional law of $Z-d$ given $Z>d$:
+it approximates the zero-variance law of \cref{prop:is-zero-variance} in shape, not just in
+location, which a Gaussian cannot do. For the call, with the same $d$, the relative second
+moments grow like $2\sqrt{2\pi}\,de^{d^2/2}$ for plain Monte Carlo and like $\sqrt{\pi/8}\,d$
+for the shift to the strike (\exref{ex:is-call-asymptotics}). For the digital, written as $G=\1_{[d,\infty)}$ (same price), $\log G$ is concave, the GHS drift
+is the boundary point $d$, and the bound of \cref{prop:is-optimal-drift}(iii) reads
+$\Et[Y^2]/p_d^2\le e^{-d^2/2}/N(-d)\le\sqrt{2\pi}(1+d^2)/d$, about twice the exact value.
+
+\Cref{tab:is-drifts} compares, at two strikes, the shifts chosen by three criteria: the GHS
+drift, the variance-optimal shift, and the cross-entropy shift of \cref{sec:is-ce}, which for a
+digital is $\E[Z\mid Z>d]=N'(d)/N(-d)$. They differ by amounts that shrink as $d$ grows, and
+their relative errors are within $3\%$ of each other; the payoff shape matters more than the
+criterion. \Cref{fig:is-rare} shows the whole range of strikes.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}ll@{\quad}cc@{\quad}cc@{\quad}cc@{\quad}c@{}}
+    \toprule
+    & & \multicolumn{2}{c}{GHS} & \multicolumn{2}{c}{optimal} & \multicolumn{2}{c}{cross-entropy} & plain \\
+    & & shift & rel.\ err. & shift & rel.\ err. & shift & rel.\ err. & rel.\ err. \\
+    \midrule
+    $K=150$, $d=2.177$ & digital & $2.177$ & $1.587$ & $2.379$ & $1.563$ & $2.531$ & $1.577$ & $8.18$ \\
+     & call & $2.581$ & $1.010$ & $2.731$ & $0.998$ & $2.844$ & $1.005$ & $11.43$ \\
+    $K=200$, $d=3.616$ & digital & $3.616$ & $2.018$ & $3.747$ & $2.007$ & $3.861$ & $2.015$ & $81.71$ \\
+     & call & $3.880$ & $1.312$ & $3.995$ & $1.305$ & $4.092$ & $1.310$ & $115.26$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Mean shifts (in standard deviations of $Z$) and exact relative errors per sample
+    for the test case with strikes $150$ and $200$ (digital prices $0.0146$ and
+    $1.48\times10^{-4}$, call prices $0.165$ and $1.52\times10^{-3}$). The exponential sampler
+    of \cref{prop:is-rare}(iii) has relative errors $0.234$ and $0.119$ for the digitals.}
+  \label{tab:is-drifts}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.85\textwidth]{ch09-rare}
+  \caption{Exact relative error per sample against the strike for the test case: (a) digital
+    call, (b) call. The GHS, variance-optimal and cross-entropy shifts are nearly
+    indistinguishable; dots are Monte Carlo estimates for the GHS shift ($10^5$ samples).}
+  \label{fig:is-rare}
+\end{figure}
+
+\section{Adaptive importance sampling: cross-entropy}\label{sec:is-ce}
+
+The variance-optimal parameter minimises $\Et[(fL)^2]$, itself an expectation to be estimated
+with weights that may be wild. The \emph{cross-entropy method}
+\citep{rubinstein-ce,deboer-ce} replaces the variance by a distance to the zero-variance law
+$g^*=fq/\mu$ that, for exponential families, is minimised in closed form.
+
+\begin{proposition}[Cross-entropy for Gaussian mean shifts]\label{prop:is-cross-entropy}
+Let $f\ge0$ be Borel, $Z\sim\mathcal N(0,I_m)$ under $\Q$, $\mu=\EQ[f(Z)]\in(0,\infty)$,
+$\EQ[f(Z)|Z|^2]<\infty$, and $g^*=fq/\mu$. For $v\in\R^m$ let $\tilde q_v$ be the density of
+$\mathcal N(v,I_m)$ and $L_v=q/\tilde q_v$.
+\begin{enumerate}[label=(\roman*)]
+  \item The cross-entropy $-\int g^*\log\tilde q_v$ equals
+    $\frac m2\log(2\pi)+\frac12\E_{g^*}|Z-v^*|^2+\frac12|v-v^*|^2$, with
+    $v^*=\E_{g^*}[Z]=\EQ[f(Z)Z]/\mu$. It is uniquely minimised at $v=v^*$; when the
+    Kullback--Leibler divergence $\int g^*\log(g^*/\tilde q_v)$ is finite, it differs from the
+    cross-entropy by a constant, and $v^*$ minimises it too.
+  \item For every $u\in\R^m$, $v^*=\Et_u[fL_uZ]/\Et_u[fL_u]$, and if $Z_1,Z_2,\dots$ are
+    independent $\mathcal N(u,I_m)$, the ratio
+    $\hat v_n=\sum_if(Z_i)L_u(Z_i)Z_i\big/\sum_if(Z_i)L_u(Z_i)$ converges to $v^*$ almost surely.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $-\log\tilde q_v(z)=\frac m2\log(2\pi)+\frac12|z-v|^2$, and
+$\E_{g^*}|Z-v|^2=\E_{g^*}|Z-v^*|^2+|v-v^*|^2$ because $\E_{g^*}[Z-v^*]=0$; all terms are
+finite by the moment assumption. (ii) By \cref{prop:is-likelihood-ratio}(i), applied
+coordinatewise to $fZ_j$ and to $f$, $\EQ[fZ]=\Et_u[fL_uZ]$ and $\mu=\Et_u[fL_u]$. The
+numerator and denominator of $\hat v_n$, divided by $n$, converge almost surely by the strong
+law, and the limit of the denominator is $\mu>0$.
+\end{proof}
+
+When $f$ is rare, most $f(Z_i)$ vanish at $u=0$ and $\hat v_n$ is undefined or noisy. The
+multilevel algorithm (\citealp{deboer-ce}, Section~2.1 and Algorithm~2.1) climbs to the target
+through intermediate levels: sample from $\mathcal N(v_t,I)$, set the level $\gamma_t$ to the
+smaller of the target and the $(1-\rho)$-quantile of the simulated scores (for example the
+average $A$ of an Asian), update $v_{t+1}=\hat v_n$ with the payoff at level $\gamma_t$, and
+stop once $\gamma_t$ has reached the target and $v_t$ has settled. For the Asian example, with
+$\rho=0.1$ and $10^4$ paths per iteration, the target level is reached at the second or third
+iteration, and after $8$ iterations the ratio of the norms of the cross-entropy and GHS drifts
+is $1.23$, $1.13$, $1.07$, $1.05$ for $K=100,120,140,160$ (\cref{fig:is-asian}(a); our
+implementation, seed $K$): close in the tail, larger near the money. For the digital, $v^*=\E[Z\mid Z>d]=N'(d)/N(-d)$ overshoots the GHS
+drift $d$ by at most $1/d$, by \cref{lem:is-mills}.
+
+Adaptive schemes have risks that a fixed drift does not.
+\begin{enumerate}[label=(\alph*)]
+  \item \emph{Noisy updates.} Each update is a weighted average. If the current law is far from
+    $g^*$, a few samples carry all the weight and successive iterates wander; the effective
+    sample size below, computed with the update weights $f(Z_i)L(Z_i)$, is the alarm.
+  \item \emph{Reuse bias.} Iteration $t$ samples from $\mathcal N(v_t,I)$ with $v_t$ fixed by
+    earlier iterations, so its weighted mean is conditionally unbiased, and an equal-weight pool
+    of the iterations' estimates is unbiased (a sum of martingale differences). Bias appears
+    when a parameter chosen from a sample is applied to that same sample, for instance
+    $f(Z_i+\hat v)e^{-\hat v^\top Z_i-|\hat v|^2/2}$ with $\hat v$ computed from the $Z_i$, or
+    when the best of several candidates is reported with its in-sample error: the analogue of
+    \cref{prop:cv-estimated-beta}.
+  \item \emph{Scale.} The full Gaussian family also updates the covariance, to
+    $\mathrm{Cov}_{g^*}(Z)$. A smaller covariance means thinner tails, and
+    \cref{prop:is-gaussian} shows how that can make the variance infinite without any sign in
+    the sample; in path space, \cref{sec:is-path} shows that rescaling many coordinates
+    degenerates. Estimating $m(m+1)/2$ parameters from weighted samples is itself noisy.
+\end{enumerate}
+
+\begin{proposition}[Effective sample size]\label{prop:is-ess}
+Let $L_1,L_2,\dots\ge0$ be i.i.d.\ weights with $\Et[L]=1$, and
+$\mathrm{ESS}_n=\big(\sum_{i\le n}L_i\big)^2/\sum_{i\le n}L_i^2$ (on the event that some
+$L_i>0$).
+\begin{enumerate}[label=(\roman*)]
+  \item $1\le\mathrm{ESS}_n\le n$, with $\mathrm{ESS}_n=n$ if and only if all the $L_i$ are equal.
+  \item $\mathrm{ESS}_n/n\to1/\Et[L^2]$ almost surely, with $1/\infty=0$.
+  \item For the mean shift $\mathcal N(\mu,I_m)$, $1/\Et[L^2]=e^{-|\mu|^2}$; for a rescaling
+    $\mathcal N(0,\beta^2I_m)$ with $\beta>1/\sqrt2$, it is $\big(\sqrt{2\beta^2-1}/\beta^2\big)^m$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Cauchy--Schwarz gives $(\sum L_i)^2\le n\sum L_i^2$, with equality iff the $L_i$ are equal;
+and $(\sum L_i)^2\ge\sum L_i^2$ for nonnegative terms. (ii) By the strong law,
+$\frac1n\sum L_i\to1$; if $\Et[L^2]<\infty$, also $\frac1n\sum L_i^2\to\Et[L^2]$. If
+$\Et[L^2]=\infty$, then for every $M$, $\frac1n\sum L_i^2\ge\frac1n\sum\min(L_i^2,M)\to\Et[\min(L^2,M)]$,
+which tends to $\infty$ as $M\to\infty$ by monotone convergence. (iii) The weights are products
+of $m$ independent one-dimensional weights; use \cref{prop:is-gaussian}(i).
+\end{proof}
+
+The effective sample size of a mean shift depends on $|\mu|^2$ only. A drift of fixed size
+spread over many dates, like a Girsanov drift with fixed $\int\theta^2$ on a finer and finer
+grid, does not degenerate as the dimension grows; a fixed shift $c$ per coordinate gives
+$ne^{-mc^2}$, and a rescaling decays geometrically in $m$ (\cref{fig:is-degeneracy}(a)). The
+effective sample size describes the weights, not the estimator of a given payoff. For the
+Asian at $K=160$, $e^{-|\mu|^2}\approx4\times10^{-8}$, and yet the estimator is excellent: the
+weights are deliberately small on the paths that pay and large on paths that do not. For one
+payoff the diagnostic is the relative standard error of $fL$; the effective sample size matters
+when one weighted sample prices many payoffs, and inside the adaptive updates.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.85\textwidth]{ch09-degeneracy}
+  \caption{(a) $\mathrm{ESS}/n$ against the dimension (\cref{prop:is-ess}): lines exact, dots
+    from $10^4$ draws, which overestimate it when the weights are heavy-tailed. (b) Running
+    sample standard deviation of the call estimator with $\alpha=0.27$: for $\beta=1$ and $0.75$
+    it settles at the exact values (dashed); for $\beta=0.55<1/\sqrt2$ the variance is infinite
+    and three seeds never settle (our implementation, \texttt{default\_rng}, seeds $1$--$3$).}
+  \label{fig:is-degeneracy}
+\end{figure}
+
+\section{Importance sampling with control variates}\label{sec:is-cv}
+
+Importance sampling decides where to sample; a control variate removes what is predictable
+in the samples. A control keeps its known mean after weighting.
+
+\begin{proposition}[Controls under the sampling law]\label{prop:is-control}
+Let $g$ be Borel with known $\gamma=\EQ[g(X)]$, and let $\tilde q$ satisfy
+\eqref{eq:is-support} for both $f$ and $g$, with $f(X)L(X)$ and $g(X)L(X)$ in $L^2(\Qt)$.
+\begin{enumerate}[label=(\roman*)]
+  \item For every $b$, $Y_b=f(X)L(X)-b\big(g(X)L(X)-\gamma\big)$ has $\Et[Y_b]=\mu$. Its
+    variance is minimised at $b^*=\widetilde{\Cov}(fL,gL)/\widetilde\Var(gL)$, where it equals
+    $(1-\tilde\rho^2)\widetilde\Var(fL)$, $\tilde\rho$ being the correlation of $fL$ and $gL$
+    under $\Qt$ (provided $\widetilde\Var(gL)>0$).
+  \item With $g\equiv1$ the control is the weight itself, with mean $1$ when $\{q>0\}\subseteq\{\tilde q>0\}$.
+    The \emph{self-normalised} estimator $\hat\mu^{\mathrm{sn}}_n=\sum_if(X_i)L(X_i)/\sum_iL(X_i)$
+    equals the control-variate estimator with control $L$ and coefficient
+    $b=\hat\mu^{\mathrm{sn}}_n$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\Et[gL]=\gamma$ by \cref{prop:is-likelihood-ratio}(i), and the rest is
+\cref{thm:cv-optimal} under $\Qt$. (ii) With $\bar Y=\frac1n\sum f(X_i)L(X_i)$ and
+$\bar L=\frac1n\sum L(X_i)$, $\bar Y-\hat\mu^{\mathrm{sn}}_n(\bar L-1)=\hat\mu^{\mathrm{sn}}_n$
+because $\hat\mu^{\mathrm{sn}}_n\bar L=\bar Y$.
+\end{proof}
+
+The correlation that matters is the one between the \emph{weighted} quantities under $\Qt$.
+The linear control $S_T$ is weak for deep out-of-the-money calls even under $\Q$ (exact
+$\rho^2=0.10$ at $K=150$ and $0.003$ at $K=200$, against $0.78$ at $K=100$), and after the GHS
+shift it is weaker still ($\tilde\rho^2=0.003$ and $8\times10^{-7}$), because the drift removes
+the linear part of $\log G$ (\cref{prop:is-optimal-drift}). A
+nonlinear control that tracks the payoff on the important paths survives, such as the geometric
+Asian call for the Asian (\cref{prop:as-control}). In \cref{tab:is-lab} the control dominates
+near the money, importance sampling in the tail, and together they win at every strike. The
+self-normalised estimator suits weights known up to a constant (\exref{ex:is-self-normalized}).
+
+\begin{table}[ht]
+  \centering
+  \small\setlength{\tabcolsep}{4.5pt}
+  \begin{tabular}{@{}rr@{\quad}cccc@{\quad}ccc@{}}
+    \toprule
+    & & \multicolumn{4}{c}{standard error, $n=2^{17}$} & \multicolumn{3}{c}{variance reduction} \\
+    $K$ & price & plain & control & IS & both & control & IS & both \\
+    \midrule
+    $100$ & $4.4963$ & $2.0\times10^{-2}$ & $5.3\times10^{-4}$ & $6.7\times10^{-3}$ & $4.0\times10^{-4}$ & $1458$ & $9.2$ & $2560$ \\
+    $120$ & $0.36113$ & $5.7\times10^{-3}$ & $3.9\times10^{-4}$ & $8.8\times10^{-4}$ & $1.4\times10^{-4}$ & $220$ & $42$ & $1621$ \\
+    $140$ & $0.012755$ & $1.0\times10^{-3}$ & $1.7\times10^{-4}$ & $4.1\times10^{-5}$ & $1.5\times10^{-5}$ & $34$ & $618$ & $4359$ \\
+    $160$ & $2.7333\times10^{-4}$ & $1.4\times10^{-4}$ & $4.7\times10^{-5}$ & $1.0\times10^{-6}$ & $6.6\times10^{-7}$ & $9.2$ & $1.9\times10^4$ & $4.7\times10^4$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Arithmetic Asian call, test case, $16$ fixings: plain Monte Carlo, the geometric
+    control, importance sampling with the GHS drift, and both (control fitted in sample with
+    \texttt{variance.control\_variate}). Our implementation (\texttt{default\_rng},
+    \texttt{SeedSequence(2026)}, \texttt{importance.asian\_laboratory}); price: combined
+    estimate. Only $9$ of $2^{17}$ plain paths pay at $K=160$, so the variances of plain Monte
+    Carlo and of the control alone are estimated from the importance sample
+    ($\EQ[h]=\Et[hL]$, optimal coefficient).}
+  \label{tab:is-lab}
+\end{table}
+
+\demo{09-importance-sampling.ipynb}{Asian drifts, effective sample sizes, this laboratory.}
+
+\furtherreading
+\Cref{fig:is-densities,fig:is-contours} and \cref{rem:is-share} reproduce the course's
+slides. \textcite{glasserman-mc} covers the likelihood ratio and tilting in Section~4.6.1 and
+the GHS drift in Section~4.6.2; \textcite{asmussen-glynn} treat importance sampling in
+Section~V.1 and rare events in Chapter~VI (efficiency VI.1, tilting VI.2, cross-entropy VI.8).
+Cross-entropy is due to \textcite{rubinstein-ce} (tutorial: \textcite{deboer-ce});
+\textcite{dembo-zeitouni}, Chapter~2, proves Cramér's theorem.

@@ -1,0 +1,155 @@
+% Exercises for Chapter 13 (Monte Carlo Greeks). Statements only: solutions are kept privately.
+Throughout, the model is that of the notes: under $\Q$, $S_T=SG$ with
+$G=\exp(\nu T+\sigma\sqrt TZ)$, $\nu=r-y-\sigma^2/2$, $Z\sim\mathcal N(0,1)$, and $S,\sigma,T>0$.
+The test case is $S=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$. The pathwise and
+likelihood-ratio estimators are those of \noteref{eq:gr-pw-bs} and \noteref{eq:gr-lr-bs}. You may
+use the results of the notes, quoting them, and the closed forms of \texttt{bs.py}. In
+computational parts, use NumPy's \texttt{default\_rng} with a seed of your choice and report it.
+
+\begin{exercise}[Identities that hold draw by draw]\label{ex:gr-homogeneity}
+\easy Consider the call.
+\begin{enumerate}[label=(\alph*)]
+  \item The strike does not enter the law of $S_T$, but the payoff is
+    $K\big(S_T/K-1\big)^+$ and $S_T/K=(S/K)G$. Use the likelihood ratio in $\log(S/K)$ to derive
+    an unbiased estimator $\partial_K^{\mathrm{lr}}$ of $\partial C/\partial K$, and show that
+    $S\,\Delta^{\mathrm{lr}}+K\,\partial_K^{\mathrm{lr}}=e^{-rT}(S_T-K)^+$ for every draw. Compare its
+    per-draw standard deviation at the test case with that of the pathwise
+    $\partial_K^{\mathrm{pw}}=-e^{-rT}\1_{\{S_T>K\}}$.
+  \item Differentiate $\partial_K^{\mathrm{pw}}$ once more in $K$ by likelihood ratio to get an
+    estimator of $\partial^2C/\partial K^2$, the discounted risk-neutral density of $S_T$ at $K$
+    (Breeden--Litzenberger). Show that $K^2$ times it equals $S^2$ times the LR-PW gamma of
+    \noteref{prop:gr-hybrid-gamma} for every draw.
+  \item The pathwise derivative of the pathwise delta is $0$ almost surely, so there is no
+    draw-by-draw relation between $\mathcal V^{\mathrm{pw}}$ and a ``pathwise gamma''. Show,
+    however, that $\mathcal V^{\mathrm{pw}}=\sigma TS^2\,\Gamma^{\mathrm{pw\text{-}lr}}$ for every draw,
+    where $\Gamma^{\mathrm{pw\text{-}lr}}$ is the PW-LR estimator of \noteref{prop:gr-hybrid-gamma}.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Extrapolated differences]\label{ex:gr-extrapolation}
+\medium Let $\alpha$ be $C^5$ near $\theta$, let $D_h=(Y(\theta+h)-Y(\theta-h))/(2h)$ for one
+replication, and let $E_h=(4D_h-D_{2h})/3$, computed with common random numbers (four evaluations
+of $Y$ per replication).
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E E_h-\alpha'(\theta)=-\frac1{30}\alpha^{(5)}(\theta)h^4+o(h^4)$.
+  \item Suppose that $\E[(Y(\theta_1)-Y(\theta_2))^2]\le c|\theta_1-\theta_2|$ near $\theta$. Show
+    that $\Var E_h\le C/h$ for a constant $C$, and use \noteref{prop:gr-finite-difference}(iv)
+    to find the orders of the best bump and of the best mean squared error, assuming the variance
+    is exactly of order $1/h$ and $\alpha^{(5)}(\theta)\ne0$.
+  \item For the delta of the digital call in the test case and $n=10^6$, find the bump that
+    minimises the root mean squared error of $E_h$ (exact bias from the closed form; variance by
+    quadrature or by simulation with at least $10^6$ draws), and compare with the central
+    difference and with the likelihood-ratio estimator (\noteref{exa:gr-digital}).
+  \item Why is extrapolation pointless for a Lipschitz payoff with common random numbers?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Smoothing by conditioning]\label{ex:gr-smoothing}
+\medium This is partly computational. A digital on a two-date average pays
+$e^{-rT}\1_{\{(S_{t_1}+S_T)/2>K\}}$ with $t_1=T/2$; take the test case.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E\big[\1_{\{(S_{t_1}+S_T)/2>K\}}\,\big|\,S_{t_1}\big]=\varphi(S_{t_1})$, where
+    $\varphi(s)=N(d(s))$ with
+    $d(s)=\big(\log\frac{s}{2K-s}+\nu(T-t_1)\big)/\big(\sigma\sqrt{T-t_1}\big)$ for $s<2K$, and
+    $\varphi(s)=1$ for $s\ge2K$. Show that $\varphi$ is continuously differentiable on
+    $(0,\infty)$ with a bounded derivative.
+  \item Deduce that $e^{-rT}\varphi(S_{t_1})$ is an unbiased estimator of the price with no
+    larger variance, and that its pathwise delta $e^{-rT}\varphi'(S_{t_1})S_{t_1}/S$ is unbiased.
+    What does the pathwise method give for the original payoff?
+  \item Write the likelihood-ratio deltas of the original and of the conditioned payoffs, using
+    the score of the first step.
+  \item With $10^6$ draws, estimate the delta by the three unbiased estimators of (b) and (c),
+    with standard errors, and compare with the exact delta, computed by one-dimensional
+    quadrature. Which would you use?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Combining pathwise and likelihood ratio]\label{ex:gr-combination}
+\easy Let $D_1$ and $D_2$ be two unbiased estimators of the same Greek, computed from the same
+draw, with finite variances $v_1,v_2$ and covariance $c_{12}$, and $v_1+v_2>2c_{12}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $D(\lambda)=\lambda D_1+(1-\lambda)D_2$ is unbiased for every $\lambda$, and
+    find the $\lambda^*$ that minimises its variance and the minimal variance. Explain why this
+    is a control variate (\noteref{thm:cv-optimal}) and what happens if $\lambda^*$ is estimated
+    from the same draws (\noteref{prop:cv-estimated-beta}).
+  \item For the delta of the test-case call, with $D_1=\Delta^{\mathrm{pw}}$ and
+    $D_2=\Delta^{\mathrm{lr}}$, compute the correlation, $\lambda^*$ and the variance of
+    $D(\lambda^*)$ relative to that of the pathwise estimator alone. Repeat for the vega. Is the
+    combination worth it?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The likelihood-ratio delta at the forward]\label{ex:gr-small-vol}
+\medium Consider the call struck at the forward, $K=F=Se^{(r-y)T}$, and let $\sigma\downarrow0$
+with $S,T,r,y$ fixed. Write $s=\sigma\sqrt T$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that the Black--Scholes delta tends to $e^{-yT}/2$.
+  \item Show that $\Var\Delta^{\mathrm{pw}}\to e^{-2yT}/4$ and $\Var\Delta^{\mathrm{lr}}\to\frac54e^{-2yT}$,
+    justifying the limits. Why does the blow-up of \noteref{rem:gr-lr-degenerate} not occur?
+  \item The gamma itself grows like $e^{-yT}/(\sqrt{2\pi}\,Ss)$. Show that the relative standard
+    deviation per draw of the LR-LR gamma estimator, $\mathrm{sd}(\Gamma^{\mathrm{lr}})/\Gamma$, has
+    a finite limit, and compute it.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Greeks of the asymptotic square-root call]\label{ex:gr-asc}
+\medium This is a computational exercise, from the course's homework. The asymptotic
+square-root call pays $F(S_T)=2K\big[1-\sqrt{K/S_T}\,\big]^+$ and has Black--Scholes price
+$e^{-rT}2K\big[N(d_-)-\sqrt{K/S}\,e^{-\nu T/2+\sigma^2T/8}N(d_--\frac12\sigma\sqrt T)\big]$.
+\begin{enumerate}[label=(\alph*)]
+  \item Write the pathwise delta and $\rho_y$, check the hypotheses of
+    \noteref{thm:gr-pathwise}, and show that $\rho_y^{\mathrm{pw}}=-TS\Delta^{\mathrm{pw}}$.
+  \item Write the likelihood-ratio delta and the three gamma estimators of
+    \noteref{prop:gr-hybrid-gamma}, after checking its hypotheses.
+  \item Compute the delta and gamma of the closed form (analytically or by finite differences of
+    the closed form). With $n=10^3$ draws reused for every $S_0$ in
+    $[Ke^{-2\sigma\sqrt T},Ke^{2\sigma\sqrt T}]$, plot the bumped central delta for
+    $\varepsilon=0.1,0.01,0.001$ and the pathwise and likelihood-ratio deltas against $S_0$. Then,
+    at $S_0=K$ with $n=10^5$, report the estimates and standard errors of the two deltas and the
+    three gammas. Which gamma estimator would you use?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A barrier monitored once]\label{ex:gr-barrier}
+\hard This is partly computational. A call knocked out if the price is at or below $B$ at the
+single date $t_1=T/2$ pays $e^{-rT}(S_T-K)^+\1_{\{S_{t_1}>B\}}$; take the test case and $B=90$.
+Let $C(s,\tau)$ be the Black--Scholes call price with spot $s$ and maturity $\tau$, $q$ the
+density of $S_{t_1}$, and $b(S)=(\log(B/S)-\nu t_1)/(\sigma\sqrt{t_1})$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that the price is $V(S)=e^{-rt_1}\E\big[\1_{\{S_{t_1}>B\}}C(S_{t_1},T-t_1)\big]$ and
+    that
+    \[
+      V'(S)=e^{-rt_1}\E\Big[\1_{\{S_{t_1}>B\}}\partial_sC(S_{t_1},T-t_1)\frac{S_{t_1}}S\Big]
+      +e^{-rt_1}C(B,T-t_1)\,\frac BS\,q(B).
+    \]
+    Evaluate both terms by quadrature.
+  \item Show that the pathwise estimator $e^{-rT}\1_{\{S_T>K\}}\1_{\{S_{t_1}>B\}}S_T/S$ has mean
+    equal to the first term only. Which hypothesis of \noteref{thm:gr-pathwise} fails?
+  \item Write the likelihood-ratio delta with the score of the first step.
+  \item \emph{One-step survival.} Draw $U$ uniform on $(0,1)$ and
+    $Z_1=N^{-1}\big(N(b)+U(1-N(b))\big)$, so that $Z_1$ has the law of $Z$ given $Z>b$; build
+    $S_{t_1}$ from $Z_1$ and $S_T$ from an independent $Z_2$, and let
+    $Y^{\mathrm s}=\big(1-N(b(S))\big)\,e^{-rT}(S_T-K)^+$. Show that $\E Y^{\mathrm s}=V(S)$, that for
+    fixed $(U,Z_2)$ the map $S\mapsto Y^{\mathrm s}$ is Lipschitz near $S$ with an integrable
+    constant, and differentiable except where $S_T=K$ (\emph{hint}: Mills' ratio
+    $(1-N(z))/N'(z)$ is decreasing), and write its pathwise delta.
+  \item With $n=10^5$, compare the estimators of (b), (c) and (d) with the exact delta.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The adjoint of the Black--Scholes formula]\label{ex:gr-adjoint-bs}
+\medium This is a computational exercise. Write the call price as a sequence of elementary
+steps: $v_1=\log(S/K)$, $v_2=\sigma\sqrt T$, $v_3=(r-y)T$, $d_+=(v_1+v_3)/v_2+v_2/2$,
+$d_-=d_+-v_2$, $a=e^{-yT}$, $b=e^{-rT}$, $C=SaN(d_+)-KbN(d_-)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Write the reverse sweep that, from $\bar C=1$, returns $\partial C/\partial x$ for the
+    six inputs $x\in\{S,K,T,r,y,\sigma\}$ in one pass, without any library for automatic
+    differentiation.
+  \item Implement it and check it against \texttt{bs.greeks} and $\partial_KC=-e^{-rT}N(d_-)$
+    for the test case. Explain why the adjoint $\bar d_+$ of $d_+$, after both of its uses have
+    been accumulated, is exactly zero.
+  \item Count the operations of the forward and reverse sweeps (additions and multiplications,
+    and evaluations of $\exp$, $\log$, $N$ and $N'$), and compare with central bumps of the six
+    inputs.
+\end{enumerate}
+\end{exercise}

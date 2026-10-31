@@ -1,5 +1,663 @@
-\begin{planned}
-  \item Brownian motion, It\^o's formula and the standard model, in brief (the IEOR 222 notes have the details)
-  \item risk-neutral pricing and the Feynman--Kac formula
-  \item Dirac deltas and Green's functions for pricing equations
-\end{planned}
+% Chapter 1: The standard model, revisited.
+
+Every method in these notes starts from two facts about the Black--Scholes--Merton model with a
+dividend yield. A price is a discounted expectation under a risk-neutral measure, and the same
+price solves a parabolic partial differential equation. Monte Carlo methods compute the
+expectation (Part~II); trees and finite-difference grids solve the equation
+(\cref{ch:20-grids}). The Feynman--Kac formula says that the two coincide, and the Green's
+function of the equation, the price of a claim that pays at a single terminal stock price,
+connects both to the static replication of
+\cref{ch:03-strike-arbitrage,ch:04-static-replication}.
+
+The IEOR 222 notes build Brownian motion, It\^o calculus and risk-neutral pricing from the
+ground up. Here we recall what the course uses, add the dividend yield, and prove what later
+chapters lean on: the pricing formula with a yield (\cref{sec:sm-model}), the Feynman--Kac
+formula for a diffusion with a state-dependent discount rate (\cref{sec:sm-feynman-kac}), and
+the Green's function of the pricing equation, with the precise sense in which it solves the
+equation with a Dirac delta as terminal value (\cref{sec:sm-green}). Along the way we see that a
+pricing equation can have solutions that are not prices.
+
+Throughout, $T>0$ is a fixed horizon, $N$ and $N'$ are the standard normal distribution
+function and density, and $\mathcal N(m,v)$ is the normal law with mean $m$ and variance $v$.
+
+\section{Brownian motion and It\^o's formula, in brief}\label{sec:sm-recap}
+
+Let $(\Omega,\F,\Prob)$ be a probability space with a filtration $(\F_t)_{0\le t\le T}$ whose
+$\F_0$ contains the events of probability zero. A \emph{Brownian motion} for $(\F_t)$ is a
+continuous adapted process $W$ with $W_0=0$ whose increments $W_t-W_s$, $s<t$, are
+$\mathcal N(0,t-s)$ and independent of $\F_s$. Then $\Cov(W_s,W_t)=\min(s,t)$, and $W_t$ has
+the density
+\begin{equation}\label{eq:sm-heat-kernel}
+  k(t,x)=\frac{1}{\sqrt{2\pi t}}\,e^{-x^2/(2t)},\qquad t>0,\ x\in\R,
+\end{equation}
+the \emph{heat kernel}. Differentiating gives $\partial_xk=-\frac xtk$ and
+$\partial_tk=\big(\frac{x^2}{2t^2}-\frac1{2t}\big)k=\frac12\partial_{xx}k$, and as $t\downarrow0$
+the kernel concentrates at $0$. \Cref{sec:sm-green} is built on these two facts.
+
+Cumulative sums of independent $\mathcal N(0,h)$ increments have exactly the law of $W$ on a
+grid of step $h$, which is how Monte Carlo builds paths (\cref{ch:07-path-simulation}); steps of
+$\pm\sqrt h$ with probability $\frac12$ give a walk whose value at each fixed time converges in
+law to that of $W$ (central limit theorem), which is the binomial model (\cref{ch:20-grids};
+a trinomial variant is \exref{ex:sm-trinomial}). The paths of $W$ are nowhere differentiable, and
+along partitions of $[0,t]$ with mesh going to zero $\sum_j(W_{t_{j+1}}-W_{t_j})^2\to t$ in $L^2$
+(see the IEOR 222 notes): the \emph{quadratic variation} $[W,W]_t=t$, source of the
+rules $\dd W\,\dd W=\dd t$ and $\dd W\,\dd t=\dd t\,\dd t=0$.
+
+\paragraph{It\^o integrals.} Let $H$ be progressively measurable with
+$\int_0^TH_s^2\,\dd s<\infty$ almost surely. The It\^o integral $M_t=\int_0^tH_s\,\dd W_s$ is
+then a continuous \emph{local} martingale. If $\E\int_0^TH_s^2\,\dd s<\infty$, it is a
+square-integrable martingale and $\E[M_t^2]=\E\int_0^tH_s^2\,\dd s$ (It\^o's isometry). Without
+this condition $M$ need not be a martingale; the hypotheses of the Feynman--Kac formula exclude
+that case.
+
+\paragraph{It\^o's formula.} Let $I\subseteq\R$ be an open interval and $X$ a continuous process
+with values in $I$ and $X_t=X_0+\int_0^tb_s\,\dd s+\int_0^t\sigma_s\,\dd W_s$, for adapted
+processes $b$, $\sigma$ with $\int_0^T(|b_s|+\sigma_s^2)\,\dd s<\infty$. A function $f$ is in
+$C^{1,2}([0,T)\times I)$ if $\partial_tf$, $\partial_xf$, $\partial_{xx}f$ exist and are continuous
+on $[0,T)\times I$. For such $f$ and $t<T$,
+\begin{equation}\label{eq:sm-ito}
+  \dd f(t,X_t)=\Big(\partial_tf+b_t\,\partial_xf+\frac{\sigma_t^2}{2}\,\partial_{xx}f\Big)(t,X_t)\,\dd t
+  +\sigma_t\,\partial_xf(t,X_t)\,\dd W_t .
+\end{equation}
+If $A$ is a continuous adapted process of finite variation (no $\dd W$ part), the product rule
+reads $\dd(AY)=A\,\dd Y+Y\,\dd A$ for every It\^o process $Y$. We use \eqref{eq:sm-ito} and the
+product rule without proof; see \textcite{shreve2}, Sections~4.3--4.4, or
+\textcite{karatzas-shreve}, Section~3.3. Those versions are for $f$ on $[0,\infty)\times\R$; for an
+open $I=(\alpha,\beta)$ and $t\le T'<T$, take $\alpha<\alpha_n<\beta_n<\beta$ with
+$\alpha_n\downarrow\alpha$, $\beta_n\uparrow\beta$, apply them to $f\chi_n$, with $\chi_n$ smooth, equal
+to $1$ on $[\alpha_n,\beta_n]$ and vanishing near $\alpha$ and $\beta$, up to the exit time of $X$
+from $(\alpha_n,\beta_n)$, and note that this time exceeds $T'$ for large $n$, since the compact
+set $X([0,T'])$ lies in $I$.
+
+\section{The standard model}\label{sec:sm-model}
+
+\begin{definition}[The standard model]\label{def:sm-model}
+Let $r,y,\mu\in\R$, $\sigma>0$ and $S_0>0$ be constants, let $W$ be a Brownian motion under $\Prob$,
+and let $(\F_t)_{0\le t\le T}$ be the filtration generated by $W$ and augmented by the
+$\Prob$-null events. The \emph{standard model} is the market with
+\begin{enumerate}[label=(\roman*)]
+  \item a money-market account worth $B_t=e^{rt}$ at time $t$;
+  \item a stock that pays dividends continuously, at the rate $yS_t\,\dd t$ per share, and
+    whose price solves
+    \begin{equation}\label{eq:sm-P}
+      \dd S_t=(\mu-y)\,S_t\,\dd t+\sigma S_t\,\dd W_t,\qquad
+      \text{that is,}\quad S_t=S_0\exp\Big(\Big(\mu-y-\frac{\sigma^2}{2}\Big)t+\sigma W_t\Big);
+    \end{equation}
+  \item the \emph{risk-neutral measure} $\Q$ on $\F_T$, defined by $\Q(A)=\E[Z_T\1_A]$ with
+    \[
+      Z_t=\exp\Big(-\theta W_t-\frac{\theta^2}{2}t\Big),\qquad
+      \theta=\frac{\mu-r}{\sigma}\quad\text{(the market price of risk)},
+    \]
+    and the process $W^\Q_t=W_t+\theta t$.
+\end{enumerate}
+We write $\nu=r-y-\frac{\sigma^2}{2}$ for the drift of $\log S$ under $\Q$.
+\end{definition}
+
+The constant $\mu$ is the expected rate of \emph{total} return under $\Prob$: price
+appreciation, $\mu-y$, plus the dividend yield $y$. Paying dividends out lowers the drift of
+the price, not the return of the shareholder. Continuous dividends are an idealisation that fits
+an index well. For a currency, $y$ is the foreign interest rate (\cref{ch:17-multi-asset}); for a
+commodity it is a convenience yield net of storage costs. Time-dependent $r$, $y$ and $\sigma$ are
+treated in \cref{ch:07-path-simulation}.
+
+\begin{lemma}[The two measures]\label{lem:sm-girsanov}
+In the standard model:
+\begin{enumerate}[label=(\roman*)]
+  \item $Z$ is a $\Prob$-martingale with $Z_T>0$ and $\E[Z_T]=1$, so $\Q$ is a probability measure
+    on $\F_T$ with the same null events as $\Prob$;
+  \item $W^\Q$ is a Brownian motion under $\Q$ for the filtration $(\F_t)$, and
+    \begin{equation}\label{eq:sm-Q}
+      \dd S_t=(r-y)\,S_t\,\dd t+\sigma S_t\,\dd W^\Q_t,\qquad S_t=S_0\exp\big(\nu t+\sigma W^\Q_t\big);
+    \end{equation}
+  \item for $0\le s\le t\le T$ and every real $q$,
+    \begin{equation}\label{eq:sm-moments}
+      \EQ\big[S_t^q\,\big|\,\F_s\big]=S_s^q\exp\Big(q(r-y)(t-s)+\frac{q(q-1)}{2}\sigma^2(t-s)\Big),
+    \end{equation}
+    and the same holds under $\Prob$ with $\mu$ in place of $r$. In particular $e^{-(r-y)t}S_t$, and
+    the discounted value $e^{-rt}\,e^{yt}S_t$ of one share bought at time $0$ with its dividends
+    reinvested in shares, are $\Q$-martingales;
+  \item $\EQ\big[\sup_{t\le T}S_t^q\big]\le2S_0^q\exp\big((|q\nu+\frac12q^2\sigma^2|+\frac12q^2\sigma^2)T\big)<\infty$
+    for every real $q$, and similarly under $\Prob$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(i) For $s<t$, $Z_t=Z_s\exp(-\theta(W_t-W_s)-\frac{\theta^2}2(t-s))$, and the increment is
+independent of $\F_s$ with $\E[e^{-\theta(W_t-W_s)}]=e^{\theta^2(t-s)/2}$ (the normal moment
+generating function). So $\E[Z_t\mid\F_s]=Z_s$, and $\E[Z_T]=Z_0=1$. Since $Z_T>0$,
+$\Q(A)=0$ if and only if $\Prob(A)=0$.
+
+(ii) By Girsanov's theorem (\textcite{karatzas-shreve}, Theorem~3.5.1), applied to the
+martingale $Z$ of (i), $W_t+\theta t$ is a $\Q$-Brownian motion for $(\F_t)$ on $[0,T]$; Novikov's
+condition $\E[\exp(\frac12\theta^2T)]<\infty$, which also implies (i), holds trivially because
+$\theta$ is constant. Substituting $\dd W_t=\dd W^\Q_t-\theta\,\dd t$ in \eqref{eq:sm-P} turns the
+drift into $\mu-y-\sigma\theta=r-y$, and the exponent of \eqref{eq:sm-P} equals
+$\nu t+\sigma W^\Q_t$.
+
+(iii) By \eqref{eq:sm-Q}, $S_t^q=S_s^q\exp\big(q\nu(t-s)+q\sigma(W^\Q_t-W^\Q_s)\big)$, and the
+increment is $\mathcal N(0,t-s)$ under $\Q$ and independent of $\F_s$. The normal moment
+generating function gives the factor $\exp(q\nu(t-s)+\frac12q^2\sigma^2(t-s))$, which is
+\eqref{eq:sm-moments}. Under $\Prob$ use \eqref{eq:sm-P} instead. Taking $q=1$ gives the two
+martingales.
+
+(iv) Write $S_t^q=S_0^qe^{at}M_t$ with $a=q\nu+\frac12q^2\sigma^2$ and
+$M_t=\exp(q\sigma W^\Q_t-\frac12q^2\sigma^2t)$, a continuous $\Q$-martingale with
+$\EQ[M_T^2]=e^{q^2\sigma^2T}$. Doob's maximal inequality (\textcite{karatzas-shreve},
+Theorem~1.3.8(iv)) gives $\EQ[\sup_{t\le T}M_t^2]\le4\EQ[M_T^2]$, and then
+$\EQ[\sup_tS_t^q]\le S_0^qe^{|a|T}\big(\EQ[\sup_tM_t^2]\big)^{1/2}$.
+\end{proof}
+
+\paragraph{Trading with dividends.} A self-financing strategy starts with wealth $X_0$, holds
+$\Delta_t$ shares at time $t$, and keeps the rest of its wealth, $X_t-\Delta_tS_t$, in the
+money-market account; dividends are paid into the account. Over $[t,t+\dd t]$ the wealth gains
+the price change, the dividends and the interest:
+\begin{equation}\label{eq:sm-wealth}
+  \dd X_t=\Delta_t\,\dd S_t+y\,\Delta_tS_t\,\dd t+r\,(X_t-\Delta_tS_t)\,\dd t .
+\end{equation}
+We call $\Delta$ \emph{admissible} if it is progressively measurable and
+$\EQ\int_0^T\Delta_t^2S_t^2\,\dd t<\infty$. By the product rule and \eqref{eq:sm-Q},
+\begin{equation}\label{eq:sm-discounted-wealth}
+  \dd\big(e^{-rt}X_t\big)=e^{-rt}\Delta_t\big(\dd S_t-(r-y)S_t\,\dd t\big)=e^{-rt}\sigma\Delta_tS_t\,\dd W^\Q_t ,
+\end{equation}
+so $X_t=e^{rt}\big(X_0+\int_0^te^{-ru}\sigma\Delta_uS_u\,\dd W^\Q_u\big)$ is the unique solution of
+\eqref{eq:sm-wealth}. The wealth does not depend on whether the integral against $\dd S$ is built
+under $\Prob$ or under $\Q$: for simple integrands it is a finite sum, the same under both; a
+general $\Delta$ is approximated by simple ones whose integrals converge in probability
+(\textcite{karatzas-shreve}, Section~3.2), and convergence in probability, with its limit, is
+preserved by equivalent measures.
+The real-world drift $\mu$ has disappeared from \eqref{eq:sm-discounted-wealth}.
+
+\begin{proposition}[Risk-neutral pricing with a dividend yield]\label{prop:sm-risk-neutral}
+In the standard model, let $f:(0,\infty)\to\R$ be Borel with $\EQ|f(S_T)|<\infty$. For $0\le t<T$
+and $x>0$ let
+\begin{equation}\label{eq:sm-price-function}
+  v(t,x)=e^{-r(T-t)}\int_{\R}f\big(x\,e^{\nu(T-t)+\sigma\sqrt{T-t}\,z}\big)\,N'(z)\,\dd z
+\end{equation}
+wherever the integral converges absolutely, and let $v(T,x)=f(x)$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{Price formula.} For every $t\in[0,T)$ the integral converges absolutely at $x=S_t$,
+    $\Q$-almost surely, and for every $t\in[0,T]$
+    \begin{equation}\label{eq:sm-price}
+      V_t:=e^{-r(T-t)}\,\EQ\big[f(S_T)\,\big|\,\F_t\big]=v(t,S_t)\qquad\text{almost surely.}
+    \end{equation}
+    In particular $V_0=e^{-rT}\EQ[f(S_T)]=v(0,S_0)$, and $e^{-rt}V_t$ is a $\Q$-martingale.
+  \item \emph{Replication and no arbitrage.} If $\Delta$ is admissible, the discounted wealth
+    $e^{-rt}X_t$ is a $\Q$-martingale. Hence, if $X_T=f(S_T)$ almost surely, then $X_t=V_t$ for
+    every $t\in[0,T]$ almost surely; and if $X_0=0$ and $X_T\ge0$ almost surely, then $X_T=0$
+    almost surely.
+  \item \emph{Existence of the hedge.} If $\EQ[f(S_T)^2]<\infty$, there is an admissible $\Delta$
+    whose wealth started from $X_0=V_0$ ends at $X_T=f(S_T)$.
+  \item \emph{Path-dependent claims.} (ii) and (iii) hold for every $\F_T$-measurable claim $\xi$ in
+    place of $f(S_T)$ (integrable for (ii), with $\EQ[\xi^2]<\infty$ for (iii)), with
+    $V_t=e^{-r(T-t)}\EQ[\xi\mid\F_t]$.
+\end{enumerate}
+\end{proposition}
+
+So a square-integrable claim, path-dependent or not, can be replicated, every admissible
+replicating strategy is worth $V_t$ at time $t$, and trading the claim at any other price against
+the replicating strategy is an arbitrage. The price depends on $r$, $y$ and $\sigma$, not on $\mu$.
+
+\begin{proof}
+(i) Write $S_T=S_tR$ with $R=\exp\big(\nu(T-t)+\sigma(W^\Q_T-W^\Q_t)\big)$. Under $\Q$, $S_t$ is
+$\F_t$-measurable and $R$ is independent of $\F_t$, with the law of
+$e^{\nu(T-t)+\sigma\sqrt{T-t}\,Z}$, $Z\sim\mathcal N(0,1)$ (\cref{lem:sm-girsanov}(ii)). By the
+independence lemma (\textcite{shreve2}, Section~2.3), applied to the nonnegative functions $f^+$
+and $f^-$, $\EQ[f^\pm(S_T)\mid\F_t]=e^{r(T-t)}v^\pm(t,S_t)$, where $v^\pm\in[0,\infty]$ is
+\eqref{eq:sm-price-function} with $f^\pm$ in place of $f$. Both are finite almost surely because
+$\EQ[f^\pm(S_T)]<\infty$; subtracting gives \eqref{eq:sm-price}. The martingale property is the
+tower property: $e^{-rt}V_t=\EQ[e^{-rT}f(S_T)\mid\F_t]$.
+
+(ii) By \eqref{eq:sm-discounted-wealth}, $e^{-rt}X_t-X_0$ is the It\^o integral of
+$e^{-ru}\sigma\Delta_uS_u$ against the $\Q$-Brownian motion $W^\Q$, and
+$\EQ\int_0^Te^{-2ru}\sigma^2\Delta_u^2S_u^2\,\dd u\le e^{2|r|T}\sigma^2\EQ\int_0^T\Delta_u^2S_u^2\,\dd u<\infty$,
+so it is a $\Q$-martingale. If $X_T=f(S_T)$, then
+$e^{-rt}X_t=\EQ[e^{-rT}f(S_T)\mid\F_t]=e^{-rt}V_t$. If $X_0=0$ and $X_T\ge0$, then
+$\EQ[e^{-rT}X_T]=X_0=0$, so $X_T=0$ $\Q$-almost surely, hence $\Prob$-almost surely by
+\cref{lem:sm-girsanov}(i).
+
+(iii) The $\Q$-martingale $M_t=e^{-rt}V_t$ is square integrable. Since $\theta$ is constant, $W$
+and $W^\Q$ generate the same filtration, and the null events of $\Prob$ and $\Q$ coincide, so
+$(\F_t)$ is the augmented filtration of the $\Q$-Brownian motion $W^\Q$. By the martingale
+representation theorem (\textcite{karatzas-shreve}, Section~3.4.D; \textcite{oksendal},
+Theorem~4.3.4), $M_t=M_0+\int_0^t\varphi_u\,\dd W^\Q_u$ for a progressively measurable $\varphi$
+with $\EQ\int_0^T\varphi_u^2\,\dd u<\infty$. Then $\Delta_t=e^{rt}\varphi_t/(\sigma S_t)$ is
+admissible, and by \eqref{eq:sm-discounted-wealth} the wealth started from $V_0$ satisfies
+$e^{-rt}X_t=M_t$, so $X_T=V_T=f(S_T)$.
+
+(iv) The proofs of (ii) and (iii) use only that $V_T=f(S_T)$ is $\F_T$-measurable, integrable or
+square integrable, and that $e^{-rt}V_t=\EQ[e^{-rT}f(S_T)\mid\F_t]$; they apply verbatim to $\xi$.
+\end{proof}
+
+\begin{remark}[Forwards and the test case]\label{rem:sm-forward}
+For $f(x)=x$, \eqref{eq:sm-moments} gives $V_t=e^{-r(T-t)}S_te^{(r-y)(T-t)}=S_te^{-y(T-t)}$: a
+claim to the share at $T$, without the dividends paid before $T$, is worth less than the share.
+The \emph{forward price}, the delivery price $F$ that makes a forward contract worth nothing, solves
+$e^{-r(T-t)}\EQ[S_T-F\mid\F_t]=0$, so $F_{t,T}=S_te^{(r-y)(T-t)}=\EQ[S_T\mid\F_t]$. For the course's
+test case $S_0=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, the forward is
+$100\,e^{-0.01}=99.005$, below the spot because the yield exceeds the rate, and the call is worth
+$7.36429$ (\cref{ch:02-black-scholes}). A call with strike $K=0$ pays $S_T$ and is worth
+$S_0e^{-yT}$.
+\end{remark}
+
+\begin{remark}[Edge cases]\label{rem:sm-edges}
+At $t=T$, \eqref{eq:sm-price} reads $V_T=f(S_T)$; with $y=0$, $e^{-rt}S_t$ itself is a
+$\Q$-martingale. If $\sigma=0$ (excluded by the definition), the stock is riskless with total
+return $\mu$, absence of arbitrage forces $\mu=r$, and the price of $f(S_T)$ is
+$e^{-rT}f(S_0e^{(r-y)T})$: for continuous $f$ with $|f(x)|\le a(x^q+x^{-q})$, the limit of
+\eqref{eq:sm-price-function} as $\sigma\downarrow0$, by dominated convergence. The hypothesis
+$\EQ|f(S_T)|<\infty$ is not automatic: $\EQ[e^{S_T}]=\infty$, because a lognormal variable has no
+exponential moments, so the claim paying $e^{S_T}$ has no finite price.
+\end{remark}
+
+\demo{01-standard-model.ipynb}{simulate the stock under $\Prob$ and under $\Q$ from the same
+normals, and price a call from real-world samples by reweighting them with $Z_T$.}
+
+\section{The Feynman--Kac formula}\label{sec:sm-feynman-kac}
+
+Why should a price solve an equation? By \cref{prop:sm-risk-neutral}, $e^{-rt}v(t,S_t)$ is a
+$\Q$-martingale. If $v$ is smooth, It\^o's formula \eqref{eq:sm-ito} writes its differential as
+$e^{-rt}\big(\partial_tv+(r-y)x\,\partial_xv+\frac12\sigma^2x^2\partial_{xx}v-rv\big)(t,S_t)\,\dd t$
+plus a $\dd W^\Q$ term. A martingale has no drift, so the bracket vanishes along the path, and
+hence wherever the path can go. This heuristic assumes that $v$ is smooth, the hard part. The
+Feynman--Kac formula goes the other way, as pricing by equations needs: a smooth solution is the
+expectation. The argument works for any diffusion.
+
+\paragraph{Setting.} Let $I=(\alpha,\beta)$ with $-\infty\le\alpha<\beta\le\infty$, and let
+$b,\sigma,r,c:[0,T]\times I\to\R$ be continuous: a drift, a volatility, a discount rate and a
+running payoff. Let $\Q$ be a probability measure (in applications, a risk-neutral measure), $W$
+a $\Q$-Brownian motion for $(\F_t)$, and $X$ a continuous adapted process with values in $I$ and
+\[
+  X_t=x_0+\int_0^tb(s,X_s)\,\dd s+\int_0^t\sigma(s,X_s)\,\dd W_s,\qquad 0\le t\le T,
+\]
+for some $x_0\in I$. Write $\mathcal L_tf=\frac12\sigma(t,\cdot)^2f''+b(t,\cdot)f'$ and
+$D_t=\exp\big(-\int_0^tr(s,X_s)\,\dd s\big)$.
+
+\begin{theorem}[Feynman--Kac]\label{thm:sm-feynman-kac}
+Let $g:I\to\R$ be Borel, $E\subseteq I$ a Borel set with $\Q(X_T\in E)=0$, and
+$u\in C^{1,2}([0,T)\times I)$ a solution of
+\begin{gather}
+  \partial_tu+\mathcal L_tu-r\,u+c=0\qquad\text{on }[0,T)\times I,\label{eq:sm-fk-pde}\\
+  \lim_{(s,z)\to(T,x),\ s<T}u(s,z)=g(x)\qquad\text{for every }x\in I\setminus E.\label{eq:sm-fk-terminal}
+\end{gather}
+Let $H_s=D_s\,\sigma(s,X_s)\,\partial_xu(s,X_s)$ for $s<T$, and assume (a) or (b):
+\begin{enumerate}[label=(\alph*)]
+  \item $\int_0^TH_s^2\,\dd s<\infty$ almost surely, the It\^o integral $\int_0^tH_s\,\dd W_s$,
+    $t\in[0,T]$, is a $\Q$-martingale (for instance, $\EQ\int_0^TH_s^2\,\dd s<\infty$), and
+    $\EQ\int_0^TD_s|c(s,X_s)|\,\dd s<\infty$;
+  \item $r\ge-r_0$ for a constant $r_0\ge0$, and there are a constant $C$ and a continuous
+    $\psi:I\to[1,\infty)$ with $|u(s,x)|+|c(s,x)|\le C\psi(x)$ on $[0,T)\times I$ and
+    $\EQ\big[\sup_{s\le T}\psi(X_s)\big]<\infty$.
+\end{enumerate}
+Then $D_Tg(X_T)$ and $\int_0^TD_sc(s,X_s)\,\dd s$ are integrable, and the process
+\[
+  Y_t=D_t\,u(t,X_t)+\int_0^tD_s\,c(s,X_s)\,\dd s\ \ (t<T),\qquad
+  Y_T=D_T\,g(X_T)+\int_0^TD_s\,c(s,X_s)\,\dd s,
+\]
+is a $\Q$-martingale on $[0,T]$. In particular
+\begin{equation}\label{eq:sm-fk}
+  u(0,x_0)=\EQ\Big[\int_0^TD_s\,c(s,X_s)\,\dd s+D_T\,g(X_T)\Big],
+\end{equation}
+and, in case (b), and in case (a) if $r$ is bounded above, for every $t\in[0,T)$, almost surely,
+\begin{equation}\label{eq:sm-fk-conditional}
+  u(t,X_t)=\EQ\Big[\int_t^Te^{-\int_t^sr(w,X_w)\,\dd w}c(s,X_s)\,\dd s
+  +e^{-\int_t^Tr(w,X_w)\,\dd w}g(X_T)\,\Big|\,\F_t\Big].
+\end{equation}
+\end{theorem}
+
+The theorem applies to a solution $X^{t,x}$ started at $x$ at a time $t$ (when there is one):
+with $\widetilde W_s=W_{t+s}-W_t$ and $\widetilde\F_s=\F_{t+s}$ it solves a shifted equation on
+$[0,T-t]$, and \eqref{eq:sm-fk} gives $u(t,x)$ as the unconditional expectation of the variable in
+\eqref{eq:sm-fk-conditional}, with $X^{t,x}$ in place of $X$. The set $E$ is there for discontinuous payoffs: no solution is
+continuous at $(T,K)$ for the digital payoff $\1_{(K,\infty)}$, and $E=\{K\}$ is harmless when
+$X_T$ has a density.
+
+\begin{proof}
+\emph{No drift.} Fix $T'<T$. It\^o's formula \eqref{eq:sm-ito} on $[0,T']$ (where $u$ is $C^{1,2}$
+and $X$ stays in $I$), the product rule with the finite-variation factor $D$, $\dd D_t=-r(t,X_t)D_t\,\dd t$,
+and \eqref{eq:sm-fk-pde} give
+\[
+  \dd Y_t=D_t\big(\partial_tu+\mathcal L_tu-ru+c\big)(t,X_t)\,\dd t+H_t\,\dd W_t=H_t\,\dd W_t,\qquad t\le T'.
+\]
+As $T'<T$ is arbitrary, almost surely $Y_t=Y_0+\int_0^tH_s\,\dd W_s$ for all $t<T$. On the event
+$\{X_T\notin E\}$, which has probability one, $Y_t\to Y_T$ as $t\uparrow T$: $D$, $X$ and the
+running integral are continuous, and \eqref{eq:sm-fk-terminal} applies along $(t,X_t)\to(T,X_T)$.
+
+\emph{Case (a).} The integral $M_t=\int_0^tH_s\,\dd W_s$ is continuous on $[0,T]$, so letting
+$t\uparrow T$ gives $Y_T=Y_0+M_T$ almost surely. As $M$ is a martingale, $Y_T$ is integrable and
+$\EQ[Y_T\mid\F_t]=Y_0+M_t=Y_t$. Since $\int_0^TD_s|c(s,X_s)|\,\dd s$ is integrable by assumption,
+so is $D_Tg(X_T)=Y_T-\int_0^TD_sc(s,X_s)\,\dd s$.
+
+\emph{Case (b): localization.} Now $D_t\le e^{r_0T}$, and
+$G=e^{r_0T}(1+T)\,C\sup_{s\le T}\psi(X_s)$ is integrable. Every $Y_t$, $t<T$, satisfies $|Y_t|\le G$,
+and so does $Y_T$ on $\{X_T\notin E\}$, because $|g(X_T)|=\lim_t|u(t,X_t)|\le C\psi(X_T)$ there.
+With $\alpha_n,\beta_n$ as in \cref{sec:sm-recap} and $x_0\in(\alpha_1,\beta_1)$, let $T_n=T-T/(n+1)$, and let $\vartheta_n$ be the first time
+$t\le T_n$ at which $X_t\notin(\alpha_n,\beta_n)$, or $T_n$ if there is none. It is a stopping
+time, as the hitting time of a closed set by a continuous adapted process
+(\textcite{karatzas-shreve}, Section~1.2). For $s\le\vartheta_n$ the point $(s,X_s)$ lies in the
+compact set $[0,T_n]\times[\alpha_n,\beta_n]$, on which $\sigma$, $\partial_xu$ and $D$ are bounded,
+so $H\1_{[0,\vartheta_n]}$ is bounded, its integral is a martingale, and that integral is
+$Y_{t\wedge\vartheta_n}-Y_0$ (\textcite{karatzas-shreve}, Section~3.2). Hence, for $t<T$,
+\[
+  Y_{t\wedge\vartheta_n}=\EQ\big[Y_{\vartheta_n}\,\big|\,\F_t\big].
+\]
+For each outcome, $X([0,T])$ is a compact subset of $I$, contained in $(\alpha_n,\beta_n)$ for all
+large $n$; then $\vartheta_n=T_n\uparrow T$, so $Y_{t\wedge\vartheta_n}\to Y_t$ and, on
+$\{X_T\notin E\}$, $Y_{\vartheta_n}\to Y_T$. By dominated convergence (bound $G$),
+$Y_{\vartheta_n}\to Y_T$ in $L^1$, and since conditional expectation is a contraction in $L^1$,
+$\EQ[Y_{\vartheta_n}\mid\F_t]\to\EQ[Y_T\mid\F_t]$ in $L^1$. The left side converges almost surely
+to $Y_t$, so $Y_t=\EQ[Y_T\mid\F_t]$. Integrability of the two terms of $Y_T$ follows from the bound $G$.
+
+\emph{Conclusion.} The martingale property at $t=0$ is \eqref{eq:sm-fk}, since $Y_0=u(0,x_0)$. For
+\eqref{eq:sm-fk-conditional}, subtract the $\F_t$-measurable $\int_0^tD_sc\,\dd s$ from both sides
+of $Y_t=\EQ[Y_T\mid\F_t]$ and multiply by the $\F_t$-measurable $D_t^{-1}$; this is allowed when
+the product of $D_t^{-1}$ with the integrable variable inside the expectation is integrable. In
+case (b) that product is bounded by $G$; in case (a) with $r\le\bar r$, $D_t^{-1}\le e^{|\bar r|T}$.
+\end{proof}
+
+\begin{remark}[On the hypotheses]\label{rem:sm-fk-hypotheses}
+\leavevmode
+\begin{enumerate}[label=(\alph*),leftmargin=*]
+  \item \emph{Growth and moments.} Hypothesis (b) holds with $\psi\equiv1$ when $u$ and $c$ are
+    bounded and $r$ is bounded below. For the stock of the standard model, $\psi(x)=x^p+x^{-p}$
+    works for every $p\ge0$, by \cref{lem:sm-girsanov}(iv). For $I=\R$ and coefficients that are
+    Lipschitz in $x$ uniformly in $t$, $\psi(x)=1+x^2$ works, because then
+    $\EQ[\sup_{t\le T}X_t^2]<\infty$ (proved in the IEOR 222 notes).
+  \item \emph{Uniqueness.} If the hypotheses hold for the solutions started from every $(t,x)$,
+    two solutions of \eqref{eq:sm-fk-pde}--\eqref{eq:sm-fk-terminal} in the class allowed by (b)
+    are both equal to the same expectation, hence to each other: the theorem is also a uniqueness
+    theorem. Without a restriction of this kind uniqueness fails. Tychonoff constructed a solution
+    of the heat equation that vanishes at the initial time and is not identically zero; it grows
+    faster than $e^{ax^2}$ for every $a$, and uniqueness does hold among solutions bounded by
+    $Ce^{ax^2}$ (\textcite{karatzas-shreve}, Section~4.3). In the variables of
+    \cref{sec:sm-green} this gives nonzero solutions of the pricing equation with zero terminal
+    value. A solution can also fail by blowing up near the terminal time at a single point
+    (\exref{ex:sm-dipole}).
+  \item \emph{Discounting.} The lower bound on $r$ in (b) keeps $D$ bounded. Case (a) has no such
+    bound, and the next example needs this.
+\end{enumerate}
+\end{remark}
+
+\begin{remark}[The converse]\label{rem:sm-fk-converse}
+That the expectation is a $C^{1,2}$ solution is the harder direction, which we do not prove in
+general. \textcite{karatzas-shreve}, Theorem~5.7.6, proves \eqref{eq:sm-fk-conditional} for
+solutions of polynomial growth, Lipschitz coefficients and a nonnegative discount rate; their
+Remark~5.7.8 recalls when a
+solution exists ($\sigma^2$ bounded below by a positive constant, bounded H\"older coefficients,
+a continuous payoff of polynomial growth), by the parametrix construction of
+\textcite{friedman-parabolic}, Chapter~1. \textcite{oksendal}, Theorem~8.2.1, proves both
+directions for time-independent coefficients, a discount rate bounded below and a $C^2$ payoff
+with compact support. For the standard model, \cref{cor:sm-superposition} proves the converse
+for every payoff with polynomial growth in $\xi$ and $1/\xi$.
+\end{remark}
+
+\begin{example}[A bond with a random short rate]\label{exa:sm-vasicek}
+Let the short rate be an Ornstein--Uhlenbeck process under $\Q$,
+$\dd X_t=\kappa(\bar x-X_t)\,\dd t+\gamma\,\dd W_t$ with $\kappa,\gamma>0$, on $I=\R$, and price the
+zero-coupon bond paying $1$ at $T$ by discounting at $r(t,x)=x$ (so $c=0$, $g=1$, $E=\emptyset$).
+Try $u(t,x)=\exp\big(A(T-t)-B(T-t)\,x\big)$. Substituting in \eqref{eq:sm-fk-pde} and collecting the
+terms in $x$ and the constant terms gives $B'=1-\kappa B$ and
+$A'=-\kappa\bar xB+\frac12\gamma^2B^2$, with $A(0)=B(0)=0$, which are solved by
+\begin{equation}\label{eq:sm-vasicek}
+  B(\tau)=\frac{1-e^{-\kappa\tau}}{\kappa},\qquad
+  A(\tau)=\Big(\bar x-\frac{\gamma^2}{2\kappa^2}\Big)\big(B(\tau)-\tau\big)-\frac{\gamma^2B(\tau)^2}{4\kappa}.
+\end{equation}
+Hypothesis (b) fails: on $I=\R$ the rate $r(t,x)=x$ is unbounded below, so $D$ is unbounded.
+Hypothesis (a) holds. Here $H_s=-\gamma B(T-s)\,\exp\big(A(T-s)-B(T-s)X_s-\int_0^sX_w\,\dd w\big)$, and since $X$ is a
+Gaussian process, the exponent is a Gaussian variable whose mean and variance depend continuously
+on $s$; so $\EQ[H_s^2]$ is bounded on $[0,T]$ and $\EQ\int_0^TH_s^2\,\dd s<\infty$. By
+\eqref{eq:sm-fk}, the bond is worth $u(0,x_0)=\EQ\big[\exp(-\int_0^TX_s\,\dd s)\big]$. With
+$\kappa=0.5$, $\bar x=4\%$, $\gamma=2\%$, $T=5$ and $x_0=4\%$, $u(0,x_0)=0.820253$. Our implementation
+(numpy \texttt{default\_rng}, seed $2029$), with $10^5$ exact paths of $X$ on $50$ steps and the
+trapezoid rule for the integral, gives $0.820203$ with standard error $1.6\times10^{-4}$.
+\Cref{fig:sm-feynman-kac} repeats the comparison for seven initial rates.
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch01-feynman-kac}
+  \caption{Two numerical checks. Left: the bond of \cref{exa:sm-vasicek} ($\kappa=0.5$,
+    $\bar x=4\%$, $\gamma=2\%$, $T=5$), Monte Carlo estimate minus the solution
+    \eqref{eq:sm-vasicek} of the pricing equation, with $95\%$ confidence intervals, for seven
+    initial rates $x_0$. Each estimate uses $10^5$ exact paths of $X$ with $50$ steps and its own
+    seed ($2026$ to $2032$); every interval contains zero. Right: the largest relative residual
+    of the backward and forward equations \eqref{eq:sm-backward}--\eqref{eq:sm-forward} for the
+    Green's function of the test case ($T-t=0.25$, $61$ points), computed by central differences
+    with relative step $h$. It decreases like $h^2$ until rounding errors, which grow as $h$
+    shrinks, take over.}
+  \label{fig:sm-feynman-kac}
+\end{figure}
+
+For the standard model, \cref{thm:sm-feynman-kac} becomes the following.
+
+\begin{corollary}[The pricing equation of the standard model]\label{cor:sm-bs-pde}
+Let $f:(0,\infty)\to\R$ be Borel, and let $E$ be a Lebesgue-null Borel set. Let $v\in C^{1,2}([0,T)\times(0,\infty))$ solve
+\begin{equation}\label{eq:sm-bs-pde}
+  \partial_tv+(r-y)\,x\,\partial_xv+\frac{\sigma^2x^2}{2}\,\partial_{xx}v-r\,v=0\qquad\text{on }[0,T)\times(0,\infty),
+\end{equation}
+with $|v(t,x)|\le C(x^p+x^{-p})$ for constants $C,p\ge0$ and $v(t,x)\to f(x_0)$ as
+$(t,x)\to(T,x_0)$, for every $x_0\notin E$. Then $\EQ|f(S_T)|<\infty$, $v$ is the function
+\eqref{eq:sm-price-function}, and $v(t,S_t)=V_t$ is the price of \cref{prop:sm-risk-neutral} for
+every $t\in[0,T)$. In particular
+\eqref{eq:sm-bs-pde} has at most one solution with these properties.
+\end{corollary}
+
+\begin{proof}
+Apply \cref{thm:sm-feynman-kac}(b) under $\Q$ to the stock started at $x$ at time $t$, which is
+$S^{t,x}_s=x\exp\big(\nu(s-t)+\sigma(W^\Q_s-W^\Q_t)\big)$: here $I=(0,\infty)$, $b(t,x)=(r-y)x$,
+the volatility is $\sigma x$, the discount rate is the constant $r$, $c=0$ and $g=f$, and
+$\psi(x)=x^p+x^{-p}\ge1$ satisfies the moment condition by \cref{lem:sm-girsanov}(iv). The law of $S^{t,x}_T$ has a density, so $\Q(S^{t,x}_T\in E)=0$.
+\Cref{eq:sm-fk} with the time shift gives $v(t,x)=e^{-r(T-t)}\EQ[f(S^{t,x}_T)]$, which is
+\eqref{eq:sm-price-function}, and the theorem started at time $0$ gives the integrability of
+$f(S_T)$ and, by \eqref{eq:sm-fk-conditional}, $v(t,S_t)=V_t$.
+\end{proof}
+
+\begin{remark}[The equation as a hedging argument]\label{rem:sm-hedge}
+Rearranged, \eqref{eq:sm-bs-pde} reads
+$\partial_tv=r(v-x\,\partial_xv)+y\,x\,\partial_xv-\frac12\sigma^2x^2\,\partial_{xx}v$: for a position
+replicated by $\Delta=\partial_xv$ shares and $v-x\Delta$ in cash, the time decay equals the interest
+on the cash, plus the dividends on the shares, minus the gamma term, which pays for rebalancing in
+a moving market. This is the hedging derivation of Black, Scholes and Merton. Indeed, if $v$
+solves \eqref{eq:sm-bs-pde}, It\^o's formula and \eqref{eq:sm-discounted-wealth} give
+$e^{-rt}X_t$ and $e^{-rt}v(t,S_t)$ the same differential $e^{-rt}\sigma S_t\,\partial_xv\,\dd W^\Q_t$
+when $X_0=v(0,S_0)$ and $\Delta_t=\partial_xv(t,S_t)$; so $X_t=v(t,S_t)$ for $t\le T'<T$, whatever $\mu$
+is.
+\end{remark}
+
+\demo{01-standard-model.ipynb}{price the bond of \cref{exa:sm-vasicek} by Monte Carlo and compare
+with the solution of the pricing equation, for the rate parameters, the starting rate and the
+number of paths and steps you choose.}
+
+\section{Dirac deltas and Green's functions}\label{sec:sm-green}
+
+A claim that pays $1$ if $S_T$ falls in $[\xi,\xi+h]$ costs about $h$ times a number
+$G(t,S_t;T,\xi)$. Dividing by $h$ and letting $h\downarrow0$ produces a claim that pays
+``$\delta(S_T-\xi)$'': infinitely much if $S_T=\xi$, nothing otherwise, with total weight one.
+This \emph{Arrow--Debreu security} is not a function of $S_T$, but its price is a perfectly good
+function, and every other European price is a superposition of these. Two ideas make this
+precise.
+
+\paragraph{Dirac deltas.} For $a\in\R$, the \emph{Dirac delta} $\delta_a$ maps a continuous
+function $\varphi$ to $\varphi(a)$. It is the derivative of the step $H_a=\1_{(a,\infty)}$ and the
+second derivative of the ramp $R_a(x)=(x-a)^+$, in the following sense: for every
+$\varphi\in C^2(\R)$ that vanishes outside a bounded interval,
+\begin{equation}\label{eq:sm-step-ramp}
+  -\int_\R H_a(x)\,\varphi'(x)\,\dd x=\varphi(a),\qquad\int_\R R_a(x)\,\varphi''(x)\,\dd x=\varphi(a),
+\end{equation}
+by integration by parts (the boundary terms vanish because $\varphi$ and $\varphi'$ vanish outside
+a bounded interval). In the theory of distributions, the derivative of a generalised function $L$
+is \emph{defined} by $L'(\varphi)=-L(\varphi')$, and \eqref{eq:sm-step-ramp} says that $H_a'=\delta_a$
+and $R_a''=\delta_a$ (\textcite{strichartz-distributions}, Chapters~1--2). The second view is as
+a limit: functions $\phi_\varepsilon$ \emph{converge to $\delta_a$} if
+$\int\phi_\varepsilon h\to h(a)$ for every bounded continuous $h$. The heat kernel is the standard
+example: $\int k(\varepsilon,x-a)h(x)\,\dd x=\E[h(a+\sqrt\varepsilon Z)]\to h(a)$ as
+$\varepsilon\downarrow0$, by dominated convergence. In probabilistic terms, $\mathcal N(a,\varepsilon)$
+converges in law to the point mass at $a$. Below we test against functions of polynomial
+growth as well, which is what prices require.
+
+\paragraph{The Green's function.} By \eqref{eq:sm-Q}, given $S_t=x$ the variable $\log S_T$ is
+$\mathcal N(\log x+\nu\tau,\sigma^2\tau)$ under $\Q$, with $\tau=T-t$. So $S_T$ has the density
+\begin{equation}\label{eq:sm-density}
+  p(\tau;x,\xi)=\frac{1}{\xi\sigma\sqrt\tau}\,N'\Big(\frac{\log(\xi/x)-\nu\tau}{\sigma\sqrt\tau}\Big)
+  =\frac1\xi\,k\big(\sigma^2\tau,\ \log\xi-\log x-\nu\tau\big),\qquad x,\xi>0,
+\end{equation}
+and we define the \emph{Green's function} of the pricing equation as the discounted density
+\[
+  G(t,x;T,\xi)=e^{-r(T-t)}\,p(T-t;x,\xi),\qquad 0\le t<T,\ x,\xi>0 .
+\]
+At $\xi=K$, the argument of $N'$ in \eqref{eq:sm-density} is $-d_-$, so
+$G(t,x;T,K)=e^{-r\tau}N'(d_-)/(K\sigma\sqrt\tau)$; in the test case $G(0,100;1,100)=0.019528$.
+
+\begin{proposition}[The Green's function of the pricing equation]\label{prop:sm-green}
+Let $\sigma>0$ and $r,y\in\R$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{Arrow--Debreu prices.} For every Borel $A\subseteq(0,\infty)$ and $t<T$,
+    $e^{-r(T-t)}\Q(S_T\in A\mid\F_t)=\int_AG(t,S_t;T,\xi)\,\dd\xi$: by \cref{prop:sm-risk-neutral},
+    $G(t,S_t;T,\xi)\,\dd\xi$ is the time-$t$ price of the claim paying $\1_{[\xi,\xi+\dd\xi]}(S_T)$.
+  \item \emph{Backward equation, terminal value $\delta_\xi$.} For fixed $T$ and $\xi>0$, the
+    function $(t,x)\mapsto G(t,x;T,\xi)$ is infinitely differentiable on $[0,T)\times(0,\infty)$ and
+    solves the pricing equation \eqref{eq:sm-bs-pde}:
+    \begin{equation}\label{eq:sm-backward}
+      \partial_tG+(r-y)\,x\,\partial_xG+\frac{\sigma^2x^2}{2}\,\partial_{xx}G-rG=0 .
+    \end{equation}
+    As $t\uparrow T$, $G(t,\cdot\,;T,\xi)\to\delta_\xi$: $\int_0^\infty G(t,x;T,\xi)\varphi(x)\,\dd x\to\varphi(\xi)$
+    for every Borel $\varphi$ that is continuous at $\xi$ and satisfies $|\varphi(x)|\le a(x^q+x^{-q})$
+    for constants $a,q\ge0$.
+  \item \emph{Forward equation, initial value $\delta_x$.} For fixed $t$ and $x>0$, the function
+    $(T,\xi)\mapsto G(t,x;T,\xi)$ is infinitely differentiable on $(t,\infty)\times(0,\infty)$ and
+    solves the adjoint equation
+    \begin{equation}\label{eq:sm-forward}
+      \partial_TG=\frac12\,\partial_{\xi\xi}\big(\sigma^2\xi^2G\big)-\partial_\xi\big((r-y)\,\xi\,G\big)-rG .
+    \end{equation}
+    As $T\downarrow t$, $G(t,x;T,\cdot)\to\delta_x$ in the same sense as in (ii).
+\end{enumerate}
+In neither limit does $G$ converge to a function: as $t\uparrow T$, $G(t,x;T,\xi)\to0$ for $x\ne\xi$,
+while $G(t,\xi;T,\xi)\to\infty$.
+\end{proposition}
+
+So $G$ solves the pricing equation with terminal value $\delta_\xi$, and the forward equation with
+initial value $\delta_x$, ``value'' meaning the weak limits of (ii) and (iii), which are in
+particular limits in the sense of distributions.
+
+\begin{proof}
+(i) is \eqref{eq:sm-price} with $f=\1_A$, written with the density \eqref{eq:sm-density}.
+
+(ii) Pass to $w=\log x$ and $\tau=T-t$. Since $x\partial_x=\partial_w$ and
+$x^2\partial_{xx}=\partial_{ww}-\partial_w$, the pricing operator becomes
+$\partial_t+\nu\,\partial_w+\frac12\sigma^2\partial_{ww}-r$, with constant coefficients. Now
+$G=\xi^{-1}e^{-r\tau}k(\sigma^2\tau,z)$ with $z=\log\xi-w-\nu\tau$, a smooth function of $(t,w)$ for
+$\tau>0$. With $k_s$, $k_z$, $k_{zz}$ the partial derivatives of $k(s,z)$ at $(\sigma^2\tau,z)$,
+the chain rule gives
+\[
+  \partial_tG=\frac{e^{-r\tau}}{\xi}\big(rk-\sigma^2k_s+\nu k_z\big),\qquad
+  \partial_wG=-\frac{e^{-r\tau}}{\xi}k_z,\qquad
+  \partial_{ww}G=\frac{e^{-r\tau}}{\xi}k_{zz},
+\]
+so the operator applied to $G$ equals $\xi^{-1}e^{-r\tau}\sigma^2\big(\frac12k_{zz}-k_s\big)=0$, by
+the heat equation $k_s=\frac12k_{zz}$ of \cref{sec:sm-recap}. For the limit, substitute $x=e^w$:
+as a function of $w$, $k(\sigma^2\tau,\log\xi-w-\nu\tau)$ is the density of
+$V=\log\xi-\nu\tau+\sigma\sqrt\tau Z$, so
+\[
+  \int_0^\infty G\varphi\,\dd x=\frac{e^{-r\tau}}{\xi}\,\E\big[e^{V}\varphi(e^{V})\big]
+  =e^{-r\tau}\E\big[e^{-\nu\tau+\sigma\sqrt\tau Z}\varphi\big(\xi e^{-\nu\tau+\sigma\sqrt\tau Z}\big)\big].
+\]
+As $\tau\downarrow0$ the variable inside converges to $\varphi(\xi)$ for every value of $Z$, by
+continuity of $\varphi$ at $\xi$, and for $\tau\le T$ it is bounded by
+$a\,e^{(1+q)(|\nu|T+\sigma\sqrt T|Z|)}(\xi^q+\xi^{-q})$, which is integrable. Dominated convergence
+gives the limit $\varphi(\xi)$.
+
+(iii) Let $F=\xi G=e^{-r\tau}k(\sigma^2\tau,z)$ with $z=\eta-\log x-\nu\tau$, $\eta=\log\xi$, and
+$\partial_\xi=\xi^{-1}\partial_\eta$. Then $\partial_\xi(\xi G)=\xi^{-1}\partial_\eta F$ and
+$\partial_{\xi\xi}(\xi^2G)=\partial_\xi(F+\partial_\eta F)=\xi^{-1}(\partial_\eta F+\partial_{\eta\eta}F)$, so
+the right side of \eqref{eq:sm-forward} equals
+$\xi^{-1}\big(\frac12\sigma^2\partial_{\eta\eta}F-\nu\,\partial_\eta F-rF\big)
+=\xi^{-1}e^{-r\tau}\big(\frac12\sigma^2k_{zz}-\nu k_z-rk\big)$. The left side is
+$\xi^{-1}\partial_\tau F=\xi^{-1}e^{-r\tau}(\sigma^2k_s-\nu k_z-rk)$, and the two agree because
+$k_s=\frac12k_{zz}$. For the limit, $\int G(t,x;T,\xi)h(\xi)\,\dd\xi=e^{-r\tau}\E\big[h(xe^{\nu\tau+\sigma\sqrt\tau Z})\big]$,
+and dominated convergence applies as in (ii).
+
+For the last claim, $k(\sigma^2\tau,z)\to0$ as $\tau\downarrow0$ for $z\ne0$, while at $x=\xi$ the
+argument is $z=-\nu\tau$ and $k(\sigma^2\tau,-\nu\tau)=e^{-\nu^2\tau/(2\sigma^2)}/(\sigma\sqrt{2\pi\tau})\to\infty$.
+\end{proof}
+
+Superposing Arrow--Debreu securities builds every payoff, and it gives the converse of the
+Feynman--Kac formula in the standard model.
+
+\begin{corollary}[Prices as superpositions]\label{cor:sm-superposition}
+Let $f:(0,\infty)\to\R$ be Borel with $|f(\xi)|\le a(\xi^q+\xi^{-q})$ for constants $a,q\ge0$, and
+\begin{equation}\label{eq:sm-superposition}
+  v(t,x)=\int_0^\infty G(t,x;T,\xi)\,f(\xi)\,\dd\xi,\qquad 0\le t<T,\ x>0 .
+\end{equation}
+Then $v$ is the function \eqref{eq:sm-price-function}, so $v(t,S_t)$ is the price of $f(S_T)$;
+$v$ is infinitely differentiable on $[0,T)\times(0,\infty)$ and solves \eqref{eq:sm-bs-pde};
+$|v(t,x)|\le C(x^q+x^{-q})$ for a constant $C$; and $v(t,x)\to f(x_0)$ as $(t,x)\to(T,x_0)$ at every
+point $x_0$ where $f$ is continuous. The points of discontinuity of $f$ form an $F_\sigma$, hence
+Borel, set; if it is Lebesgue-null, $v$ is the only solution of \eqref{eq:sm-bs-pde} with these
+properties.
+\end{corollary}
+
+\begin{proof}
+The change of variables $\xi=xe^{\nu\tau+\sigma\sqrt\tau z}$ turns \eqref{eq:sm-superposition} into
+\eqref{eq:sm-price-function}. For smoothness, write $\phi(\eta)=f(e^\eta)$, so that
+$|\phi(\eta)|\le2ae^{q|\eta|}$, and $v(t,e^w)=e^{-r\tau}\int_\R\phi(\eta)\,k(\sigma^2\tau,\eta-w-\nu\tau)\,\dd\eta$.
+Every partial derivative of $(\tau,w)\mapsto k(\sigma^2\tau,\eta-w-\nu\tau)$ is a polynomial in
+$\eta-w-\nu\tau$ and $\tau^{-1/2}$ times $k$ itself, because $k_z=-\frac zsk$ and
+$k_s=\frac12k_{zz}$. For $\tau$ in a compact subset $[\tau_1,\tau_2]$ of $(0,T]$ and $|w|\le R$, such a
+derivative is bounded by $c(1+|\eta|^m)e^{-\eta^2/(4\sigma^2\tau_2)}$ for constants $c$, $m$
+(use $(\eta-\beta)^2\ge\frac12\eta^2-\beta^2$ with $\beta=w+\nu\tau$), which is integrable against
+$e^{q|\eta|}$. By dominated convergence and the mean value theorem we may differentiate under the
+integral sign as often as we like. So $v$ is infinitely differentiable, and applying the
+operator under the integral, \cref{prop:sm-green}(ii) gives \eqref{eq:sm-bs-pde}. The growth bound
+follows from \eqref{eq:sm-moments}: $|v(t,x)|\le ae^{-r\tau}\big(x^q\EQ[R^q]+x^{-q}\EQ[R^{-q}]\big)$ with
+$R=e^{\nu\tau+\sigma\sqrt\tau Z}$, and $\EQ[R^{\pm q}]=e^{\pm q\nu\tau+q^2\sigma^2\tau/2}$ is bounded for
+$\tau\le T$. The terminal limit is the dominated-convergence argument of \cref{prop:sm-green}(iii),
+with $x$ restricted to $[x_0/2,2x_0]$ for the bound. Uniqueness is \cref{cor:sm-bs-pde}.
+\end{proof}
+
+\begin{remark}[Calls, digitals and deltas]\label{rem:sm-arrow-debreu}
+The payoffs $\1_{(K,\infty)}$ and $(\cdot-K)^+$ in \eqref{eq:sm-superposition} give the digital call
+$D(K)=\int_K^\infty G\,\dd\xi$ and the call $C(K)=\int_K^\infty(\xi-K)\,G\,\dd\xi$, at fixed $(t,x)$ and
+$T$. Differentiating in the strike, $C'(K)=-D(K)$ and $D'(K)=-G(t,x;T,K)$: the Arrow--Debreu price
+density is the second strike derivative of the call price, the Breeden--Litzenberger formula
+(\cref{thm:sk-breeden-litzenberger}). As $T-t\downarrow0$, the three prices converge to the delta,
+the step and the ramp of
+\eqref{eq:sm-step-ramp}, written in the strike variable (\cref{fig:sm-dirac}). The digital payoff
+jumps at $K$, and its price, which is $e^{-r\tau}N(d_-)$ (\cref{ch:02-black-scholes}), is smooth
+before $T$ but cannot be continuous at $(T,K)$: this is the set $E=\{K\}$ of
+\cref{thm:sm-feynman-kac}. The Green's function itself is the extreme case. As a function of
+$(t,x)$ it solves the pricing equation and tends to $0$ as $(t,x)\to(T,x_0)$ for every
+$x_0\ne\xi$, so it satisfies \eqref{eq:sm-fk-terminal} with $g=0$ and $E=\{\xi\}$; yet it is
+not zero. So neither (a) nor (b) of \cref{thm:sm-feynman-kac} holds for it; indeed
+$\sup_{t<T}G(t,x;T,\xi)\to\infty$ as $x\to\xi$.
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch01-dirac}
+  \caption{The Arrow--Debreu price density $G(0,100;T,K)$, the digital call and the call, as
+    functions of the strike $K$, in the standard model with $S_0=100$, $r=1\%$, $y=2\%$ and
+    $\sigma=20\%$, for maturities $T=1$, $0.25$ and $0.02$. Each panel is minus the strike
+    derivative of the next (\cref{rem:sm-arrow-debreu}). As $T\downarrow0$ they approach the
+    Dirac delta $\delta_{100}$ (arrow), the step $\1_{\{K<100\}}$ and the ramp $(100-K)^+$ (dashed).}
+  \label{fig:sm-dirac}
+\end{figure}
+
+\begin{incode}
+\coderef{code/src/mfe230d/standard.py}: \texttt{lognormal\_moment} is \eqref{eq:sm-moments};
+\texttt{girsanov\_price} reweights $\Prob$-samples by $Z_T$; \texttt{green} is $G$; \texttt{superposition\_price} computes \eqref{eq:sm-superposition}
+by the trapezoid rule and reproduces the test-case call $7.36429$; \texttt{backward\_residual} and
+\texttt{forward\_residual} evaluate \eqref{eq:sm-backward}--\eqref{eq:sm-forward} by central
+differences; \texttt{fk\_vasicek\_check} is the Monte Carlo side of \cref{exa:sm-vasicek}, built on
+\coderef{code/src/mfe230d/paths.py} and \coderef{code/src/mfe230d/montecarlo.py}.
+\end{incode}
+
+\demo{01-standard-model.ipynb}{shrink the maturity and watch the three prices become a delta, a
+step and a ramp; check by finite differences that $G$ solves both equations.}
+
+\furtherreading
+\textcite{shreve2}, Chapters~4--6, develops It\^o calculus, risk-neutral pricing (with dividends
+in Section~5.5) and the Feynman--Kac formula at the level of these notes. \textcite{karatzas-shreve},
+Sections~3.5, 4.3 and 5.7, and \textcite{oksendal}, Chapter~8, give the measure-theoretic details,
+including the converse of the Feynman--Kac formula. The formula goes back to
+\textcite{feynman-spacetime} and \textcite{kac-wiener}; the pricing equation and its hedging
+derivation to \textcite{black-scholes} and \textcite{merton1973}, and the martingale view of
+pricing to \textcite{harrison-pliska}.

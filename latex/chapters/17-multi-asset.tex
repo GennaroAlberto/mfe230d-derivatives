@@ -1,0 +1,607 @@
+% Chapter 17: FX and multi-asset options.
+\providecommand{\Corr}{\operatorname{Corr}}
+\providecommand{\Black}{\operatorname{Black}}
+
+A currency option is the simplest option on two assets: the foreign money market and the
+domestic one. Its price depends on which currency we count in, and the answer to ``what is it
+worth?'' must not. This invariance is a change of \emph{num\'eraire}, the unit in which prices
+are counted, and it is the one tool that runs through the chapter. It prices currency options
+from either side of the market (\cref{sec:ma-fx,sec:ma-numeraire}), turns the option to
+exchange one asset for another into a Black--Scholes call (\cref{sec:ma-exchange}), and
+explains the drift adjustment of quanto contracts (\cref{sec:ma-quanto}). Payoffs that do not
+reduce to one dimension, such as baskets, are priced by simulating correlated assets, with the
+geometric basket as a control variate, as for the Asian options of
+\cref{ch:15-asian} (\cref{sec:ma-basket}).
+
+We write calls on lognormal variables with \emph{Black's function}: for $F>0$, $v>0$ and $K>0$,
+\begin{equation}\label{eq:ma-black}
+  \Black(F,K,v)=F\,N(d_+)-K\,N(d_-),\qquad d_\pm=\frac{\log(F/K)\pm\frac12v}{\sqrt v},
+\end{equation}
+and $\Black(F,K,0)=(F-K)^+$, $\Black(F,K,v)=F-K$ for $K\le0$. If $L$ is lognormal with mean
+$F$ and $\Var\log L=v$, then $\E(L-K)^+=\Black(F,K,v)$: this is the computation behind
+\cref{thm:bsf-formula}, and the Black--Scholes call is
+$\mathrm{BS}(S,K,T;r,y,\sigma)=e^{-rT}\Black(Se^{(r-y)T},K,\sigma^2T)$. Black's function is
+positively homogeneous of degree one in $(F,K)$.
+
+\section{Currency options}\label{sec:ma-fx}
+
+A currency market has a domestic and a foreign money market, with constant rates $r_d$ and
+$r_f$, and an \emph{exchange rate} $X_t$, the domestic price of one unit of foreign currency.
+With the dollar domestic and the pound foreign, $X$ is the USD price of one GBP, quoted as
+GBP/USD (``cable''). A pound deposited at the rate $r_f$ is worth $X_te^{r_ft}$ dollars at time
+$t$, so for a dollar investor the pound is an asset that pays a continuous dividend at the rate
+$r_f$. Under a risk-neutral measure $\Q$ for that investor (\cref{prop:sm-risk-neutral}),
+$e^{-r_dt}X_te^{r_ft}$ is a martingale. The model of \textcite{garman-kohlhagen} is the
+standard model of \cref{def:sm-model} for this asset:
+\begin{equation}\label{eq:ma-gk}
+  \frac{\dd X_t}{X_t}=(r_d-r_f)\,\dd t+\sigma\,\dd W_t\quad\text{under }\Q,\qquad\sigma>0,
+\end{equation}
+that is, $S=X$, $r=r_d$ and $y=r_f$: the foreign rate is the yield.
+
+\begin{proposition}[Garman--Kohlhagen]\label{prop:ma-garman-kohlhagen}
+In the model \eqref{eq:ma-gk}, let $K>0$, $T>0$, $F=X_0e^{(r_d-r_f)T}$ be the forward
+exchange rate and $d_\pm=\big(\log(F/K)\pm\frac12\sigma^2T\big)/(\sigma\sqrt T)$.
+\begin{enumerate}[label=(\roman*)]
+  \item A call on one unit of foreign currency with strike $K$, paying $(X_T-K)^+$ units of
+    domestic currency, and the put, paying $(K-X_T)^+$, cost in domestic currency
+    \begin{align*}
+      C&=X_0e^{-r_fT}N(d_+)-Ke^{-r_dT}N(d_-)=e^{-r_dT}\Black(F,K,\sigma^2T),\\
+      P&=Ke^{-r_dT}N(-d_-)-X_0e^{-r_fT}N(-d_+),
+    \end{align*}
+    and $C/X_0$, $P/X_0$ in foreign currency. Parity reads $C-P=e^{-r_dT}(F-K)$; at the
+    money forward, $K=F$, $C=P=e^{-r_dT}F\big(2N(\frac12\sigma\sqrt T)-1\big)$. If $r_d=r_f$, then
+    $F=X_0$ and at the money forward is at the money spot.
+  \item The replicating portfolio of the call holds, at time $0$,
+    $\Delta_f=\partial C/\partial X_0=e^{-r_fT}N(d_+)$ units of foreign currency and
+    $\Delta_d=C-X_0\,\partial C/\partial X_0=-Ke^{-r_dT}N(d_-)$ units of domestic currency, both
+    in the money markets; $C=X_0\Delta_f+\Delta_d$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) is \cref{thm:bsf-formula} with $S=X$, $r=r_d$, $y=r_f$; the ATMF value uses $d_\pm=\pm\frac12\sigma\sqrt T$.
+(ii) The delta is that of \cref{prop:bsf-greeks}; it is a number of units of the asset, here
+foreign currency, held with its ``dividends'' (the foreign interest) reinvested, as in the
+replication of \cref{prop:sm-risk-neutral}(ii). The rest of the portfolio is cash,
+$C-X_0\Delta_f=-Ke^{-r_dT}N(d_-)$. The price is homogeneous of degree one in $(X_0,K)$, so
+$\Delta_d=K\,\partial C/\partial K$ by Euler's theorem (\cref{prop:sr-euler}).
+\end{proof}
+
+\begin{example}[The course's cable call]\label{exa:ma-cable}
+With $X_0=1.2000$, $r_d=r_{\mathrm{USD}}=3\%$, $r_f=r_{\mathrm{GBP}}=2.5\%$, $\sigma=11\%$ and $T=1$, the forward
+is $F=1.2\,e^{0.005}=1.206015$, and the ATMF call costs $C=0.0513343$ USD, that is
+$0.0427786$ GBP, or $4.2565\%$ of the strike. Its hedge holds $\Delta_f=0.509044$ GBP and
+$\Delta_d=-0.559519$ USD, and indeed $1.2\times0.509044-0.559519=0.051334$. These are the
+course's $0.05133$, $0.04278$, $0.5090$ and $-0.5595$.
+\end{example}
+
+Currency markets quote differently from equity markets. Options are struck relative to the
+forward (ATMF rather than at the spot), premiums are quoted in either currency, and implied
+volatilities are quoted against a delta rather than a strike. The course's GBP/USD and
+EUR/USD smiles (CME settlement prices, 22 July 2022), plotted against the normalised strike
+$\log(K/F)/(\sigma_{\mathrm{atm}}\sqrt T)$, fall from low strikes to a minimum above the forward and
+then rise again: a skew, as for equity indices (\cref{rem:sk-smile-data}), with a smile on the upside.
+Neither currency is special: by \cref{prop:ma-numeraire}(v) below, the USD/GBP smile is the mirror
+image of the GBP/USD smile, $\sigma_{\mathrm{USD/GBP}}(m)=\sigma_{\mathrm{GBP/USD}}(-m)$ in the
+log-moneyness $m=\log(K/F)$.
+
+\section{Changing the num\'eraire}\label{sec:ma-numeraire}
+
+In this section $W$ is a $d$-dimensional Brownian motion under $\Q$ on $[0,T]$, $(\F_t)$ is its
+augmented natural filtration, and $B_t=e^{rt}$ is the money market. A \emph{price process} is
+an adapted process $V$ such that $V/B$ is a $\Q$-martingale on $[0,T]$: the value of a traded
+asset that pays no dividends, of a self-financing portfolio, or of a claim. A stock that pays
+the dividend yield $y$ is not one, but $e^{yt}S_t$, one share at $0$ with its dividends
+reinvested, is. Counting prices in units of a positive price process $N$ instead of money is a
+\emph{change of num\'eraire}; \cref{rem:sk-calendar} already counted prices in prepaid forwards.
+
+\begin{proposition}[Change of num\'eraire]\label{prop:ma-numeraire}
+Let $N$ be a price process with $N_t>0$ for all $t\le T$, almost surely.
+\begin{enumerate}[label=(\roman*)]
+  \item $Z_T=\dfrac{N_TB_0}{N_0B_T}$ is positive with $\EQ Z_T=1$, so
+    $\dd\Q^N=Z_T\,\dd\Q$ defines a probability measure on $\F_T$ equivalent to $\Q$, and
+    $\EQ[Z_T\mid\F_t]=N_tB_0/(N_0B_t)$.
+  \item (\emph{Num\'eraire invariance.}) An adapted process $V$ is a price process if and only
+    if $V/N$ is a $\Q^N$-martingale. For every $\F_T$-measurable $H$ with
+    $\EQ[|H|/B_T]<\infty$, equivalently $\E^{\Q^N}[|H|/N_T]<\infty$,
+    \[
+      B_t\,\EQ\Big[\frac{H}{B_T}\,\Big|\,\F_t\Big]=N_t\,\E^{\Q^N}\Big[\frac{H}{N_T}\,\Big|\,\F_t\Big],
+      \qquad0\le t\le T .
+    \]
+  \item (\emph{Drifts.}) Suppose $N_t/B_t=N_0\exp(\theta\cdot W_t-\frac12|\theta|^2t)$ for a
+    constant $\theta\in\R^d$. Then $W^N_t=W_t-\theta t$ is a $\Q^N$-Brownian motion. If
+    $\dd S_t/S_t=\mu_t\,\dd t+\sigma_S\cdot\dd W_t$ with $\sigma_S\in\R^d$, then
+    $\dd S_t/S_t=(\mu_t+\sigma_S\cdot\theta)\,\dd t+\sigma_S\cdot\dd W^N_t$: the drift rises by
+    $\sigma_S\cdot\theta$, the instantaneous covariance of $\log S$ and $\log N$, and the
+    volatility does not change.
+  \item (\emph{The share measure.}) If $\dd S_t/S_t=(r-y)\,\dd t+\sigma_S\cdot\dd W_t$ with
+    constants $y$ and $\sigma_S$, then $N_t=e^{yt}S_t$ satisfies (iii) with $\theta=\sigma_S$,
+    \[
+      \frac{\dd\Q^S}{\dd\Q}=\frac{S_T}{\EQ[S_T]},
+    \]
+    and under $\Q^S:=\Q^N$ the log-price has drift $r-y+\frac12|\sigma_S|^2$ instead of
+    $\nu=r-y-\frac12|\sigma_S|^2$.
+  \item (\emph{Currency put--call symmetry.}) In a currency market as in \cref{sec:ma-fx},
+    with no assumption on the dynamics of $X$, let $N_t=X_te^{r_ft}$ (the foreign money market
+    in domestic currency) be a positive price process and $\Q_f=\Q^N$, with $r=r_d$. A payoff of
+    $H\ge0$ units of foreign currency at $T$ is worth $e^{-r_fT}\E^{\Q_f}[H]$ in foreign currency
+    at $0$, and for $K>0$
+    \[
+      e^{-r_dT}\EQ\big[(X_T-K)^+\big]=X_0K\cdot e^{-r_fT}\E^{\Q_f}\Big[\Big(\frac1K-\frac1{X_T}\Big)^+\Big]:
+    \]
+    a call on one unit of foreign currency struck at $K$ is worth $X_0K$ times the foreign
+    price of a put on one unit of domestic currency struck at $1/K$. In the model
+    \eqref{eq:ma-gk}, $1/X$ has drift $r_f-r_d$ and volatility $\sigma$ under $\Q_f$, so the
+    put is the Garman--Kohlhagen put with the roles of $r_d$ and $r_f$ exchanged.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $Z_T>0$, and $\EQ Z_T=1$ because $N/B$ is a martingale; equivalence follows from
+$Z_T>0$. The martingale property gives $\EQ[Z_T\mid\F_t]=N_tB_0/(N_0B_t)=:Z_t$.
+
+(ii) By Bayes' rule for conditional expectations (\textcite{shreve2}, Lemma~5.2.2), for $s\le T$
+and $\F_s$-measurable $Y$ with $\E^{\Q^N}|Y|<\infty$,
+$\E^{\Q^N}[Y\mid\F_t]=\EQ[Z_sY\mid\F_t]/Z_t$ for $t\le s$. With $Y=V_s/N_s$, $Z_sY=(B_0/N_0)V_s/B_s$, so
+\[
+  \E^{\Q^N}\Big[\frac{V_s}{N_s}\,\Big|\,\F_t\Big]=\frac{B_t}{N_t}\,\EQ\Big[\frac{V_s}{B_s}\,\Big|\,\F_t\Big],
+  \qquad \E^{\Q^N}\Big|\frac{V_s}{N_s}\Big|=\frac{B_0}{N_0}\,\EQ\Big|\frac{V_s}{B_s}\Big| .
+\]
+Hence $V/N$ is $\Q^N$-integrable if and only if $V/B$ is $\Q$-integrable, and
+$V_t/N_t=\E^{\Q^N}[V_s/N_s\mid\F_t]$ if and only if $V_t/B_t=\EQ[V_s/B_s\mid\F_t]$. The pricing
+identity is the display with $s=T$ and $V_T=H$.
+
+(iii) The density process $Z_t=\exp(\theta\cdot W_t-\frac12|\theta|^2t)$ is the one of
+Girsanov's theorem (\textcite{karatzas-shreve}, Theorem~3.5.1), so $W^N$ is a $\Q^N$-Brownian
+motion, and substituting $\dd W_t=\dd W^N_t+\theta\,\dd t$ gives the dynamics. The covariation of
+$\log S$ and $\log N$ is $\sigma_S\cdot\theta\,\dd t$, since $\dd\log N_t=(r-\frac12|\theta|^2)\,\dd t+\theta\cdot\dd W_t$.
+
+(iv) $N_t/B_t=S_te^{(y-r)t}=S_0\exp(\sigma_S\cdot W_t-\frac12|\sigma_S|^2t)$, so $\theta=\sigma_S$
+and $Z_T=S_Te^{-(r-y)T}/S_0=S_T/\EQ[S_T]$. By (iii) the drift of $\dd S/S$ becomes
+$r-y+|\sigma_S|^2$, and that of $\log S$ is $r-y+\frac12|\sigma_S|^2$.
+
+(v) A foreign payoff $H$ is the domestic payoff $X_TH$; by (ii), which holds for nonnegative payoffs
+whether or not their prices are finite (Bayes' rule does), its domestic price is
+$N_0\E^{\Q_f}[X_TH/N_T]=X_0e^{-r_fT}\E^{\Q_f}[H]$, which is $e^{-r_fT}\E^{\Q_f}[H]$ units of foreign
+currency. The identity follows from $(X_T-K)^+=X_TK(1/K-1/X_T)^+$, a foreign payoff of
+$K(1/K-1/X_T)^+$. In the model \eqref{eq:ma-gk}, $N_t/B_t=X_0\exp(\sigma W_t-\frac12\sigma^2t)$, so by
+(iii) $\dd X/X=(r_d-r_f+\sigma^2)\,\dd t+\sigma\,\dd W^N$ under $\Q_f$, and It\^o's formula gives
+$\dd(1/X)/(1/X)=(r_f-r_d)\,\dd t+\sigma\,\dd(-W^N)$, with $-W^N$ a $\Q_f$-Brownian motion.
+\end{proof}
+
+The hypothesis that $N/B$ is a true martingale matters: a positive local martingale is a
+supermartingale, and if $\EQ[N_T/B_T]<N_0/B_0$ then $\Q^N$ has total mass below one. In (iii)
+and (iv) the exponential has constant coefficients, and it is a martingale.
+\textcite{geman-elkaroui-rochet} developed the method in this generality; \textcite{shreve2},
+Section~9.2 (Theorem~9.2.2) and Sections~9.3.3 and 9.3.7, gives it for the foreign measure and the
+put--call duality of (v). Under the share measure $N(d_+)$ is the probability that the call
+finishes in the money, as noted after \cref{thm:bsf-formula}, and the density in (iv) is the one used by
+\cref{rem:is-share}.
+
+\begin{example}[The course's London trader]\label{exa:ma-london}
+A trader in London counts in pounds. For her the dollar is the foreign currency, worth
+$X'_0=1/1.2=0.833333$ GBP, with rate $r_{\mathrm{GBP}}=2.5\%$ and yield $r_{\mathrm{USD}}=3\%$, and by (v) the cable
+call of \cref{exa:ma-cable} is $K=1.206015$ dollar puts struck at $1/K$ pounds. The
+Garman--Kohlhagen put is worth $0.0354710$ GBP, so the call is worth $K\times0.0354710=0.0427786$
+GBP, the course's value, which is $0.0513343$ USD at the spot rate. Her hedge is the same
+portfolio: the put's delta, $-0.463940$ dollars per put, times $K$ gives $-0.559519$ USD, and the
+rest is $0.509044$ GBP in cash, as in \cref{exa:ma-cable}. Both traders hold the same assets,
+pounds and dollars; only the unit of account differs.
+\end{example}
+
+The two forms of put--call symmetry are one identity. In the model \eqref{eq:ma-gk}, $X_T/F$
+has under $\Q_f$ the law that $F/X_T$ has under $\Q$ (both log-normal with log-mean
+$\frac12\sigma^2T$ and log-variance $\sigma^2T$), and substituting this into (v) turns the foreign put
+into $K/F$ domestic puts struck at $F^2/K$: this is \cref{cor:sr-pcs}, whose applications to static
+hedging of barriers are discussed there.
+
+\begin{remark}[Monte Carlo in another num\'eraire]\label{rem:ma-mc-numeraire}
+By (ii), $V_0=N_0\,\E^{\Q^N}[H/N_T]$: one may simulate under $\Q^N$ and average $N_0H/N_T$. This
+is importance sampling with the likelihood ratio $\dd\Q/\dd\Q^N=N_0B_T/(N_TB_0)$
+(\cref{prop:is-likelihood-ratio}). Under the share measure the call becomes
+$S_0e^{-yT}\,\E^{\Q^S}\big[(1-K/S_T)^+\big]$, an expectation of a payoff between $0$ and $1$. In
+the test case, with $2^{20}$ draws (our implementation, \texttt{numpy} \texttt{default\_rng},
+seed $3$), the standard deviation per draw is $9.95$ under $\Q^S$ against $12.57$ under $\Q$, a
+variance ratio of $1.6$; \exref{ex:ma-share} shows that the first stays bounded as $\sigma$ grows while the
+second does not.
+\end{remark}
+
+\section{Exchange options}\label{sec:ma-exchange}
+
+From here on, $d$ assets follow, under $\Q$,
+\begin{equation}\label{eq:ma-model}
+  \frac{\dd S_{i,t}}{S_{i,t}}=(r-y_i)\,\dd t+\sigma_i\,\dd W_{i,t},\qquad
+  \dd\langle W_i,W_j\rangle_t=\rho_{ij}\,\dd t,\qquad i,j=1,\dots,d,
+\end{equation}
+with $\sigma_i>0$ and a correlation matrix $\rho=(\rho_{ij})$, symmetric positive semidefinite with
+unit diagonal. Concretely, $W=A\bar W$ for a standard $k$-dimensional Brownian motion $\bar W$ and
+a $d\times k$ matrix $A$ with $AA^\top=\rho$ (\cref{prop:rng-cholesky}), and $(\F_t)$ is generated by $\bar W$. The log-prices
+$\log S_{i,T}=\log S_{i,0}+\nu_iT+\sigma_iW_{i,T}$, $\nu_i=r-y_i-\frac12\sigma_i^2$, form a Gaussian
+vector with $\E S_{i,T}=F_i:=S_{i,0}e^{(r-y_i)T}$ and covariance
+$\Sigma_{ij}=\rho_{ij}\sigma_i\sigma_jT$.
+
+\begin{theorem}[Margrabe's formula]\label{thm:ma-margrabe}
+Let $d=2$, $\rho=\rho_{12}\in[-1,1]$, $T>0$, and
+\[
+  \sigma_{\mathrm{ex}}=\sqrt{\sigma_1^2-2\rho\sigma_1\sigma_2+\sigma_2^2}\ \in\ \big[|\sigma_1-\sigma_2|,\,\sigma_1+\sigma_2\big].
+\]
+\begin{enumerate}[label=(\roman*)]
+  \item The option to exchange asset $2$ for asset $1$ at $T$, paying $(S_{1,T}-S_{2,T})^+$, is
+    worth, at $0$,
+    \[
+      M=\Black\big(S_{1,0}e^{-y_1T},\,S_{2,0}e^{-y_2T},\,\sigma_{\mathrm{ex}}^2T\big)
+      =\mathrm{BS}\big(S_{1,0},S_{2,0},T;\,y_2,\,y_1,\,\sigma_{\mathrm{ex}}\big):
+    \]
+    the Black--Scholes call with spot $S_{1,0}$, strike $S_{2,0}$, rate $y_2$, yield $y_1$ and
+    volatility $\sigma_{\mathrm{ex}}$. The interest rate $r$ does not enter.
+  \item $\sigma_{\mathrm{ex}}=0$ if and only if $\rho=1$ and $\sigma_1=\sigma_2$; then
+    $M=(S_{1,0}e^{-y_1T}-S_{2,0}e^{-y_2T})^+$. In all cases $\sigma_{\mathrm{ex}}$ decreases
+    strictly in $\rho$, from $\sigma_1+\sigma_2$ at $\rho=-1$ to $|\sigma_1-\sigma_2|$ at $\rho=1$.
+  \item If $\sigma_{\mathrm{ex}}>0$, $M$ is homogeneous of degree one in $(S_{1,0},S_{2,0})$ with
+    $\partial M/\partial S_{1,0}=e^{-y_1T}N(d_+)$ and $\partial M/\partial S_{2,0}=-e^{-y_2T}N(d_-)$,
+    $d_\pm=\big(\log\frac{S_{1,0}e^{-y_1T}}{S_{2,0}e^{-y_2T}}\pm\frac12\sigma_{\mathrm{ex}}^2T\big)/(\sigma_{\mathrm{ex}}\sqrt T)$,
+    and $M=S_{1,0}\,\partial_1M+S_{2,0}\,\partial_2M$: the delta hedge holds the two assets and no cash.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(ii) $\sigma_{\mathrm{ex}}^2=(\sigma_1-\sigma_2)^2+2(1-\rho)\sigma_1\sigma_2$, which vanishes exactly
+when both terms do, and is affine in $\rho$ with slope $-2\sigma_1\sigma_2<0$.
+
+(i) Write $W_i=a_i\cdot\bar W$, with $a_i$ the $i$-th row of $A$, so that $|a_i|=1$ and
+$a_1\cdot a_2=\rho$; this holds for every $k$, including the rank-one factors at $\rho=\pm1$. The
+num\'eraire $N_t=e^{y_2t}S_{2,t}$ has $N_t/B_t=S_{2,0}\exp(\sigma_2a_2\cdot\bar W_t-\frac12\sigma_2^2t)$, so it
+satisfies \cref{prop:ma-numeraire}(iii), with $\bar W$ in the role of $W$ and $\theta=\sigma_2a_2$. Under
+$\Q^N$, $\bar W^N=\bar W-\theta t$ is a standard Brownian motion; the drift of $\dd S_1/S_1$ rises by
+$\sigma_1a_1\cdot\theta=\rho\sigma_1\sigma_2$ and that of $\dd S_2/S_2$ by $\sigma_2^2$. Hence
+$R=S_1/S_2$ satisfies
+\[
+  \log R_T=\log R_0+\big(y_2-y_1-\tfrac12\sigma_{\mathrm{ex}}^2\big)T+u\cdot\bar W^N_T,\qquad
+  u=\sigma_1a_1-\sigma_2a_2,
+\]
+because $\rho\sigma_1\sigma_2-\frac12\sigma_1^2-\frac12\sigma_2^2=-\frac12\sigma_{\mathrm{ex}}^2$; and
+$|u|^2=\sigma_1^2-2\rho\sigma_1\sigma_2+\sigma_2^2=\sigma_{\mathrm{ex}}^2$. So under $\Q^N$, $R_T$ is lognormal with mean $R_0e^{(y_2-y_1)T}$ and
+log-variance $\sigma_{\mathrm{ex}}^2T$ (a constant if $\sigma_{\mathrm{ex}}=0$). By
+\cref{prop:ma-numeraire}(ii) with $H=(S_{1,T}-S_{2,T})^+$, for which $\EQ H\le\EQ S_{1,T}<\infty$,
+\begin{align*}
+  M&=N_0\,\E^{\Q^N}\Big[\frac{(S_{1,T}-S_{2,T})^+}{e^{y_2T}S_{2,T}}\Big]
+  =S_{2,0}e^{-y_2T}\,\E^{\Q^N}\big[(R_T-1)^+\big]\\
+  &=S_{2,0}e^{-y_2T}\Black\big(R_0e^{(y_2-y_1)T},1,\sigma_{\mathrm{ex}}^2T\big),
+\end{align*}
+and homogeneity of $\Black$ gives the first form; the second is the identity after
+\eqref{eq:ma-black} with $r=y_2$, $y=y_1$. For $\sigma_{\mathrm{ex}}=0$ this is the formula in (ii).
+
+(iii) The derivatives are $\Delta$ and $\partial_Kc$ of \cref{prop:bsf-greeks} for the inputs of (i), and
+the last identity is Euler's theorem (\cref{prop:sr-euler}).
+\end{proof}
+
+With $y_1=y_2=0$ this is the formula of \textcite{margrabe}. In the course's words, the
+num\'eraire change is a \emph{dimensional reduction}: writing the price as $S_2\,D(S_1/S_2)$ turns
+the two-asset pricing equation into a one-asset equation for $D$, the price measured in units of
+asset $2$. The same device is the pre-wash of \cref{prop:sr-power}. Options on the better or the
+worse of two assets reduce to exchange options (\exref{ex:ma-max}); the spread
+$(S_{1,T}-S_{2,T}-K)^+$ with $K\ne0$ does not (\exref{ex:ma-spread}).
+
+\paragraph{Cross rates and the volatility triangle.} For a dollar investor, the pound and the euro
+are two assets of the form \eqref{eq:ma-model}: $S_1=X_1$, the USD price of a pound, with yield
+$r_{\mathrm{GBP}}$, and $S_2=X_2$, the USD price of a euro, with yield $r_{\mathrm{EUR}}$. The cross rate $X_{12}=X_1/X_2$
+is the EUR price of a pound, and a GBP/EUR call struck at $K$ pays $(X_{12,T}-K)^+$ euros, that is
+$(X_{1,T}-KX_{2,T})^+$ dollars: an exchange option. Its volatility is
+$\sigma_{12}=\sigma_{\mathrm{ex}}=\big(\sigma_1^2-2\rho\sigma_1\sigma_2+\sigma_2^2\big)^{1/2}$, with $\rho$ the
+correlation of GBP/USD and EUR/USD returns, both quoted against the dollar. The three
+volatilities are the sides of a triangle with angle $\arccos\rho$ opposite $\sigma_{12}$ (the law of
+cosines), so $|\sigma_1-\sigma_2|\le\sigma_{12}\le\sigma_1+\sigma_2$, and a quoted cross volatility
+implies the correlation $\rho=(\sigma_1^2+\sigma_2^2-\sigma_{12}^2)/(2\sigma_1\sigma_2)$. Dividing the dollar
+price by $X_{2,0}$ gives the Garman--Kohlhagen price of a euro-based investor with volatility
+$\sigma_{12}$: the law of one price at work.
+
+\begin{example}[The course's cross-currency inputs]\label{exa:ma-cross}
+With $X_1=1.20$, $X_2=1.02$, $\sigma_1=11\%$, $\sigma_2=10\%$, $r_{\mathrm{USD}}=3\%$, $r_{\mathrm{GBP}}=2.5\%$ and
+$r_{\mathrm{EUR}}=1\%$, the GBP/EUR spot is $1.176471$ and its one-year forward is
+$1.176471\,e^{0.01-0.025}=1.158955$. Correlations in $[-1,1]$ allow
+$\sigma_{12}\in[1\%,21\%]$. The ATMF GBP/EUR call, paying $(1\text{ GBP}-1.158955\text{ EUR})^+$, is
+worth between $0.004669$ and $0.097871$ USD; a quoted $\sigma_{12}=8\%$ implies $\rho=0.7136$ and
+the value $0.037343$ USD (\cref{fig:ma-cross}). A quote outside $[1\%,21\%]$ admits no
+correlation and is an arbitrage within the model; \exref{ex:ma-triangle} asks what a static
+portfolio of four options (the cross call, the GBP/USD call, and the EUR/USD call and put) can do with it.
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch17-cross}
+  \caption{The cross rate GBP/EUR with $\sigma_1=11\%$ (GBP/USD), $\sigma_2=10\%$ (EUR/USD) and the
+    rates of \cref{exa:ma-cross}. (a) The cross volatility against the correlation $\rho$ of
+    GBP/USD and EUR/USD, between the dotted levels $|\sigma_1-\sigma_2|$ and $\sigma_1+\sigma_2$; the dot is
+    the quote $8\%$, implying $\rho=0.714$. (b) The USD value of the
+    ATMF GBP/EUR call by \cref{thm:ma-margrabe}, with Monte Carlo estimates and $\pm2$ standard
+    errors, from the same $2^{14}$ normal pairs at every $\rho$ (seed $17$) and the principal-components
+    factor, which also works at $\rho=\pm1$.}
+  \label{fig:ma-cross}
+\end{figure}
+
+\section{Correlated simulation and quantos}\label{sec:ma-quanto}
+
+\paragraph{Simulating correlated assets.} Under \eqref{eq:ma-model}, a vector of terminal prices is
+sampled exactly in one step,
+\[
+  S_{i,T}=S_{i,0}\exp\big(\nu_iT+\sigma_i\sqrt T\,(AZ)_i\big),\qquad Z\sim\mathcal N(0,I_k),\quad AA^\top=\rho,
+\]
+by \cref{prop:rng-cholesky}(i), and a path is sampled by repeating this over each interval with
+independent $Z$'s (\cref{prop:ps-gbm-exact}). The Cholesky factor costs about $d^3/3$ operations
+once and $d^2/2$ per draw; a lower triangular factor with positive diagonal exists if and only if
+$\rho$ is positive definite. At
+$\rho_{12}=\pm1$ the second pivot $1-\rho_{12}^2$ vanishes and the positive-pivot recursion stops, while the
+principal-components factor of \cref{prop:rng-cholesky}(iii), which needs only semidefiniteness,
+still works; we use it in \cref{fig:ma-cross}. A matrix of pairwise correlations collected from
+different sources need not be semidefinite at all, and then no model has it. Antithetic draws
+negate the whole vector $Z$; moment matching must match the sample covariance as well as the
+means, which is harder (\cref{prop:cv-moment-matching}).
+
+\paragraph{Quantos.} A \emph{quanto} pays a foreign quantity in domestic currency at a rate fixed in
+advance: an option on a foreign index, struck in foreign currency, whose payoff is converted at the
+rate $\bar X$, whatever the exchange rate at maturity. Let $S$ be the foreign-currency price of a
+foreign stock with dividend yield $y$, $X$ the exchange rate as in \cref{sec:ma-fx}, and $\Q$ the
+domestic risk-neutral measure: the domestic money market, the foreign money market $X_te^{r_ft}$
+and the foreign stock with reinvested dividends, worth $X_tS_te^{yt}$, all have $\Q$-martingale
+prices once discounted at $r_d$. Assume
+\begin{equation}\label{eq:ma-quanto-model}
+  \frac{\dd X_t}{X_t}=\mu_X\,\dd t+\sigma_X\,\dd W_{X,t},\qquad
+  \frac{\dd S_t}{S_t}=\mu_S\,\dd t+\sigma_S\,\dd W_{S,t},\qquad
+  \dd\langle W_X,W_S\rangle_t=\rho\,\dd t,
+\end{equation}
+with constants $\mu_X,\mu_S$, $\sigma_X,\sigma_S>0$ and $\rho\in[-1,1]$, where $W_X=a_X\cdot\bar W$ and
+$W_S=a_S\cdot\bar W$ for a standard $k$-dimensional $\Q$-Brownian motion $\bar W$ generating the filtration
+and unit vectors with $a_X\cdot a_S=\rho$, as in \eqref{eq:ma-model}. As in \cref{def:sm-model}, $\Q$ is
+equivalent to the real-world measure $\Prob$ on $\F_T$.
+
+\begin{proposition}[Quantos and composites]\label{prop:ma-quanto}
+In this market, with $T>0$ and $K>0$:
+\begin{enumerate}[label=(\roman*)]
+  \item $\mu_X=r_d-r_f$ and $\mu_S=r_f-y-\rho\sigma_S\sigma_X$. Under the foreign measure $\Q_f$ of
+    \cref{prop:ma-numeraire}(v), $\dd S/S=(r_f-y)\,\dd t+\sigma_S\,\dd W^f_S$ with $W^f_S$ a
+    $\Q_f$-Brownian motion.
+  \item (\emph{Quanto.}) The payoff $\bar X(S_T-K)^+$ in domestic currency costs
+    \[
+      \bar Xe^{-r_dT}\Black\big(F^q,K,\sigma_S^2T\big)=\bar X\,\mathrm{BS}(S_0,K,T;\,r_d,\,y_q,\,\sigma_S),\qquad
+      F^q=S_0e^{(r_f-y-\rho\sigma_S\sigma_X)T},
+    \]
+    with $y_q=y+r_d-r_f+\rho\sigma_S\sigma_X$.
+  \item (\emph{Composite.}) The payoff $(X_TS_T-K)^+$, a foreign stock struck in domestic currency,
+    costs $\mathrm{BS}(X_0S_0,K,T;\,r_d,\,y,\,\sigma_c)$ with
+    $\sigma_c^2=\sigma_S^2+2\rho\sigma_S\sigma_X+\sigma_X^2$.
+  \item (\emph{Foreign strike, spot conversion.}) The payoff $X_T(S_T-K)^+$ costs
+    $X_0\,\mathrm{BS}(S_0,K,T;\,r_f,\,y,\,\sigma_S)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By It\^o's formula, $X_te^{(r_f-r_d)t}$ and $X_tS_te^{(y-r_d)t}$ are exponentials of
+Brownian motions with constant coefficients, with drift rates $\mu_X+r_f-r_d$ and
+$\mu_X+\mu_S+\rho\sigma_S\sigma_X+y-r_d$ (the cross term is $\dd\langle\log X,\log S\rangle=\rho\sigma_S\sigma_X\,\dd t$).
+Such an exponential is a martingale if and only if its drift rate is zero (its mean is
+$e^{(\text{drift rate})\,t}$ times its initial value), which gives $\mu_X$ and then $\mu_S$. Under $\Q_f$,
+\cref{prop:ma-numeraire}(iii) with $N_t/B_t=X_0\exp(\sigma_XW_{X,t}-\frac12\sigma_X^2t)$, that is
+$\theta=\sigma_Xa_X$, raises the drift of $\dd S/S$ by $\sigma_Sa_S\cdot\theta=\rho\sigma_S\sigma_X$.
+(ii) Under $\Q$, $S_T$ is lognormal with mean $F^q$ and log-variance $\sigma_S^2T$; and
+$\mathrm{BS}(S_0,K,T;r_d,y_q,\sigma_S)=e^{-r_dT}\Black(S_0e^{(r_d-y_q)T},K,\sigma_S^2T)$ with $r_d-y_q=r_f-y-\rho\sigma_S\sigma_X$.
+(iii) By (i), $\log(X_TS_T)$ is normal with variance $\sigma_c^2T$, and $\EQ[X_TS_T]=X_0S_0e^{(r_d-y)T}$
+because $X_tS_te^{(y-r_d)t}$ is a martingale. (iv) By \cref{prop:ma-numeraire}(v) the foreign-currency
+price is $e^{-r_fT}\E^{\Q_f}[(S_T-K)^+]=\mathrm{BS}(S_0,K,T;r_f,y,\sigma_S)$ by (i); convert at $X_0$.
+\end{proof}
+
+The \emph{quanto adjustment} $-\rho\sigma_S\sigma_X$ lowers the drift of a foreign asset that tends to
+rise with the foreign currency. The correlation is that of the returns of $S$, in foreign
+currency, and of $X$, quoted as domestic per foreign. Quadratic covariation is the limit in
+probability of sums of products of increments, and limits in probability are the same under
+equivalent measures; since $\Prob$, $\Q$ and $\Q_f$ are equivalent, $\rho$ is the same under all three, and it
+can be estimated from historical data; quoting the rate the other way round changes its sign. The
+adjustment does not vanish when $r_d=r_f$, and it is the only trace of the exchange rate in the
+price: the quanto does not depend on $X_0$, and $\sigma_X$ enters only through $\rho\sigma_X$.
+\exref{ex:ma-elf} prices the remaining contract of the course's list, a currency option whose
+notional is a foreign share.
+
+\begin{example}[A quanto call]\label{exa:ma-quanto}
+Take a foreign index with $S_0=K=100$ GBP, $y=2\%$ and $\sigma_S=20\%$, the cable parameters of
+\cref{exa:ma-cable}, and $\rho=-0.3$. Then $y_q=1.84\%$, the quanto forward is $101.1668$ against
+the foreign forward $100.5013$, and the quanto call with $\bar X=1$ USD per GBP costs $8.35441$
+USD; with $\rho=0$ and $\rho=+0.3$ it would cost $7.99516$ and $7.64664$. The ordinary call costs
+$8.03523$ GBP, that is $9.64228$ USD at the spot rate (iv), and the composite call struck at $120$
+USD costs $9.79110$ USD, with $\sigma_c=19.72\%$ (iii). Our implementation, simulating $(S_T,X_T)$
+under $\Q$ with $2^{20}$ draws (\texttt{numpy} \texttt{default\_rng}, seed $2026$), gives $8.3457$, $9.6313$
+and $9.7784$, with standard errors between $0.013$ and $0.016$, all within one standard error of the formulas.
+\end{example}
+
+\section{Basket options}\label{sec:ma-basket}
+
+A \emph{basket call} pays $(A-K)^+$, where $A=\sum_iw_iS_{i,T}$ is a weighted sum of the prices
+at maturity in the model \eqref{eq:ma-model}: an option on an index of a few stocks, or on a
+currency basket. It is the cross-sectional analogue of the Asian option of
+\cref{ch:15-asian}: there the summands are one asset at several dates, with covariances
+$\sigma^2\min(t_i,t_j)\ge0$; here they are several assets at one date, with the covariances
+$\Sigma_{ij}=\rho_{ij}\sigma_i\sigma_jT$ of any sign. The sum of lognormals is not lognormal, and
+with $d\ge2$ assets no closed form is known, except in degenerate cases. Write
+$D=e^{-rT}$, $Y=D(A-K)^+$, $C=\EQ Y$ and $\Phi=\sum_iw_iF_i=\EQ A$.
+
+\begin{proposition}[Basket options]\label{prop:ma-basket}
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{The geometric basket.}) Let all $w_i>0$, $a_i=w_iF_i/\Phi$, and
+    $G=\Phi\prod_i(S_{i,T}/F_i)^{a_i}$. Then $\log G\sim\mathcal N(\mu_G,v_G)$ with
+    $\mu_G=\log\Phi-\frac12\sum_ia_i\Sigma_{ii}$ and $v_G=a^\top\Sigma a$; $G\le A$ on every path;
+    and $X^{\mathrm g}=D(G-K)^+$ has mean $D\Black(\EQ G,K,v_G)\le C$, where
+    $\EQ G=e^{\mu_G+v_G/2}\le\Phi$.
+  \item (\emph{The geometric control.}) Under (i), $0\le Y-X^{\mathrm g}\le D(A-G)$ and, with
+    $c=\Sigma a$,
+    \begin{align*}
+      \Var(Y-X^{\mathrm g})&\le D^2\EQ\big[(A-G)^2\big]\\
+      &=D^2\Big(\sum_{i,j}w_iw_jF_iF_je^{\Sigma_{ij}}-2\,\EQ G\sum_iw_iF_ie^{c_i}+(\EQ G)^2e^{v_G}\Big).
+    \end{align*}
+    If $v_G>0$ and $\Var Y>0$, the control-variate estimator with the optimal coefficient has variance
+    $(1-\Corr(Y,X^{\mathrm g})^2)\Var Y/n$ (\cref{thm:cv-optimal}), and
+    $1-\Corr(Y,X^{\mathrm g})^2\le D^2\EQ[(A-G)^2]/\Var Y$, whose numerator does not depend on $K$.
+  \item (\emph{Moment matching.}) $\EQ A=\Phi$ and $\EQ A^2=\sum_{i,j}w_iw_jF_iF_je^{\Sigma_{ij}}$. If
+    $\Phi>0$, the lognormal law with these two moments has log-variance
+    $v_2=\log(\EQ A^2/\Phi^2)$, and the \emph{two-moment approximation} is
+    $C_2=D\Black(\Phi,K,v_2)$. It equals $C$ if $A$ is lognormal (for instance if $d=1$, or if
+    $\rho_{ij}=1$ and all $\sigma_i$ are equal), and if all $w_i\ge0$ and $K\le0$. It is not a bound:
+    in the three-asset example below, $C_2-C$ changes sign with $K$ (\cref{tab:ma-basket}).
+  \item (\emph{Mixed signs.}) If some weights are positive and some negative and $\Sigma$ is
+    positive definite, then $\Q(A<0)>0$. The geometric basket of (i)--(ii) is then undefined, and no
+    lognormal law has the law of $A$: when $\Phi>0$, $C_2$ can still be computed, but it puts no mass where
+    $A<0$, and none of the exact cases of (iii) applies; if $\Phi\le0$, no lognormal law even has the
+    mean of $A$. Plain Monte Carlo is unaffected.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\log G=\log\Phi+\sum_ia_i(\log S_{i,T}-\log F_i)$ is a linear function of a Gaussian vector,
+with $\E(\log S_{i,T}-\log F_i)=-\frac12\Sigma_{ii}$ and variance $a^\top\Sigma a$. The weights $a_i$ are
+positive with sum one, and $\log$ is concave, so the weighted arithmetic--geometric mean
+inequality gives $\prod_ix_i^{a_i}\le\sum_ia_ix_i$ for $x_i=S_{i,T}/F_i$; multiplied by $\Phi$, this
+is $G\le\sum_iw_iS_{i,T}=A$. The mean of $X^{\mathrm g}$ is the identity after \eqref{eq:ma-black}
+(or $D(\EQ G-K)^+$ if $v_G=0$); it is at most $C$ because $(G-K)^+\le(A-K)^+$, and
+$\EQ G\le\EQ A$.
+(ii) $x\mapsto(x-K)^+$ is nondecreasing and $1$-Lipschitz, so $0\le(A-K)^+-(G-K)^+\le A-G$, and
+$\Var(Y-X^{\mathrm g})\le\EQ[(Y-X^{\mathrm g})^2]$. For the moments, $\EQ[S_{i,T}S_{j,T}]=F_iF_je^{\Sigma_{ij}}$,
+$\EQ G^2=(\EQ G)^2e^{v_G}$, and $\log S_{i,T}+\log G$ is normal with variance
+$\Sigma_{ii}+2c_i+v_G$, where $c_i=\Cov(\log S_{i,T},\log G)=(\Sigma a)_i$, so
+$\EQ[S_{i,T}G]=F_i\,\EQ G\,e^{c_i}$. If $v_G>0$ then $X^{\mathrm g}$ has positive variance, and
+\cref{thm:cv-optimal}(ii) applies; its optimal variance is at most the variance at coefficient one.
+(iii) The moments follow as in (ii). A lognormal $L$ with mean $\Phi$ has $\E L^2=\Phi^2e^{\Var\log L}$,
+which gives $v_2$. If $A$ is lognormal, $C_2=C$ by \eqref{eq:ma-black}; under the stated
+condition all $S_{i,T}/F_i$ are equal to one lognormal variable, so $A=\Phi\,S_{1,T}/F_1$. If all
+$w_i\ge0$ and $K\le0$, then $A-K\ge0$ and both sides equal $D(\Phi-K)$. The sign changes are in
+\cref{tab:ma-basket}.
+(iv) The vector $(\log S_{i,T})$ has a positive Gaussian density on $\R^d$, so every open subset of
+$(0,\infty)^d$ has positive probability. With $w_1>0>w_2$, say, the open set where
+$w_1S_{1,T}+\sum_{i\ge3}|w_i|S_{i,T}<|w_2|S_{2,T}$ is nonempty and lies in $\{A<0\}$. A lognormal
+variable is positive, and $G>0$.
+\end{proof}
+
+The geometric basket with the weights $a_i$, proportional to the forward values $w_iF_i$ rather
+than to $w_i$, is the choice of \textcite{gentle-basket}, as it is usually described: $A/\Phi$ and $G/\Phi$ are then the
+arithmetic and geometric means of the same ratios $S_{i,T}/F_i$, which agree to first order when the
+ratios are close to one. Equal weights $w_i/\sum_jw_j$ would give a geometric mean of the prices
+themselves, which is far below $A$ when the prices differ in scale. Gentle's \emph{approximation}
+prices $(G-K')^+$ with the strike $K'=K-(\Phi-\EQ G)$ shifted by the difference of the means; like
+$C_2$, which is due to \textcite{levy-1992}, it is a heuristic, with no error bound, and it errs in both
+directions: it underprices in \cref{exa:ma-basket}, but with three equicorrelated assets ($\rho_{ij}=0.9$,
+volatilities $5\%$, $5\%$, $80\%$, $T=2$, $K=60$, other inputs as in \cref{exa:ma-basket}) it gives $38.265$
+against $C=37.343$, and $C_2=40.992$. The bound in (ii)
+does not depend on the strike, as in \cref{prop:as-control}, but it depends on how dispersed the
+ratios $S_{i,T}/F_i$ are, and dispersion grows with low or negative correlations
+(\exref{ex:ma-dispersion}).
+
+\begin{remark}[Conditioning, and a reference price]\label{rem:ma-reference}
+Write the log-prices as $m+LZ$ with $LL^\top=\Sigma$ and $Z\sim\mathcal N(0,I_d)$, and split
+$Z=e\,\xi+QZ'$, where $e$ is the unit vector along $L^\top a$ and the columns of $Q$ are an orthonormal
+basis of $e^\perp$, so that $\log G-\mu_G=\sqrt{v_G}\,\xi$, with
+$\xi\sim\mathcal N(0,1)$ independent of $Z'\in\R^{d-1}$. Given $Z'$, $A=\sum_i\alpha_ie^{b_i\xi}$ with
+$\alpha_i>0$ and $b=Le=c/\sqrt{v_G}$; it is a convex function of $\xi$, so it exceeds $K$ outside an
+interval, whose endpoints are found by bisection, and $\EQ[(A-K)^+\mid Z']$ is a sum of terms
+$e^{b_i^2/2}N(\cdot)$, as for the Asian options of \cref{ch:15-asian}. This conditional
+value is an unbiased estimator with no larger variance (\cref{thm:st-conditional}) and a smooth function
+of $Z'$ when all $b_i>0$. In the example below ($d=3$), a product Gauss--Hermite rule in $Z'$ with
+$8\times8$ nodes already gives ten digits, and $16\times16$ nodes agree with $64\times64$ to $10^{-14}$.
+Conditioning on $G$ instead gives the lower bound $D\,\EQ[(\EQ[A\mid G]-K)^+]\le C$ by the conditional
+Jensen inequality, whatever the covariances, with
+$\EQ[A\mid\log G=x]=\sum_iw_iF_i\exp\big(c_i(x-\mu_G)/v_G-c_i^2/(2v_G)\big)$. If every $c_i\ge0$, this function is
+increasing in $x$, it crosses $K$ once, and the bound has the closed form of \cref{prop:as-curran}(ii), as
+\textcite{curran} proposed for ``portfolio options''.
+\end{remark}
+
+\begin{example}[A three-asset basket]\label{exa:ma-basket}
+Take three assets with the test-case inputs $S_{i,0}=100$, $r=1\%$, $y_i=2\%$, $T=1$, volatilities
+$20\%$, $25\%$ and $30\%$, the correlations $0.5$, $0.3$, $0.6$ of \cref{exm:rng-three-assets}, equal
+weights $w_i=\frac13$ and $K=100$. Then $\Phi=99.0050$, $\sqrt{v_G}=20.23\%$ and $\sqrt{v_2}=20.30\%$,
+against volatilities averaging $25\%$: diversification. The reference price of
+\cref{rem:ma-reference} is $C=7.4655807$. Our implementation, with $2^{20}$ draws (\texttt{numpy}
+\texttt{default\_rng}, seed $2026$), gives
+$7.46603\pm0.01256$ by plain Monte Carlo; the geometric control, with the in-sample coefficient
+$1.0498$ and correlation $0.99679$, gives $7.46541\pm0.00101$, $12$ times more precise; and three
+controls (the geometric call, the forward $DA$ and the strip $D\sum_iw_i(S_{i,T}-K)^+$) give
+$7.46585\pm0.00071$, with $R^2=0.99678$ (\cref{thm:cv-multiple}). Before any simulation, (ii) bounds
+$\Var(Y-X^{\mathrm g})$ by $2.888$, about $1.7\%$ of $\Var Y\approx165.5$. The two-moment
+approximation gives $C_2=7.48004$, Gentle's $7.36489$, the conditioning bound of
+\cref{rem:ma-reference} $7.45406$, and the geometric call, a lower bound, $6.87976$.
+\end{example}
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}lrrrrr@{}}
+    \toprule
+    $K$ & $80$ & $90$ & $100$ & $110$ & $120$\\
+    \midrule
+    reference $C$ & $20.132481$ & $12.804691$ & $7.465581$ & $4.023289$ & $2.027888$\\
+    two moments $C_2$ & $+319.2$ & $+319.7$ & $+144.6$ & $-68.7$ & $-199.0$\\
+    Gentle & $-325.6$ & $-700.3$ & $-1006.9$ & $-1085.2$ & $-945.9$\\
+    conditioning bound & $-76.8$ & $-105.0$ & $-115.2$ & $-110.5$ & $-95.5$\\
+    geometric call & $-9647.6$ & $-7881.5$ & $-5858.2$ & $-3991.3$ & $-2517.6$\\
+    \bottomrule
+  \end{tabular}
+  \caption{The three-asset basket call of \cref{exa:ma-basket}: reference prices from
+    \cref{rem:ma-reference}, and the errors of the approximations and bounds, in units of $10^{-4}$.}
+  \label{tab:ma-basket}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch17-basket}
+  \caption{The three-asset basket call of \cref{exa:ma-basket} against the strike. (a) Standard
+    deviation per draw: plain Monte Carlo, the geometric control and the three controls, all with
+    in-sample coefficients, from the same $2^{16}$ draws (seed $17$). (b) Errors relative to the reference
+    price of the two-moment approximation, of Gentle's approximation and of the conditioning lower bound;
+    the geometric call, $0.25$ to $0.96$ below the reference, is off the scale.}
+  \label{fig:ma-basket}
+\end{figure}
+
+\Cref{tab:ma-basket} and \cref{fig:ma-basket} show the pattern of \cref{ch:15-asian} with larger
+numbers. The control removes between $98.8\%$ and $99.6\%$ of the variance for strikes from $80$ to
+$120$, less as the option moves out of the money. Two-moment matching errs by up to $0.03$ with
+both signs, overpricing in the money and underpricing out of it; Gentle's shift underprices by
+$0.03$ to $0.11$. For a basket the summands are less alike than the fixings of an average, so
+approximations that treat $A$ as nearly lognormal, or nearly geometric, are less accurate, and the
+control is weaker: $1-\rho^2$ is $6.4\times10^{-3}$ here against $6.9\times10^{-4}$ for the monthly
+Asian of \cref{ch:15-asian}. Beyond three or four assets, product quadrature in $Z'$ becomes too
+expensive (\cref{prop:mc-dimension}), while Monte Carlo with the geometric control, or the conditional
+estimator of \cref{rem:ma-reference} with randomised quasi-Monte Carlo, keeps its cost per draw of
+order $d^2$.
+
+\demo{17-multi-asset.ipynb}{the cable call in either currency, with simulation under the domestic and
+the foreign measures; the cross-rate triangle and exchange options against the correlation;
+quantos against the correlation; and the basket's control variates and approximations, with sliders
+for the volatilities, the correlations and the strike.}
+
+\begin{incode}
+\coderef{code/src/mfe230d/multiasset.py}: \texttt{black} is \eqref{eq:ma-black};
+\texttt{garman\_kohlhagen}, \texttt{gk\_hedge} and \texttt{currency\_symmetry} implement
+\cref{prop:ma-garman-kohlhagen} and \cref{prop:ma-numeraire}(v), on top of
+\coderef{code/src/mfe230d/bs.py}; \texttt{numeraire\_drift} and \texttt{call\_samples\_share\_measure}
+\cref{prop:ma-numeraire}(iii)--(iv) and \cref{rem:ma-mc-numeraire}; \texttt{terminal\_prices} samples
+\eqref{eq:ma-model} with \texttt{rng.cholesky} or \texttt{rng.pca\_factor}; \texttt{margrabe},
+\texttt{exchange\_vol}, \texttt{implied\_correlation} and \texttt{cross\_atmf\_call}
+\cref{thm:ma-margrabe} and \cref{exa:ma-cross}; \texttt{quanto\_option}, \texttt{composite\_option},
+\texttt{foreign\_option} and \texttt{fx\_equity\_terminal} \cref{prop:ma-quanto};
+\texttt{geometric\_basket\_option}, \texttt{basket\_cv\_bound}, \texttt{basket\_lognormal},
+\texttt{gentle\_call} and \texttt{basket\_mc} (through \texttt{variance.control\_variate} and
+\texttt{variance.regression\_control\_variates}) \cref{prop:ma-basket}; \texttt{basket\_reference} and
+\texttt{curran\_lower\_bound} \cref{rem:ma-reference}.
+\end{incode}
+
+\paragraph{Course examples reproduced.} The ATMF cable call ($0.05133$ USD, $0.04278$ GBP) and its
+two deltas ($0.5090$ GBP, $-0.5595$ USD); the London trader's thought experiment, with the same
+price and the same hedge in pounds, and put--call symmetry; the cross-rate volatility
+$\sigma_{\mathrm{eff}}^2=\sigma_1^2-2\rho\sigma_1\sigma_2+\sigma_2^2$, the Frankfurt trader's
+thought experiment and the triangle of admissible volatilities; the Cholesky recipe for correlated
+normals (via \cref{exm:rng-three-assets}); and the course's ``pre-washed'' inputs for quantos,
+composites and foreign options.
+
+\furtherreading
+\textcite{shreve2}, Chapter~9, treats num\'eraires, the domestic and foreign risk-neutral measures,
+Siegel's paradox (Section~9.3.4) and put--call duality, and \textcite{geman-elkaroui-rochet} is the
+original account of the change of num\'eraire. \textcite{garman-kohlhagen} and \textcite{margrabe} are
+short and readable; \textcite{stulz-1982} prices options on the maximum or the minimum of two assets
+with the bivariate normal distribution. \textcite{glasserman-mc} samples multivariate normals in
+Section~2.3.3 and correlated geometric Brownian motions in Section~3.2.3, and treats control variates in
+Section~4.1. \textcite{levy-1992}, \textcite{gentle-basket} and \textcite{curran} give the basket
+approximations of \cref{sec:ma-basket}.

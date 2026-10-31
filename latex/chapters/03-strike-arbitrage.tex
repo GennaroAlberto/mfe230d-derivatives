@@ -1,5 +1,585 @@
-\begin{planned}
-  \item monotonicity, convexity and bounds in the strike
-  \item the Breeden--Litzenberger formula: the risk-neutral density from option prices
-  \item the smile in market data, and what it implies for binary options
-\end{planned}
+% Chapter 3: Arbitrage in the strike and the smile.
+
+Fix a maturity and look at the price of a European call as a function of its strike. Before
+any model is chosen, absence of arbitrage already shapes this function: it is convex and
+nonincreasing, its slopes lie between $-e^{-rT}$ and $0$, and it starts at the price of the
+stock without its dividends. Minus its first derivative is the price of a digital option, and its
+second derivative is the discounted risk-neutral density of $S_T$: the
+\emph{Breeden--Litzenberger formula}, which turns a strip of option prices into a probability
+law. Chapter~1 met the same object as the Green's function of the pricing equation
+(\cref{prop:sm-green}).
+
+Markets quote options through their Black--Scholes implied volatilities, and for equity indices
+these are far from flat: they fall as the strike rises. Since the strike enters a price through
+the implied volatility as well, every strike derivative picks up terms in the slope and the
+curvature of the smile. For an at-the-money digital the first of them, the \emph{skew term}, is
+about a fifth of the price (\cref{exa:sk-course-digital}).
+
+The IEOR 222 notes prove the strike relations in a one-period market without dividends. Here we
+add the yield, prove the Breeden--Litzenberger formula in the generality that market data need
+(atoms in the law of $S_T$, call curves with kinks), characterize exactly which functions are call
+prices, and turn to methods: extracting a density from quotes and choosing the strike spacing
+(\cref{prop:sk-fd-density}), pricing and replicating digitals under a smile
+(\cref{prop:sk-binary-smile,prop:sk-call-spreads}), and testing a parametric smile for
+arbitrage. \Cref{ch:04-static-replication} builds general payoffs out of the same strip of
+options.
+
+Throughout, $T>0$ is a fixed maturity, $r,y\in\R$, $S_0>0$, $F=S_0e^{(r-y)T}$ is the forward
+price, and $\Delta_h^2f(K)=\big(f(K-h)-2f(K)+f(K+h)\big)/h^2$ is the second difference of a
+function $f$ with step $h>0$. One-sided derivatives are written $\partial^\pm f(K)$.
+
+\section{Call prices across strikes}\label{sec:sk-strike}
+
+\paragraph{The market.} At time $0$ the following claims on the date $T$ are traded, in a
+frictionless market (any real quantity, no bid--ask spread):
+\begin{itemize}
+  \item the zero-coupon bond, which pays $1$ and costs $e^{-rT}$;
+  \item the \emph{prepaid forward}, which pays $S_T$ and costs $S_0e^{-yT}$; in the standard model
+    of \cref{def:sm-model}, $e^{-yT}$ shares bought at time $0$, with the dividends reinvested in
+    shares, grow to one share at $T$;
+  \item European calls and puts with strikes $K\ge0$, which pay $(S_T-K)^+$ and $(K-S_T)^+$ and
+    cost $C(K)$ and $P(K)$.
+\end{itemize}
+The terminal price $S_T$ is a random variable on $(\Omega,\F,\Prob)$ with $S_T\ge0$ (limited
+liability). A static portfolio holds fixed quantities of finitely many of these claims; its
+price and its payoff are the corresponding linear combinations. We use one of two hypotheses.
+\begin{enumerate}[label=(\Alph*)]
+  \item \emph{No static arbitrage:} no static portfolio with a payoff $V\ge0$ almost surely has
+    a negative price, or a price of zero together with $\Prob(V>0)>0$.
+  \item \emph{Pricing measure:} there is a probability measure $\Q$ equivalent to $\Prob$ with
+    $\EQ[S_T]<\infty$ under which every traded payoff $X$ costs $e^{-rT}\EQ[X]$. In particular
+    $\EQ[S_T]=e^{rT}S_0e^{-yT}=F$, and $C(K)=e^{-rT}\EQ[(S_T-K)^+]$.
+\end{enumerate}
+Both imply \emph{positivity}:
+\begin{enumerate}[label=(P)]
+  \item a static portfolio whose payoff is nonnegative almost surely has a nonnegative price.
+\end{enumerate}
+Under (A) this is part of the definition; under (B) it holds because the expectation of a
+nonnegative variable is nonnegative, and $\Prob$ and $\Q$ have the same null sets. Applied to a
+payoff $V$ and to $-V$, (P) gives the \emph{law of one price}: if two portfolios have the same
+payoff almost surely, they have the same price. Hypothesis (B) implies (A) (the argument is
+the one for a one-period market in the IEOR 222 notes); the converse, the fundamental theorem of
+asset pricing, is not needed here. The proposition below uses (P) only, so it is
+\emph{model-free}: it holds in every market free of static arbitrage, whatever the law of $S_T$.
+
+\begin{proposition}[Strike relations]\label{prop:sk-strike-bounds}
+Assume (P). Let $K\ge0$, $0\le K_1<K_2$, $\lambda\in[0,1]$ and $K_\lambda=\lambda K_1+(1-\lambda)K_2$.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Parity and bounds}) $C(K)-P(K)=S_0e^{-yT}-Ke^{-rT}$, $C(0)=S_0e^{-yT}$, $P(0)=0$, and
+    \[
+      \big(S_0e^{-yT}-Ke^{-rT}\big)^+\le C(K)\le S_0e^{-yT},\qquad
+      \big(Ke^{-rT}-S_0e^{-yT}\big)^+\le P(K)\le Ke^{-rT}.
+    \]
+  \item (\emph{Monotonicity and slopes})
+    $-e^{-rT}(K_2-K_1)\le C(K_2)-C(K_1)\le0$ and $0\le P(K_2)-P(K_1)\le e^{-rT}(K_2-K_1)$.
+  \item (\emph{Convexity}) $C(K_\lambda)\le\lambda C(K_1)+(1-\lambda)C(K_2)$, and the same for $P$.
+\end{enumerate}
+Consequently $C$ is convex, nonincreasing and Lipschitz with constant $e^{-rT}$ on $[0,\infty)$.
+It has one-sided derivatives at every $K>0$, with
+$-e^{-rT}\le\partial^-C(K)\le\partial^+C(K)\le0$, and a right derivative $\partial^+C(0)\in[-e^{-rT},0]$.
+The put is convex and nondecreasing, with slopes in $[0,e^{-rT}]$, and $P''=C''$ wherever either exists.
+\end{proposition}
+
+\begin{proof}
+For $x\ge0$ and $K,K_1,K_2$ as in the statement, the following hold:
+\begin{gather}
+  (x-K)^+-(K-x)^+=x-K,\qquad 0\le(x-K)^+,\qquad x-K\le(x-K)^+\le x,\label{eq:sk-payoff-bounds}\\
+  (x-K_1)^+-(x-K_2)^+=\min\big((x-K_1)^+,\,K_2-K_1\big)\in[0,K_2-K_1],\label{eq:sk-call-spread}\\
+  \lambda(x-K_1)^++(1-\lambda)(x-K_2)^+-(x-K_\lambda)^+\ge0 .\label{eq:sk-fly}
+\end{gather}
+The upper bound in \eqref{eq:sk-payoff-bounds} uses $x\ge0$ and $K\ge0$; \eqref{eq:sk-call-spread}
+is checked on $x\le K_1$, $K_1<x<K_2$ and $x\ge K_2$; and \eqref{eq:sk-fly} holds because
+$K\mapsto(x-K)^+$ is the maximum of the affine functions $0$ and $x-K$, hence convex. At $x=S_T$
+each line compares the payoffs of two static portfolios of calls, puts, bonds and the prepaid
+forward, and (P) with the law of one price turns it into the claimed relation between prices.
+For example, a call minus a put pays $S_T-K$, which is also the payoff of the prepaid forward
+minus $K$ bonds; this is parity. A call with strike $0$ pays $S_T$, so $C(0)=S_0e^{-yT}$, and a put
+with strike $0$ pays nothing. The \emph{call spread} \eqref{eq:sk-call-spread} pays between $0$
+and $K_2-K_1$, the payoff of $K_2-K_1$ bonds; this is (ii) for calls. The portfolio in
+\eqref{eq:sk-fly} is a \emph{butterfly}; this is (iii). By parity $P$ differs from $C$ by the
+affine function $K\mapsto Ke^{-rT}-S_0e^{-yT}$, which turns the relations for calls into those for
+puts and leaves second derivatives unchanged.
+
+For the derivatives, (iii) says that the slope $(C(b)-C(a))/(b-a)$ of a chord is nondecreasing in
+each endpoint, for $0\le a<b$. So as $h\downarrow0$ the quotients $(C(K+h)-C(K))/h$ decrease and
+$(C(K)-C(K-h))/h$ increase, the first stays above the second, and by (ii) both lie in $[-e^{-rT},0]$.
+Their limits are $\partial^+C(K)\ge\partial^-C(K)$ (only the first one at $K=0$).
+\end{proof}
+
+Read backwards, each line of the proof is a trade. A call spread quoted at a negative price, or
+above $e^{-rT}(K_2-K_1)$, is bought, respectively sold against $K_2-K_1$ bonds; a butterfly quoted
+at a negative price is bought. The IEOR 222 notes work these trades out in detail.
+
+\begin{remark}[Edges and atoms]\label{rem:sk-edges}
+At $K=0$ the call is worth $S_0e^{-yT}$, not $S_0$: it is a claim to the share at $T$ without the
+dividends paid before $T$. Under (B), the right slope at the origin is
+$\partial^+C(0)=-e^{-rT}\Q(S_T>0)$ (\cref{thm:sk-breeden-litzenberger}(i)): it equals the extreme value
+$-e^{-rT}$ exactly when $\Q(S_T=0)=0$, and a stock that can default with positive risk-neutral
+probability has a flatter call curve at the origin (\exref{ex:sk-default}). As $K\to\infty$,
+\cref{prop:sk-strike-bounds} only gives that $C$ decreases to some limit $\ge0$; under (B) the limit
+is $0$, by dominated convergence with $(S_T-K)^+\le S_T$, and the slopes
+$\partial^+C(K)=-e^{-rT}\Q(S_T>K)$ tend to $0$ as well. A kink of $C$ at some $K>0$, that is
+$\partial^-C(K)<\partial^+C(K)$, is the signature of an atom of the law of $S_T$ at $K$ (again
+\cref{thm:sk-breeden-litzenberger}(i)), such as a cash takeover offer at the price $K$.
+\end{remark}
+
+\begin{remark}[Finitely many strikes, several maturities]\label{rem:sk-finite}
+Markets quote calls at finitely many strikes $0<K_1<\dots<K_n$. With $K_0=0$ and $C(K_0)=S_0e^{-yT}$,
+let $s_i=(C(K_i)-C(K_{i-1}))/(K_i-K_{i-1})$. \Cref{prop:sk-strike-bounds} requires
+\begin{equation}\label{eq:sk-checks}
+  -e^{-rT}\le s_1\le s_2\le\dots\le s_n\le0\qquad\text{and}\qquad C(K_n)\ge0,
+\end{equation}
+and conversely \eqref{eq:sk-checks} implies every relation of the proposition between quoted strikes,
+because the piecewise-linear interpolation of the quotes is then convex, nonincreasing and has
+slopes in $[-e^{-rT},0]$. With equal spacing $h$, $s_{i+1}-s_i=h\,\Delta_h^2C(K_i)$ is the price of a
+butterfly divided by $h$. These conditions are \emph{necessary}. Whether quotes satisfying them can
+be produced by some law of $S_T$ with mean $F$ (a ``model'' in the sense of \textcite{davis-hobson},
+which chooses the null sets too) is a separate theorem: yes, except in the boundary case
+$s_n=0<C(K_n)$, a ``weak arbitrage'' (their Theorem~3.1 for one maturity, Theorem~4.2 for several;
+the IEOR 222 notes construct a discrete law). Under (B) with a given $\Prob$, the $\Q$-law of $S_T$ must
+be equivalent to its $\Prob$-law, which can rule out more. If the $\Prob$-law has full support, so has the
+$\Q$-law, and then all inequalities in \eqref{eq:sk-checks} are strict: $s_1>-e^{-rT}$ because
+$\Q(S_T<K_1)>0$, $s_{i+1}>s_i$ because the butterfly on $K_{i-1},K_i,K_{i+1}$ pays off on
+$(K_{i-1},K_{i+1})$, and $s_n<0<C(K_n)$ because $\Q(S_T>K_n)>0$. Conversely, if the $\Prob$-law has a
+positive density on $(0,\infty)$ (lognormal, say), strict inequalities suffice. Pick
+$\sigma_0=-e^{-rT}$, $\sigma_i\in(s_i,s_{i+1})$ for $i<n$ and $\sigma_n\in(s_n,0)$; the convex function through the
+quotes with slopes $\sigma_0<\sigma_1<\dots<\sigma_n<0$, then $0$, has one kink in each $(K_{i-1},K_i)$ and one in
+$(K_n,\infty)$, and by \cref{thm:sk-breeden-litzenberger}(iv) it prices calls for a law with an atom at each
+kink. Replace each atom by a positive density on its cell with the same mass and mean (a small weight
+on a fixed positive density on the cell, the rest uniform near the atom, will do): the prices at the $K_i$ do not change, since every $(x-K_i)^+$ is affine on
+each cell. With $q$ the resulting density and $p$ the $\Prob$-density of $S_T$, $\dd\Q/\dd\Prob=q(S_T)/p(S_T)$
+gives (B). For a rectangular grid (the same strikes at every maturity), with zero rates and
+dividends, \textcite{carr-madan-2005} show that nonnegative prices of call spreads, butterflies and
+calendar spreads suffice to exclude static arbitrage.
+\end{remark}
+
+\begin{remark}[Calendar spreads]\label{rem:sk-calendar}
+Let calls with maturities $T_1<T_2$ be priced by one pricing measure under which
+$X_t=e^{-(r-y)t}S_t$ is a martingale on $[0,T_2]$, as in the standard model. Then
+$C(K,T)=e^{-yT}\EQ[(X_T-\kappa)^+]$ with $\kappa=Ke^{-(r-y)T}$, and conditional Jensen,
+$\EQ[(X_{T_2}-\kappa)^+\mid\F_{T_1}]\ge(X_{T_1}-\kappa)^+$, gives
+\begin{equation}\label{eq:sk-calendar}
+  e^{yT_2}C\big(\kappa e^{(r-y)T_2},T_2\big)\ \ge\ e^{yT_1}C\big(\kappa e^{(r-y)T_1},T_1\big),\qquad\kappa\ge0 :
+\end{equation}
+calls are nondecreasing in the maturity when the strike moves with the forward and prices are
+counted in prepaid forwards. In terms of implied volatilities (\cref{sec:sk-smile}), the total
+implied variance $\sigma^2T$ at a fixed ratio $K/F$ is nondecreasing in $T$. At a fixed strike
+the call can lose value with maturity when $y>0$ (\exref{ex:sk-calendar}).
+\end{remark}
+
+\section{The Breeden--Litzenberger formula}\label{sec:sk-bl}
+
+In this section (B) holds, and $\mu$ is the law of $S_T$ under $\Q$, a probability measure on
+$[0,\infty)$ with mean $F$. It is convenient to define $C(K)=e^{-rT}\EQ[(S_T-K)^+]$ for every real
+$K$: for $K<0$ this is $S_0e^{-yT}-Ke^{-rT}$, the price of the prepaid forward and $-K$ bonds. The
+butterfly with strikes $K-h$, $K$, $K+h$ pays, for every $x$,
+\begin{equation}\label{eq:sk-tent}
+  (x-K+h)^+-2(x-K)^++(x-K-h)^+=h^2\Lambda_h(x-K),\qquad \Lambda_h(u)=\frac{(h-|u|)^+}{h^2},
+\end{equation}
+a tent of height $1/h$ and area $1$ centred at $K$ (check the four intervals cut by $K-h$, $K$,
+$K+h$). Its price is $h^2\Delta_h^2C(K)$.
+
+\begin{theorem}[Breeden--Litzenberger]\label{thm:sk-breeden-litzenberger}
+Assume (B), and let $\mu$ be the law of $S_T$ under $\Q$.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Digitals}) For every $K>0$,
+    \[
+      \partial^+C(K)=-e^{-rT}\Q(S_T>K),\qquad \partial^-C(K)=-e^{-rT}\Q(S_T\ge K),
+    \]
+    and $\partial^+C(0)=-e^{-rT}\Q(S_T>0)$. So $\partial^+C(K)-\partial^-C(K)=e^{-rT}\Q(S_T=K)$, and $C$ is
+    differentiable at $K>0$ if and only if $\Q(S_T=K)=0$.
+  \item (\emph{Second differences and the law}) For $h>0$ and $K\in\R$,
+    $\Delta_h^2C(K)=e^{-rT}\EQ[\Lambda_h(S_T-K)]\ge0$. As $h\downarrow0$:
+    \begin{enumerate}[label=(\alph*)]
+      \item $h\,\Delta_h^2C(K)\to e^{-rT}\Q(S_T=K)$ for every $K$;
+      \item $\int_\R\phi(K)\,\Delta_h^2C(K)\,\dd K\to e^{-rT}\EQ[\phi(S_T)]$ for every bounded continuous
+        $\phi:\R\to\R$: the measures $\Delta_h^2C(K)\,\dd K$ converge weakly to $e^{-rT}\mu$.
+    \end{enumerate}
+    Moreover $C''=e^{-rT}\mu$ in the sense of distributions:
+    $\int_\R C(K)\,\phi''(K)\,\dd K=e^{-rT}\EQ[\phi(S_T)]$ for every $\phi\in C^2(\R)$ that vanishes
+    outside a bounded interval.
+  \item (\emph{Densities}) Let $I\subseteq(0,\infty)$ be an open interval. If $\mu$ has a density $q$
+    on $I$, that is $\Q(S_T\in A)=\int_Aq(x)\,\dd x$ for Borel sets $A\subseteq I$, then $C$ is
+    differentiable on $I$, $C'(b)-C'(a)=e^{-rT}\int_a^bq(x)\,\dd x$ for $a<b$ in $I$, and at every
+    $K\in I$ where $q$ is continuous
+    \[
+      C''(K)=\lim_{h\downarrow0}\Delta_h^2C(K)=e^{-rT}q(K).
+    \]
+    Conversely, if $C$ is differentiable on $I$ and $C'$ is absolutely continuous on $I$ (for
+    instance $C\in C^2(I)$), then $\mu$ has the density $e^{rT}C''$ on $I$.
+  \item (\emph{Which functions are call prices}) A function $c:[0,\infty)\to\R$ is of the form
+    $c(K)=e^{-rT}\int(x-K)^+\,\nu(\dd x)$ for a probability measure $\nu$ on $[0,\infty)$ with mean
+    $F$ if and only if $c$ is convex, $c(0)=S_0e^{-yT}$, $\partial^+c(0)\ge-e^{-rT}$, and $c(K)\to0$ as
+    $K\to\infty$. Then $\nu$ is unique: $\nu((K,\infty))=-e^{rT}\partial^+c(K)$ for $K\ge0$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) Let $K>0$ and $0<h\le K$. By \eqref{eq:sk-call-spread},
+\begin{gather*}
+  \frac{C(K+h)-C(K)}{h}=-e^{-rT}\EQ\Big[\frac{\min\big((S_T-K)^+,h\big)}h\Big],\\
+  \frac{C(K)-C(K-h)}{h}=-e^{-rT}\EQ\Big[\frac{\min\big((S_T-K+h)^+,h\big)}h\Big].
+\end{gather*}
+Both integrands take values in $[0,1]$; as $h\downarrow0$ the first converges to $\1_{\{S_T>K\}}$ and
+the second to $\1_{\{S_T\ge K\}}$, for every outcome. Dominated convergence gives the two
+derivatives, and the first computation applies at $K=0$ as well.
+
+(ii) The identity is \eqref{eq:sk-tent} at $x=S_T$, divided by $h^2$, and priced. (a) The variable
+$h\Lambda_h(S_T-K)=(1-|S_T-K|/h)^+$ lies in $[0,1]$ and converges to $\1_{\{S_T=K\}}$; use dominated
+convergence. (b) The integrand $|\phi(K)|\Lambda_h(S_T-K)$ is jointly measurable and its double
+integral is at most $\sup|\phi|$, so by Fubini's theorem
+\[
+  \int_\R\phi(K)\,\Delta_h^2C(K)\,\dd K=e^{-rT}\EQ\Big[\int_\R\phi(S_T-u)\,\Lambda_h(u)\,\dd u\Big].
+\]
+For each outcome the inner integral is an average of $\phi$ over $[S_T-h,S_T+h]$, because $\Lambda_h$ is
+a probability density on $[-h,h]$; it tends to $\phi(S_T)$ by continuity, and it is bounded by
+$\sup|\phi|$. Dominated convergence concludes. For the distributional identity, let $\phi$ vanish
+outside $[-M,M]$. Integrating by parts twice, with no boundary terms at $-M$,
+$\int_\R(x-K)^+\phi''(K)\,\dd K=\int_{-M}^x(x-K)\phi''(K)\,\dd K=\phi(x)$ for every $x$. Since
+$\int_\R|(x-K)^+\phi''(K)|\,\dd K\le2M(|x|+M)\sup|\phi''|$ and $\EQ|S_T|<\infty$, Fubini's theorem
+lets us take $\EQ$ inside, which gives the identity.
+
+(iii) $\mu$ has no atoms in $I$, so by (i) $C$ is differentiable on $I$ with
+$C'(K)=-e^{-rT}\Q(S_T>K)$, and $C'(b)-C'(a)=e^{-rT}\Q(a<S_T\le b)=e^{-rT}\int_a^bq$. At a point $K$
+where $q$ is continuous (in particular finite near $K$), the fundamental theorem of calculus gives
+$C''(K)=e^{-rT}q(K)$; and for $h$ so small that $[K-h,K+h]\subset I$,
+$\Delta_h^2C(K)=e^{-rT}\int q(x)\Lambda_h(x-K)\,\dd x$, an average of $q$ over $[K-h,K+h]$, which tends
+to $e^{-rT}q(K)$. Conversely, if $C$ is differentiable on $I$, then $\mu$ has no atoms in $I$ by (i),
+so $C'(K)=-e^{-rT}\Q(S_T>K)$ on $I$, and for $a<b$ in $I$, by absolute continuity,
+$\Q(a<S_T\le b)=e^{rT}\big(C'(b)-C'(a)\big)=\int_a^be^{rT}C''(x)\,\dd x$; here $C''\ge0$ almost everywhere
+because $C'$ is nondecreasing. The finite measures $\mu$ and $e^{rT}C''(x)\,\dd x$ on $I=(\alpha,\beta)$ agree on the
+intervals $(a,b]\subset I$, hence, by continuity from below, on $(\alpha,b]$ for $b\in I$ and on $I$ itself.
+Extended by zero outside $I$, they are finite measures on $\R$ with the same distribution function, so
+they coincide (\textcite{durrett}, Theorem~1.1.4: a measure on $\R$ is determined by its Stieltjes
+measure function).
+
+(iv) \emph{Necessity.} $c$ is convex because each $K\mapsto(x-K)^+$ is, and integrating against $\nu$
+preserves convexity; $c(0)=e^{-rT}\int x\,\nu(\dd x)=e^{-rT}F$; $\partial^+c(0)=-e^{-rT}\nu((0,\infty))\ge-e^{-rT}$ by (i),
+whose proof only used the law; and $c(K)\to0$ by dominated convergence.
+
+\emph{Sufficiency.} First, three facts about a convex $c$ on $[0,\infty)$ with $\partial^+c(0)$ finite.
+It is continuous: in the interior because chord slopes are monotone, hence locally bounded, and at
+$0$ because the right difference quotient has the finite limit $\partial^+c(0)$. Its right derivative
+$g=\partial^+c$ exists everywhere, is nondecreasing, and is right-continuous: if $u_n\downarrow u$ and
+$v>u_1$, then $g(u)\le g(u_n)\le(c(v)-c(u_n))/(v-u_n)$, and letting $n\to\infty$ and then $v\downarrow u$
+gives $\lim_ng(u_n)=g(u)$. And $c(b)-c(a)=\int_a^bg(u)\,\dd u$: for $a=u_0<\dots<u_m=b$, convexity gives
+$g(u_j)\le(c(u_{j+1})-c(u_j))/(u_{j+1}-u_j)\le g(u_{j+1})$, so $c(b)-c(a)$ lies between the lower and the
+upper Riemann sums of the monotone, hence Riemann-integrable, function $g$.
+
+Now $g\le0$, since $g(u_0)>0$ would force $c(u)\ge c(u_0)+g(u_0)(u-u_0)\to\infty$; and $g(u)\to0$ as
+$u\to\infty$, since $g$ increases to some $L\le0$, and $L<0$ would force
+$c(u)\le c(u_0)+L(u-u_0)\to-\infty$. So $G(u)=1+e^{rT}g(u)$ is nondecreasing, right-continuous, with
+$G(0)\ge0$ by hypothesis and $G(u)\uparrow1$; set $G=0$ on $(-\infty,0)$. It is then the distribution
+function of a probability $\nu$ on $[0,\infty)$ (\textcite{durrett}, Theorem~1.1.4), with
+$\nu((u,\infty))=-e^{rT}g(u)$ for $u\ge0$. Writing $(x-K)^+=\int_K^\infty\1_{\{x>u\}}\,\dd u$ and
+using Tonelli's theorem,
+\[
+  \int(x-K)^+\,\nu(\dd x)=\int_K^\infty\nu((u,\infty))\,\dd u=-e^{rT}\int_K^\infty g(u)\,\dd u
+  =e^{rT}\Big(c(K)-\lim_{v\to\infty}c(v)\Big)=e^{rT}c(K).
+\]
+At $K=0$ this gives the mean $e^{rT}c(0)=F$. Uniqueness: by (i), every $\nu$ that produces $c$ has
+$\nu((K,\infty))=-e^{rT}\partial^+c(K)$ for all $K\ge0$, so its distribution function is $G$, and a
+measure is determined by its distribution function (\textcite{durrett}, Theorem~1.1.4).
+\end{proof}
+
+So the second strike derivative of the call is the discounted risk-neutral density when the
+density exists and is continuous, and in general it is the discounted law itself, as a measure.
+Prices at one maturity therefore identify the law of $S_T$ under $\Q$ (not the law under $\Prob$,
+and not the law of the path), and part (iv) shows that \cref{prop:sk-strike-bounds} together
+with $C(K)\to0$ is all that a single maturity can tell: every function with those properties is the
+call price curve of exactly one law of $S_T$ with mean $F$. Whether that law is admissible for a given
+$\Prob$ is a further condition: under (B) it must be equivalent to the $\Prob$-law of $S_T$
+(\cref{rem:sk-finite}). In the standard model, (iii) gives
+$C''(K)=G(0,S_0;T,K)$, the Green's function of \cref{prop:sm-green}.
+
+Atoms show up in data through part (ii)(a): the butterfly $h^2\Delta_h^2C(K)$ centred at an
+atom is asymptotic to $e^{-rT}\Q(S_T=K)\,h$, not $O(h^2)$, so $\Delta_h^2C$ has a spike of height close to
+$e^{-rT}\Q(S_T=K)/h$ (\cref{fig:sk-strike}). The extreme case is a riskless stock, $\mu=\delta_F$:
+then $C(K)=e^{-rT}(F-K)^+$, a ramp whose second derivative in the sense of (ii) is $e^{-rT}\delta_F$. In the
+standard model the law of $S_T$ tends to $\delta_{S_0}$ as $T\downarrow0$ (\cref{prop:sm-green}), and the call
+curve to the ramp $(S_0-K)^+$.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch03-strike}
+  \caption{Three laws of $S_T$ with the same mean $F=99.005$ (test case, $T=1$): lognormal with
+    $\sigma=20\%$; the SSVI smile of \cref{sec:sk-smile}; and a takeover model in which $S_T=120$ with
+    probability $p=0.2$ and is otherwise lognormal ($\sigma=20\%$, mean $93.756$). Left: $\Q(S_T>K)$
+    computed as $-e^{rT}$ times the right slope of the call price, which jumps by $p$ at the atom.
+    Right: $e^{rT}\Delta_h^2C(K)$ with $h=1$ on the strikes $40,41,\dots,180$, a density estimate for the
+    first two laws and a spike of height $p/h$ plus the continuous part at $K=120$ for the third.}
+  \label{fig:sk-strike}
+\end{figure}
+
+\demo{03-strike-arbitrage.ipynb}{move an atom of the law of $S_T$ and the strike step $h$, and
+watch the kink in the call curve, the jump of the digital and the spike of the second
+difference.}
+
+\paragraph{From quotes to densities.} Quotes carry errors: rounding to the tick, the bid--ask
+spread, stale prices. Second differences divide these errors by $h^2$, so the strike spacing has to
+balance them against the bias of a coarse grid.
+
+\begin{proposition}[Densities from noisy quotes]\label{prop:sk-fd-density}
+Let $h>0$, let $C$ be four times continuously differentiable on $[K-h,K+h]$ with $|C''''|\le M_4$
+there, and let $\tilde C$ be quotes with $|\tilde C-C|\le\varepsilon$ at $K-h$, $K$ and $K+h$. Then
+\begin{equation}\label{eq:sk-fd-bound}
+  \big|\Delta_h^2\tilde C(K)-C''(K)\big|\le\frac{M_4h^2}{12}+\frac{4\varepsilon}{h^2}.
+\end{equation}
+For $M_4,\varepsilon>0$ the right side is smallest at $h_*=(48\varepsilon/M_4)^{1/4}$, where it equals
+$2\sqrt{M_4\varepsilon/3}$.
+\end{proposition}
+
+\begin{proof}
+Taylor's formula with integral remainder at $K\pm h$, added, gives
+$\Delta_h^2C(K)-C''(K)=h^{-2}\int_0^h\frac{(h-u)^3}{6}\big(C''''(K+u)+C''''(K-u)\big)\,\dd u$, whose absolute
+value is at most $h^{-2}\cdot2M_4h^4/24=M_4h^2/12$. The errors contribute
+$|e(K-h)-2e(K)+e(K+h)|/h^2\le4\varepsilon/h^2$, with $e=\tilde C-C$. The function $ah^2+b/h^2$ with
+$a,b>0$ is smallest at $h^4=b/a$, where it equals $2\sqrt{ab}$.
+\end{proof}
+
+The bias is of order $h^2$ and the noise of order $\varepsilon/h^2$, so the best error is of order
+$\sqrt\varepsilon$: halving the price errors improves the density by a factor $\sqrt2$ only. As an
+example, take the SSVI prices of \cref{fig:sk-smile} at $T=1$, rounded to the cent
+($\varepsilon=0.005$). On $[50,150]$, $\max|C''''|=2.763\times10^{-4}$, so $h_*=5.43$ and the bound is
+$1.36\times10^{-3}$, against a peak value $0.0272$ of $C''$. On the strikes $60,61,\dots,140$ the largest
+error of $\Delta_1^2\tilde C$ is $0.0169$, more than half the peak; on $60,65,\dots,140$ that of
+$\Delta_5^2\tilde C$ is $0.0010$ (\cref{fig:sk-smile}, right). In practice one first fits an
+arbitrage-free smile to the quotes and differentiates the fit (\cref{sec:sk-smile}); higher-order
+stencils change the exponents (\exref{ex:sk-five-point}).
+
+\section{The smile}\label{sec:sk-smile}
+
+Let $C^{\mathrm{BS}}(K,\sigma)=S_0e^{-yT}N(d_+)-Ke^{-rT}N(d_-)$ be the Black--Scholes call
+(\cref{thm:bsf-formula}), with $d_\pm=\big(\log(S_0/K)+(r-y\pm\sigma^2/2)T\big)/(\sigma\sqrt T)$, and let
+$\mathcal V=S_0e^{-yT}N'(d_+)\sqrt T=Ke^{-rT}N'(d_-)\sqrt T$ be its vega (\cref{prop:bsf-greeks}). Under (B),
+if $\Q(S_T<K)>0$ and $\Q(S_T>K)>0$, the bounds of \cref{prop:sk-strike-bounds}(i) are strict (if
+$F\ge K$, the gap below is $P(K)>0$; if $F<K$, it is $C(K)>0$; the gap above is
+$e^{-rT}\EQ[\min(S_T,K)]>0$), so by \cref{prop:bsf-implied-vol} there is exactly one $\sigma(K)>0$ with
+$C(K)=C^{\mathrm{BS}}(K,\sigma(K))$: the implied volatility of \cref{def:bsf-implied-vol}. By parity the put
+has the same one. The map $K\mapsto\sigma(K)$ is the \emph{smile} at maturity $T$. It is flat in the
+Black--Scholes model, and it is not flat in the market.
+
+\begin{remark}[The shape of equity-index smiles]\label{rem:sk-smile-data}
+Since the crash of October 1987, implied volatilities of S\&P~500 index options decrease with the
+strike over most of the quoted range: out-of-the-money puts are expensive relative to the lognormal
+model \citep{rubinstein-1994}. The smile is therefore usually called a \emph{skew}; at short
+maturities it often turns up again for far out-of-the-money calls. The skew is steepest at short
+maturities and flattens as the maturity grows: \textcite{gatheral-volatility-surface}, Chapter~3,
+shows the SPX surface of 15 September 2005 (Figure~3.2) and its at-the-money skew
+$\partial\sigma/\partial\log K$ against the time to expiry (Figure~3.4). A traders' rule of thumb, used in
+the course, scales the at-the-money skew like $T^{-1/2}$, so that smiles of different maturities nearly
+collapse when plotted against $\log(K/S_0)/(\sigma_1\sqrt T)$, with $\sigma_1$ the one-year at-the-money
+volatility. Over time the level of the surface moves with market stress more than its shape does.
+The risk-neutral density that
+\cref{thm:sk-breeden-litzenberger} extracts from a skew has a fatter left tail and a thinner right tail
+than the lognormal one (\cref{fig:sk-smile,fig:sk-binary}), consistent with the heavy tails, the
+gain/loss asymmetry and the negative correlation between returns and volatility (the leverage effect)
+documented for index returns by \textcite{cont-stylized}, Section~2 (see also the SPX returns in
+\textcite{gatheral-volatility-surface}, Figures~1.1--1.3), and with the premium that investors pay for
+crash protection. Since quotes are proprietary, this chapter uses synthetic smiles of the same shape.
+\end{remark}
+
+Every strike derivative of $C(K)=C^{\mathrm{BS}}(K,\sigma(K))$ has a direct term, at fixed volatility, and
+terms in the derivatives of the smile. For digitals this changes prices substantially.
+
+\begin{proposition}[Digitals under a smile]\label{prop:sk-binary-smile}
+Let $I\subseteq(0,\infty)$ be an open interval, $\sigma:I\to(0,\infty)$, and $C(K)=C^{\mathrm{BS}}(K,\sigma(K))$
+for $K\in I$; below, $d_\pm$, $\mathcal V$ and $\sigma$ are evaluated at $\sigma=\sigma(K)$.
+\begin{enumerate}[label=(\roman*)]
+  \item If $\sigma$ is differentiable at $K\in I$, then so is $C$, and
+    \begin{equation}\label{eq:sk-skew-term}
+      -C'(K)=e^{-rT}N(d_-)-\mathcal V\,\sigma'(K).
+    \end{equation}
+    If moreover the prices come from a pricing measure (B), then $\Q(S_T=K)=0$, and the cash-or-nothing
+    call paying $\1_{\{S_T>K\}}$ and the asset-or-nothing call paying $S_T\1_{\{S_T>K\}}$ cost
+    \begin{gather*}
+      D(K)=e^{-rT}\Q(S_T>K)=-C'(K),\\
+      A(K)=e^{-rT}\EQ\big[S_T\1_{\{S_T>K\}}\big]=C(K)+K\,D(K)=S_0e^{-yT}N(d_+)-K\mathcal V\sigma'(K).
+    \end{gather*}
+  \item If $\sigma$ is differentiable on $I$ and twice differentiable at $K$, then $C''(K)$ exists and
+    \begin{equation}\label{eq:sk-smile-density}
+      C''(K)=\frac{e^{-rT}N'(d_-)}{K\sigma\sqrt T}\Big[1+2K\sqrt T\,d_+\sigma'+K^2T\,d_+d_-\,\sigma'^2+K^2T\sigma\,\sigma''\Big].
+    \end{equation}
+    Under (B), if $\sigma$ is twice continuously differentiable on $I$, the law of $S_T$ has the
+    continuous density $e^{rT}C''$ on $I$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $C^{\mathrm{BS}}$ is continuously differentiable in $(K,\sigma)$, with $\partial_KC^{\mathrm{BS}}=-e^{-rT}N(d_-)$ (the
+terms in $\partial_Kd_\pm$ cancel because $S_0e^{-yT}N'(d_+)=Ke^{-rT}N'(d_-)$) and $\partial_\sigma C^{\mathrm{BS}}=\mathcal V$;
+the chain rule gives \eqref{eq:sk-skew-term}. Under (B), \cref{thm:sk-breeden-litzenberger}(i) gives
+$\Q(S_T=K)=0$ and $D(K)=-\partial^+C(K)=-C'(K)$. The identity
+$(S_T-K)^+=S_T\1_{\{S_T>K\}}-K\1_{\{S_T>K\}}$ and the law of one price give $A=C+KD$, and
+$C^{\mathrm{BS}}+Ke^{-rT}N(d_-)=S_0e^{-yT}N(d_+)$.
+
+(ii) Differentiate $C'=\partial_KC^{\mathrm{BS}}+\partial_\sigma C^{\mathrm{BS}}\sigma'$ once more:
+$C''=\partial_{KK}C^{\mathrm{BS}}+2\,\partial_{K\sigma}C^{\mathrm{BS}}\sigma'+\partial_{\sigma\sigma}C^{\mathrm{BS}}\sigma'^2+\mathcal V\sigma''$.
+From $\partial_Kd_-=-1/(K\sigma\sqrt T)$ and $\partial_\sigma d_-=-d_+/\sigma$,
+\[
+  \partial_{KK}C^{\mathrm{BS}}=\frac{e^{-rT}N'(d_-)}{K\sigma\sqrt T},\qquad
+  \partial_{K\sigma}C^{\mathrm{BS}}=\frac{e^{-rT}N'(d_-)\,d_+}{\sigma},\qquad
+  \partial_{\sigma\sigma}C^{\mathrm{BS}}=\frac{\mathcal V\,d_+d_-}{\sigma},
+\]
+the last because $\mathcal V=Ke^{-rT}N'(d_-)\sqrt T$ and $\partial_\sigma N'(d_-)=N'(d_-)\,d_-d_+/\sigma$.
+Factoring out $e^{-rT}N'(d_-)/(K\sigma\sqrt T)$ gives \eqref{eq:sk-smile-density}. Under (B) with
+$\sigma\in C^2(I)$, also $C\in C^2(I)$, and \cref{thm:sk-breeden-litzenberger}(iii) applies.
+\end{proof}
+
+The \emph{skew term} $-\mathcal V\sigma'(K)$ in \eqref{eq:sk-skew-term} is the error of pricing a digital with
+the Black--Scholes formula at the implied volatility of its own strike. For an equity skew,
+$\sigma'<0$, so digital calls cost more and digital puts, $e^{-rT}-D(K)$, cost less than that formula
+says. Second-order terms enter the density: \eqref{eq:sk-smile-density} contains the strike gamma,
+the cross derivative $\partial_{K\sigma}C^{\mathrm{BS}}$ (counted twice) and the volga. With $\sigma'=\sigma''=0$
+the bracket equals $1$, and \eqref{eq:sk-smile-density} is the discounted lognormal density, the Green's
+function of \cref{prop:sm-green}.
+
+\begin{example}[The course's smile]\label{exa:sk-course-digital}
+The course models the one-year index smile near the money by
+$\sigma(K)=\sigma_{\mathrm{atm}}+\xi\log(S_0/K)$, with $S_0=3900$, $T=1$, $r=3\%$, $y=1.3\%$,
+$\sigma_{\mathrm{atm}}=25\%$ and $\xi=28\%$. At $K=S_0$, $\sigma'(K)=-\xi/K$, so the skew term is
+$\xi\,e^{-yT}N'(d_+)\sqrt T$ and
+\[
+  D(S_0)=e^{-rT}N(d_-)+\xi e^{-yT}N'(d_+)\sqrt T=0.463167+0.108227=0.571394 .
+\]
+The skew term is $19\%$ of the price; leaving out the factor $e^{-yT}$, a common slip, gives $0.572810$.
+The asset-or-nothing call costs $A(S_0)=413.04+3900\times0.571394=2641.47$, against $2219.39$ with a flat
+$25\%$ volatility. \Cref{fig:sk-binary} shows the digitals and the densities across strikes: the smile
+moves risk-neutral mass from the right tail to the left tail and shifts the mode to the right of the
+forward.
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch03-binary}
+  \caption{The course's smile $\sigma(K)=25\%+28\%\log(S_0/K)$ ($S_0=3900$, $T=1$, $r=3\%$, $y=1.3\%$)
+    against a flat $25\%$ volatility. Left: digital call prices; the smile price $-C'(K)$ of
+    \eqref{eq:sk-skew-term}, the Black--Scholes digital with a flat $25\%$, and the Black--Scholes
+    digital $e^{-rT}N(d_-)$ at $\sigma(K)$, which omits the skew term. Right: the discounted density
+    $C''(K)$ from \eqref{eq:sk-smile-density} and the discounted lognormal density with $\sigma=25\%$, both
+    multiplied by $10^4$.}
+  \label{fig:sk-binary}
+\end{figure}
+
+\paragraph{Testing a smile for arbitrage.} A smile $\sigma:(0,\infty)\to(0,\infty)$ is arbitrage-free at one
+maturity when $C(K)=C^{\mathrm{BS}}(K,\sigma(K))$, with $C(0)=S_0e^{-yT}$, satisfies the conditions of
+\cref{thm:sk-breeden-litzenberger}(iv). The conditions at $K=0$ hold automatically: Black--Scholes
+prices satisfy $S_0e^{-yT}-Ke^{-rT}<C^{\mathrm{BS}}<S_0e^{-yT}$, so $C(K)\to C(0)$ and, once $C$ is convex,
+$\partial^+C(0)\ge-e^{-rT}$. For a twice differentiable smile, what remains is that the bracket in
+\eqref{eq:sk-smile-density} be nonnegative and that $C(K)\to0$ as $K\to\infty$. Written in the log-moneyness
+$k=\log(K/F)$ and the total implied variance $w(k)=\sigma(K)^2T$, the bracket is the function
+\[
+  g(k)=\Big(1-\frac{k\,w'(k)}{2w(k)}\Big)^2-\frac{w'(k)^2}{4}\Big(\frac1{w(k)}+\frac14\Big)+\frac{w''(k)}2
+\]
+(\exref{ex:sk-durrleman}), and a slice is free of butterfly arbitrage if and only if $g\ge0$ and
+$d_+\to-\infty$ as $k\to\infty$ (\textcite{gatheral-jacquier-2014}, eq.~(2.1) and Lemma~2.2).
+\textcite{roper-arbitrage-free}, Theorems~2.9 and~2.15, shows for zero rates and dividends and for
+twice-differentiable positive smiles that these conditions on every slice, together with total variance nondecreasing in $T$ and vanishing at $T=0$,
+are sufficient and necessary for a surface free of static arbitrage; for constant $r$ and $y$ apply them to
+the calls on $S_T/F_T$, $F_T=S_0e^{(r-y)T}$, whose prices are $C(K,T)/(S_0e^{-yT})$ at the strikes $K/F_T$. Arbitrage also bounds the
+slope of a smile (\exref{ex:sk-skew-bounds}).
+
+The course's smile fails the test far from the money. Its bracket is positive for
+$84.33<K<9524.18$ and negative for $K<84.33$, that is below $2.2\%$ of the spot, where $\sigma=132\%$:
+butterflies there have negative prices. Above $9524.18=S_0e^{\sigma_{\mathrm{atm}}/\xi}$ the formula gives
+$\sigma\le0$. The total variance $(\sigma_{\mathrm{atm}}-\xi k')^2T$, $k'=\log(K/S_0)$, grows like $k'^2$, while under any
+pricing measure $\limsup w(k)/|k|\le2$ in each wing: \textcite{lee-moment-formula}'s moment formula
+(his Theorems~3.2 and~3.4) identifies the limsup as an explicit function, with values in $[0,2]$, of the
+highest finite moment of $S_T$ (right wing) or of $1/S_T$ (left wing); see also
+\textcite{gatheral-volatility-surface}, Chapter~7, ``Extreme strikes''. A near-the-money fit is not a smile on all of $(0,\infty)$, and digitals, densities and
+Chapter~4's replication integrals reach far into the wings.
+
+\paragraph{A synthetic surface.} The SSVI surface of \textcite{gatheral-jacquier-2014} has the right
+shape and provably no arbitrage. With $\theta_T=\sigma_{\mathrm{atm}}^2T$ the at-the-money-forward total
+variance, $\rho\in(-1,1)$ and a function $\phi>0$, it sets
+\begin{equation}\label{eq:sk-ssvi}
+  w(k,T)=\frac{\theta_T}2\Big(1+\rho\,\phi(\theta_T)k+\sqrt{\big(\phi(\theta_T)k+\rho\big)^2+1-\rho^2}\Big),\qquad
+  \phi(\theta)=\frac{\eta}{\theta^\gamma(1+\theta)^{1-\gamma}}
+\end{equation}
+(their Definition~4.1 and eq.~(4.5)). We take the test case with $\sigma_{\mathrm{atm}}=20\%$, $\rho=-0.7$,
+$\eta=1$, $\gamma=\frac12$. By their Remark~4.4, $\eta(1+|\rho|)\le2$ (here $1.7$) suffices for (4.5) to be free of
+static arbitrage; directly, their Theorem~4.2 excludes butterfly arbitrage if
+$\theta\phi(\theta)(1+|\rho|)<4$ and $\theta\phi(\theta)^2(1+|\rho|)\le4$ for all $\theta>0$; here
+$\theta\phi(\theta)=\eta\sqrt{\theta/(1+\theta)}<1$ and $\theta\phi(\theta)^2=\eta^2/(1+\theta)<1$, so both left
+sides are below $1.7$. Their Theorem~4.1 excludes calendar arbitrage if $\theta_T$ is nondecreasing and
+$0\le\partial_\theta(\theta\phi)\le\phi\,(1+\sqrt{1-\rho^2})/\rho^2$; here $\partial_\theta(\theta\phi)/\phi=\frac12/(1+\theta)\le\frac12$,
+and the right bound is $3.50$. The at-the-money skew is
+$\partial_k\sigma=\rho\,\phi(\theta_T)\sqrt{\theta_T}/(2\sqrt T)\approx\rho\eta/(2\sqrt T)$ for small $\theta_T$: it scales
+like $T^{-1/2}$, as in \cref{rem:sk-smile-data} ($-0.697$, $-0.343$ and $-0.238$ at $T=0.25$, $1$ and $2$).
+At $T=1$ and $K=100$, $\sigma(K)=19.657\%$, the call costs $7.23033$ (against $7.36429$ at a flat $20\%$),
+and the digital costs $0.436329+0.133830=0.570159$, against $0.436000$ at a flat $20\%$; the density of
+$S_T$ at $100$ is $0.021125$, against $0.019724$ for the lognormal law.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch03-smile}
+  \caption{Left: implied volatilities of the SSVI surface \eqref{eq:sk-ssvi} ($\sigma_{\mathrm{atm}}=20\%$,
+    $\rho=-0.7$, $\eta=1$, $\gamma=\frac12$; test case) against $\log(K/F_T)$ for $T=0.25$, $1$, $2$. Right: at $T=1$,
+    the density $e^{rT}C''(K)$ of $S_T$ from \eqref{eq:sk-smile-density}, the lognormal density with
+    $\sigma=20\%$, and the estimates $e^{rT}\Delta_h^2\tilde C(K)$ from SSVI prices rounded to the cent,
+    with $h=1$ (strikes $60,61,\dots,140$) and $h=5$ (strikes $60,65,\dots,140$).}
+  \label{fig:sk-smile}
+\end{figure}
+
+\demo{03-strike-arbitrage.ipynb}{change the SSVI parameters and the maturity, and compare the smile,
+the digital with and without its skew term, the density and Durrleman's function $g$; then find
+where the course's smile stops being arbitrage-free.}
+
+\paragraph{Digitals from call spreads.} A digital is rarely listed, but call spreads are, and they
+bound it. Let $h>0$ and let the strike grid be $h\N=\{0,h,2h,\dots\}$; a \emph{grid portfolio} holds bonds,
+the prepaid forward and calls with strikes in $h\N$.
+
+\begin{proposition}[Super- and sub-replication of a digital]\label{prop:sk-call-spreads}
+Let $K\in h\N$ with $K\ge h$, and $\delta_K(x)=\1_{\{x>K\}}$.
+\begin{enumerate}[label=(\roman*)]
+  \item Among the payoffs $f(x)$ of grid portfolios with $f\ge\delta_K$ on $[0,\infty)$, the smallest
+    one pointwise is $f^+(x)=\big((x-K+h)^+-(x-K)^+\big)/h$; among those with $f\le\delta_K$ on $[0,\infty)$,
+    the largest is $f^-(x)=\big((x-K)^+-(x-K-h)^+\big)/h$.
+  \item Under (P), the cheapest super-replicating grid portfolio costs
+    $\bar D_h(K)=(C(K-h)-C(K))/h$ and the dearest sub-replicating one costs
+    $\underline D_h(K)=(C(K)-C(K+h))/h$. If the digital is traded at the price $D(K)$ and (P) holds in the
+    market that includes it, then $\underline D_h(K)\le D(K)\le\bar D_h(K)$.
+  \item Under (B), $\bar D_h(K)-\underline D_h(K)=h\,\Delta_h^2C(K)$, which tends to $e^{-rT}\Q(S_T=K)$ as
+    $h\downarrow0$; if the law of $S_T$ has a density bounded by $\bar q$ on $[K-h,K+h]$, the gap is at most
+    $e^{-rT}\bar qh$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) The payoff $f$ of a grid portfolio is continuous and affine on each interval $[jh,(j+1)h]$. If
+$f\ge\delta_K$, then $f\ge1$ on $(K,\infty)$, hence $f(K)\ge1$ by continuity, and $f(K-h)\ge0$; as $f$ is
+affine on $[K-h,K]$, $f\ge f^+$ there, and $f\ge0=f^+$ on $[0,K-h]$ and $f\ge1=f^+$ on $[K,\infty)$. If
+$f\le\delta_K$, then $f(K)\le0$ and $f(K+h)\le1$, so $f\le f^-$ on $[K,K+h]$, and $f\le0=f^-$ on $[0,K]$ and
+$f\le1=f^-$ on $[K+h,\infty)$. Both $f^\pm$ are payoffs of call spreads on the grid. (ii) By (P), prices
+are monotone in payoffs, so the extremes of (i) are the cheapest and the dearest; they also bound
+the digital. (iii) The difference of the two spreads is $h$ times the butterfly \eqref{eq:sk-tent}
+divided by $h^2$; apply \cref{thm:sk-breeden-litzenberger}(ii)(a). With a density $q\le\bar q$ on
+$[K-h,K+h]$, $h\,\Delta_h^2C(K)=e^{-rT}\int q(x)\,h\Lambda_h(x-K)\,\dd x\le e^{-rT}\bar q\,h$, because
+$\Lambda_h$ has integral $1$.
+\end{proof}
+
+The gap is first order in $h$, and it does not close at an atom. For the SSVI smile at $K=100$, the
+bounds are $[0.5138,\,0.6184]$ with $h=5$ and $[0.5595,\,0.5804]$ with $h=1$, around $D(100)=0.5702$;
+\exref{ex:sk-digital-grid} does the computation for the course's smile on its listed strike grids. A
+dealer who sells the digital at $\bar D_h(K)$ and buys the spread carries no risk at all, whatever the
+law of $S_T$; the price of this safety is the gap.
+
+\begin{incode}
+The module is \coderef{code/src/mfe230d/smile.py}. There, \texttt{strike\_checks} tests quotes against \eqref{eq:sk-checks};
+\texttt{second\_difference}, \texttt{fd\_density}, \texttt{fd\_density\_error\_bound} and \texttt{fd\_optimal\_step}
+implement \cref{prop:sk-fd-density}; \texttt{smile\_digital}, \texttt{smile\_asset\_digital} and
+\texttt{smile\_density} implement \cref{prop:sk-binary-smile}; \texttt{course\_smile}, \texttt{ssvi\_smile},
+\texttt{ssvi\_conditions} and \texttt{durrleman\_g} are the two synthetic smiles and their tests;
+\texttt{call\_spread\_bounds} is \cref{prop:sk-call-spreads}; \texttt{atom\_call} prices calls on a law with an
+atom. Black--Scholes prices and implied volatilities come from \coderef{code/src/mfe230d/bs.py}, and
+\coderef{code/tests/test_smile.py} checks every number quoted in this chapter.
+\end{incode}
+
+\furtherreading
+\textcite{breeden-litzenberger} is the original source of the density formula, and
+\textcite{merton1973} of the strike relations. \textcite{gatheral-volatility-surface} is the
+practitioner's account of the volatility surface; its Chapter~8 discusses digital options under a skew.
+\textcite{rubinstein-1994} reads risk-neutral laws from index options and builds trees that fit them.
+\textcite{davis-hobson}, \textcite{carr-madan-2005} and \textcite{roper-arbitrage-free} characterize prices and
+surfaces free of static arbitrage, \textcite{lee-moment-formula} bounds the wings of a smile, and
+\textcite{gatheral-svi-2004} and \textcite{gatheral-jacquier-2014} give the SVI and SSVI parameterizations.

@@ -1,0 +1,134 @@
+% Exercises for Chapter 3 (Arbitrage in the strike and the smile). Statements only: solutions are kept privately.
+Throughout, calls and puts have one maturity $T$, the bond paying $1$ at $T$ costs $e^{-rT}$, the
+prepaid forward paying $S_T$ costs $S_0e^{-yT}$, $F=S_0e^{(r-y)T}$, and $S_T\ge0$. Hypotheses (A), (B) and
+(P) are those of \noteref{sec:sk-strike}. You may use the results of the notes, quoting them, and the
+closed forms and the implied-volatility solver of \texttt{bs.py}. In computational parts report your
+numbers to the precision asked; if you use random numbers, use NumPy's \texttt{default\_rng} and report
+the seed.
+
+\begin{exercise}[Reading rates from parity]\label{ex:sk-parity}
+\easy Assume (P). By \noteref{prop:sk-strike-bounds}(i), $K\mapsto C(K)-P(K)$ is affine, with slope $-e^{-rT}$
+and intercept the prepaid forward.
+\begin{enumerate}[label=(\alph*)]
+  \item Suppose that the stock pays no yield but a known cash dividend $D$ at a date $t_D\in(0,T)$, and
+    that a bond paying $1$ at $t_D$ costs $e^{-rt_D}$. Find the price of the prepaid forward with a static
+    portfolio, and the affine function $C(K)-P(K)$. What does its intercept measure now?
+  \item A \emph{box spread} is long a call spread $(K_1,K_2)$ and long a put spread, short the put at
+    $K_1$ and long the put at $K_2$, with $K_1<K_2$. Find its payoff and its price.
+  \item With $S_0=100$ and $T=0.5$, the mid quotes of $C(K)-P(K)$ at $K=90,100,110$ are $11.03$, $1.23$
+    and $-8.57$; the stock pays a yield $y$. Fit an affine function by least squares and deduce $r$ and $y$,
+    in percent with two decimals. By how much can rounding the quotes to the cent move your $r$?
+  \item The bond with maturity $T$ trades at $0.9802$, and a dealer offers to buy or sell the $90/110$
+    box at $19.70$. Is there an arbitrage? If so, give the trade and its profit today.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Finding the arbitrage in quotes]\label{ex:sk-quotes}
+\easy Let $S_0=100$, $T=1$, $r=y=0$, and let calls be quoted at
+\[
+  \begin{array}{c|ccccc}
+    K & 80 & 90 & 100 & 110 & 120\\\hline
+    C(K) & 19.80 & 12.50 & 7.20 & 1.50 & 0.40
+  \end{array}
+\]
+\begin{enumerate}[label=(\alph*)]
+  \item Compute the slopes $s_1,\dots,s_5$ of \noteref{eq:sk-checks} and say which conditions fail.
+  \item For each failure, write down a static portfolio that is an arbitrage: its price today and its
+    payoff as a function of $S_T$.
+  \item Compute the implied volatility of each quote, or explain why it does not exist. How does the
+    second failure show up in the implied volatilities?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Default and the left wing]\label{ex:sk-default}
+\medium Under (B), let $S_T=0$ with probability $p\in(0,1)$ and $S_T=\frac{F}{1-p}\exp\big(\sigma\sqrt TZ-\frac{\sigma^2T}2\big)$
+otherwise, with $Z\sim\mathcal N(0,1)$ independent of the default event and $\sigma>0$.
+\begin{enumerate}[label=(\alph*)]
+  \item Check that $\EQ[S_T]=F$, and express $C(K)$ with the Black--Scholes formula.
+  \item Show that the digital put paying $\1_{\{S_T<K\}}$ and the ratio $P(K)/K$ both tend to $e^{-rT}p$ as
+    $K\downarrow0$, so that the left end of the put curve prices a claim paying $1$ at $T$ on default. Does the
+    same hold for every law of $S_T$, with $p=\Q(S_T=0)$?
+  \item Show that $P(K)\ge pKe^{-rT}$ for every $K\ge0$, and that for every fixed $v>0$ the
+    Black--Scholes put price at volatility $v$ is $o(K)$ as $K\downarrow0$. Deduce that the implied
+    volatility $\sigma(K)$ tends to $+\infty$ as $K\downarrow0$.
+  \item For $S_0=100$, $r=1\%$, $y=2\%$, $T=1$, $\sigma=20\%$ and $p=2\%$, compute $\sigma(K)$ for
+    $K=10,20,40,60,80,100,120$ and comment on the shape.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Calendar spreads at a fixed strike]\label{ex:sk-calendar}
+\medium
+\begin{enumerate}[label=(\alph*)]
+  \item In the Black--Scholes model with $S_0=100$, $r=1\%$, $y=5\%$ and $\sigma=20\%$, compute
+    $C(60,T)$ for $T=1,2,5$. Is a call with a longer maturity always worth more?
+  \item Compute $e^{yT}C(60e^{(r-y)T},T)$ for the same maturities and compare with
+    \noteref{rem:sk-calendar}.
+  \item Under the hypotheses of \noteref{rem:sk-calendar}, show that if $y=0$ and $r\ge0$, then
+    $T\mapsto C(K,T)$ is nondecreasing for every fixed $K\ge0$. Which step fails when $y>0$, and what is
+    the financial reason?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Pricing and bounding a digital under the course's smile]\label{ex:sk-digital-grid}
+\medium This is a computational exercise. Use the setting of \noteref{exa:sk-course-digital}: $S_0=3900$,
+$T=1$, $r=3\%$, $y=1.3\%$, $\sigma(K)=25\%+28\%\log(S_0/K)$, and the strike $K=4000$.
+\begin{enumerate}[label=(\alph*)]
+  \item Price the cash-or-nothing and the asset-or-nothing calls with a flat volatility of $25\%$.
+  \item Price them under the smile.
+  \item Calls trade at the strikes $25\N$. Find the cheapest super-replicating and the dearest
+    sub-replicating portfolios of the digital and their prices. Repeat for the strikes $5\N$.
+  \item Compare (a), (b) and (c). Is quoting the digital at the flat-volatility price an arbitrage? If
+    so, write the trade.
+  \item Which strike spacing would bring the gap between the bounds of (c) below $0.005$?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A higher-order stencil]\label{ex:sk-five-point}
+\medium Let $D_h f(K)=\big(-f(K-2h)+16f(K-h)-30f(K)+16f(K+h)-f(K+2h)\big)/(12h^2)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $f$ be six times continuously differentiable on $[K-2h,K+2h]$ with $|f^{(6)}|\le M_6$ there.
+    Show that $|D_hf(K)-f''(K)|\le M_6h^4/54$. \emph{Hint:} write the numerator through
+    $f(K+jh)+f(K-jh)-2f(K)$, $j=1,2$, and Taylor's formula with integral remainder.
+  \item If the values of $f$ carry errors bounded by $\varepsilon$, bound the error of $D_h$ as in
+    \noteref{prop:sk-fd-density}, find the best $h$, and show that the best bound is of order
+    $\varepsilon^{2/3}$ (against $\varepsilon^{1/2}$ for the three-point stencil).
+  \item Take the SSVI prices of \noteref{fig:sk-smile} at $T=1$ (\texttt{smile.ssvi\_smile} with its
+    defaults), rounded to the cent. On the grids $\{60,60+h,\dots,140\}$, $h\in\{1,2,3,4,5,6,8,10\}$,
+    compute the largest error of the three-point and of the five-point estimates of $C''$. Which $h$
+    is best for each, and how do the errors compare with your bounds? (Estimate $M_6$ numerically on
+    $[40,160]$.)
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Durrleman's function]\label{ex:sk-durrleman}
+\medium Let $\sigma$ be a twice differentiable smile, $k=\log(K/F)$ and $w(k)=\sigma(K)^2T$.
+\begin{enumerate}[label=(\alph*)]
+  \item Express $K\sqrt T\sigma'(K)$, $K^2T\sigma'(K)^2$ and $K^2T\sigma(K)\sigma''(K)$ through $w$, $w'$ and $w''$,
+    and show that the bracket of \noteref{eq:sk-smile-density} equals the function $g(k)$ of
+    \noteref{sec:sk-smile}.
+  \item Show that $g\equiv1$ for a flat smile. Write $g(0)$ in terms of $w(0)$, $w'(0)$, $w''(0)$, and
+    deduce that a smile with $w''(0)\le0$ and no butterfly arbitrage at the forward must have
+    $|w'(0)|\le2/\sqrt{1/w(0)+1/4}$. Compute $w(0)$, $w'(0)$, $w''(0)$ and $g(0)$ for the course's smile of
+    \noteref{exa:sk-course-digital}.
+  \item For the SSVI slice \noteref{eq:sk-ssvi}, compute $w(0)$, $w'(0)$, $w''(0)$ and $g(0)$ in terms of
+    $\theta$, $\phi=\phi(\theta)$ and $\rho$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[How steep can a smile be?]\label{ex:sk-skew-bounds}
+\hard Assume (B), and let $C(K)=C^{\mathrm{BS}}(K,\sigma(K))$ on an open interval of strikes, with $\sigma$
+differentiable there. Let $M(x)=(1-N(x))/N'(x)$ be Mills' ratio; you may use that $M$ is positive and
+strictly decreasing on $\R$, with $M(0)=\sqrt{\pi/2}$.
+\begin{enumerate}[label=(\alph*)]
+  \item Use $C'(K)\le0$ to show that $K\sqrt T\,\sigma'(K)\le M(-d_-)$.
+  \item Use the convexity of $C$ on $[0,K]$ and $C(0)=S_0e^{-yT}$ to show that $K\sqrt T\,\sigma'(K)\ge-M(d_+)$.
+    Compare with the bound that $C'(K)\ge-e^{-rT}$ gives. (Both bounds appear in
+    M.~Roper, \emph{Arbitrage free implied volatility surfaces}, preprint, University of Sydney, 2010,
+    Corollary~2.14.)
+  \item At the forward, $K=F$, show that $|\partial\sigma/\partial\log K|\le M(\sigma\sqrt T/2)/\sqrt T<\sqrt{\pi/2}/\sqrt T$:
+    the at-the-money skew can grow at most like $T^{-1/2}$ as $T\downarrow0$. Check the SSVI surface of
+    \noteref{sec:sk-smile} against this bound.
+  \item For the course's smile, compute both bounds at $K=S_0$. Find numerically the strikes at which the
+    smile violates (b), and explain why the answer is not the set where its density is negative.
+\end{enumerate}
+\end{exercise}

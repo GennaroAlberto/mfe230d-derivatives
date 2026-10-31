@@ -1,0 +1,740 @@
+% Chapter 14: American options by simulation.
+
+An American option can be exercised at any time up to its maturity; a Bermudan option, on a
+finite set of dates. Pricing either means solving an optimal stopping problem under the
+risk-neutral measure: at each date the holder compares the payoff of exercising now with
+the value of keeping the option alive. In the binomial model of the IEOR 222 notes this is
+a backward induction over the nodes of a tree, and the trees and finite differences of
+\cref{ch:20-grids} do the same on a grid. Grids are efficient in one or two state
+variables and hopeless in ten (\cref{prop:mc-dimension}). Monte Carlo handles many state
+variables, but it runs forward in time, while the exercise decision at a date requires the
+conditional expectation of the future, which one simulated path does not reveal.
+
+Three ideas make simulation work, and each is a section of this chapter.
+\Cref{sec:am-dp} reduces the problem on a finite set of dates to a dynamic programming
+recursion whose only unknowns are the continuation values, conditional expectations of a
+function of the next state. \Cref{sec:am-lsm} estimates them by regression across
+simulated paths, as \textcite{longstaff-schwartz} proposed: this produces an exercise
+policy, and any policy gives a \emph{lower} bound for the price. \Cref{sec:am-duality}
+turns the problem around: every martingale gives an \emph{upper} bound, the optimal one
+gives the price exactly, and a good policy gives a good martingale
+\citep{rogers-duality,haugh-kogan,andersen-broadie}. The two bounds bracket the price and
+measure how good the policy is. The words ``low'' and ``high'' need care, and we will be
+precise about which estimator is biased in which direction.
+
+Throughout, $S$ is the Black--Scholes stock with yield $y$ under the risk-neutral measure
+$\Q$ (\cref{def:sm-model}), with a filtration $(\F_t)$ for its Brownian motion; all
+expectations are under $\Q$, and we write $\E$ for $\EQ$. The running examples are the put of
+\textcite{longstaff-schwartz}, with $K=40$, $r=6\%$, $y=0$, $\sigma\in\{20\%,40\%\}$,
+$T\in\{1,2\}$, $S_0\in\{36,38,\dots,44\}$ and $50$ exercise dates per year, and the
+course's test case $S_0=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$.
+
+\section{Bermudan options and optimal stopping}\label{sec:am-dp}
+
+Fix exercise dates $0=t_0<t_1<\dots<t_m=T$ and write $\F_k:=\F_{t_k}$. A Bermudan claim
+with payoff function $g$ pays $g(S_{t_k})$ if it is exercised at $t_k$; let
+\[
+  Z_k=e^{-rt_k}g(S_{t_k}),\qquad k=0,\dots,m,
+\]
+be the payoff discounted to time $0$. More generally, $Z$ may be any adapted sequence. A
+\emph{stopping time} is a random variable $\tau$ with values in $\{0,\dots,m\}$ such that
+$\{\tau=j\}\in\F_j$ for every $j$: the decision to stop at $t_j$ uses only the information
+available at $t_j$. Write $\mathcal T_k$ for the set of stopping times with $k\le\tau\le m$.
+The price of the Bermudan claim is
+\begin{equation}\label{eq:am-price}
+  U_0=\sup_{\tau\in\mathcal T_0}\E[Z_\tau],
+\end{equation}
+the value of the holder's optimal stopping problem. That this is the arbitrage-free price,
+the smallest initial capital from which a self-financing portfolio dominates the payoff at
+every date, is shown for finite probability spaces in the IEOR 222 notes and in general
+discrete time by \textcite{follmer-schied}, Chapter~6; \textcite{shreve2}, Section~8.4,
+uses the corresponding definition for the American put. Here we take
+\eqref{eq:am-price} as the definition.
+
+On a finite set of dates, integrability of $\max_k|Z_k|$ is the same as integrability of
+each $Z_k$, because $\max_k|Z_k|\le\sum_k|Z_k|$; for calls and puts it holds since
+$\E[S_t]<\infty$. The next lemma is optional stopping on a finite horizon, conditionally on
+$\F_k$.
+
+\begin{lemma}[Optional stopping]\label{lem:am-optional}
+Let $(Y_j)_{k\le j\le m}$ be a supermartingale with respect to $(\F_j)$ and
+$\tau\in\mathcal T_k$. Then $Y_\tau$ is integrable and $\E[Y_\tau\mid\F_k]\le Y_k$, with
+equality if $Y$ is a martingale.
+\end{lemma}
+
+\begin{proof}
+$|Y_\tau|\le\sum_j|Y_j|$ is integrable, and $Y_\tau-Y_k=\sum_{j=k+1}^m\1_{\{\tau\ge
+j\}}(Y_j-Y_{j-1})$. The event $\{\tau\ge j\}=\Omega\setminus\{\tau\le j-1\}$ is in
+$\F_{j-1}$, so by the tower property and taking out what is known,
+$\E[\1_{\{\tau\ge j\}}(Y_j-Y_{j-1})\mid\F_k]=\E\big[\1_{\{\tau\ge
+j\}}\E[Y_j-Y_{j-1}\mid\F_{j-1}]\,\big|\,\F_k\big]\le0$, with equality for a martingale.
+\end{proof}
+
+\begin{theorem}[Bermudan dynamic programming]\label{thm:am-dp}
+Let $Z$ be adapted with $\E[\max_k|Z_k|]<\infty$. Define $U_m=Z_m$ and, for
+$k=m-1,\dots,0$,
+\begin{equation}\label{eq:am-dp}
+  C_k=\E[U_{k+1}\mid\F_k],\qquad U_k=\max(Z_k,C_k).
+\end{equation}
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Snell envelope}.) Each $U_k$ is integrable, $U\ge Z$, and $U$ is a
+    supermartingale. Every supermartingale $V$ with $V\ge Z$ satisfies $V\ge U$.
+  \item (\emph{Optimal stopping}.) For every $k$ and every $\tau\in\mathcal T_k$,
+    $\E[Z_\tau\mid\F_k]\le U_k$, with equality for
+    $\tau^*_k=\min\{j\ge k:\ j=m\text{ or }Z_j\ge C_j\}$. In particular
+    $U_0=\max_{\tau\in\mathcal T_0}\E[Z_\tau]=\E[Z_{\tau^*_0}]$ is the price \eqref{eq:am-price}.
+  \item (\emph{A sufficient condition}.) If $\tau\in\mathcal T_k$, $Z_\tau=U_\tau$, and the
+    stopped process $(U_{j\wedge\tau})_{k\le j\le m}$ is a martingale, then
+    $\E[Z_\tau\mid\F_k]=U_k$: $\tau$ is optimal from $t_k$ on.
+  \item (\emph{Stopping-time form}.) $\tau^*_m=m$, $\tau^*_k=k$ on $\{Z_k\ge C_k\}$ and
+    $\tau^*_k=\tau^*_{k+1}$ elsewhere; and $C_k=\E[Z_{\tau^*_{k+1}}\mid\F_k]$.
+  \item (\emph{Doob decomposition}.) Let $M^*_0=A^*_0=0$ and
+    \begin{equation}\label{eq:am-doob}
+      M^*_{k+1}-M^*_k=U_{k+1}-C_k,\qquad A^*_{k+1}-A^*_k=U_k-C_k .
+    \end{equation}
+    Then $M^*$ is a martingale, $A^*$ is nondecreasing and predictable ($A^*_{k+1}$ is
+    $\F_k$-measurable), and $U_k=U_0+M^*_k-A^*_k$.
+  \item (\emph{Markov form}.) If $Z_k=e^{-rt_k}g(S_{t_k})$ with $g$ measurable and
+    $|g(s)|\le a(1+s)$, then $U_k=e^{-rt_k}V_k(S_{t_k})$ and $C_k=e^{-rt_k}c_k(S_{t_k})$,
+    where $V_m=g$ and, with $\Delta_k=t_{k+1}-t_k$ and $\xi\sim\mathcal N(0,1)$,
+    \begin{equation}\label{eq:am-markov}
+      c_k(s)=e^{-r\Delta_k}\,\E\big[V_{k+1}\big(se^{\nu\Delta_k+\sigma\sqrt{\Delta_k}\,\xi}\big)\big],
+      \qquad V_k=\max(g,c_k).
+    \end{equation}
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) Let $Z^\star=\max_j|Z_j|$. By backward induction $|U_k|\le\E[Z^\star\mid\F_k]$: this
+holds for $k=m$, and if it holds for $k+1$ then $|C_k|\le\E[|U_{k+1}|\mid\F_k]\le
+\E[Z^\star\mid\F_k]$ and $|Z_k|\le\E[Z^\star\mid\F_k]$ because $Z_k$ is $\F_k$-measurable.
+So $U$ is integrable and adapted, $U\ge Z$, and $U_k\ge C_k=\E[U_{k+1}\mid\F_k]$ is the
+supermartingale property. If $V\ge Z$ is a supermartingale, then $V_m\ge Z_m=U_m$, and
+$V_{k+1}\ge U_{k+1}$ implies $V_k\ge\E[V_{k+1}\mid\F_k]\ge C_k$ and $V_k\ge Z_k$, so
+$V_k\ge U_k$.
+
+(iii) The stopped process is a martingale, so
+$U_k=\E[U_{m\wedge\tau}\mid\F_k]=\E[U_\tau\mid\F_k]=\E[Z_\tau\mid\F_k]$.
+
+(ii) By \cref{lem:am-optional} and (i), $U_k\ge\E[U_\tau\mid\F_k]\ge\E[Z_\tau\mid\F_k]$.
+For $\tau^*_k$: if $\tau^*_k=j<m$ then $Z_j\ge C_j$, so $U_j=Z_j$; and $U_m=Z_m$. The
+increments of the stopped process are
+$U_{(j+1)\wedge\tau^*_k}-U_{j\wedge\tau^*_k}=\1_{\{\tau^*_k>j\}}(U_{j+1}-U_j)$, and on
+$\{\tau^*_k>j\}\in\F_j$ we have $Z_j<C_j$, hence $U_j=C_j$ and
+$\E[\1_{\{\tau^*_k>j\}}(U_{j+1}-U_j)\mid\F_j]=\1_{\{\tau^*_k>j\}}(C_j-U_j)=0$. So (iii)
+applies. As $\F_0$ is trivial, the maximum over $\mathcal T_0$ is attained at $\tau^*_0$.
+
+(iv) The recursion is the definition of $\tau^*_k$ read from date $k$. By (ii) at $k+1$
+and the tower property, $C_k=\E\big[\E[Z_{\tau^*_{k+1}}\mid\F_{k+1}]\mid\F_k\big]=\E[Z_{\tau^*_{k+1}}\mid\F_k]$.
+
+(v) $\E[U_{k+1}-C_k\mid\F_k]=0$, $U_k-C_k\ge0$ is $\F_k$-measurable, and the sum of the two
+increments in \eqref{eq:am-doob} is $U_{k+1}-U_k$.
+
+(vi) By backward induction. Suppose $U_{k+1}=e^{-rt_{k+1}}V_{k+1}(S_{t_{k+1}})$ with
+$|V_{k+1}(s)|\le a'(1+s)$. Write $S_{t_{k+1}}=S_{t_k}e^{\nu\Delta_k+\sigma(W_{t_{k+1}}-W_{t_k})}$;
+the increment of $W$ is independent of $\F_k$ and $S_{t_k}$ is $\F_k$-measurable, so the
+independence lemma \citep[Lemma~2.3.4]{shreve2} gives $C_k=e^{-rt_k}c_k(S_{t_k})$ with
+$c_k$ as in \eqref{eq:am-markov}, which is finite with $|c_k(s)|\le
+a'(1+se^{(r-y)\Delta_k})e^{-r\Delta_k}$. Then $U_k=e^{-rt_k}\max(g,c_k)(S_{t_k})$, and
+$V_k$ again grows at most linearly.
+\end{proof}
+
+The process $U$ is the \emph{Snell envelope} of $Z$; in the Markov form, $V_k$ is the value
+of the option at $t_k$ and $c_k$ its \emph{continuation value}, the value of holding it for
+one more period. Part (iv) is the form of the recursion that simulation will use: it moves
+stopping times, not values, backwards, and the continuation value is the conditional mean
+of the discounted payoff received by following the optimal rule from the next date on. On
+continuous time, with its additional measurability issues, see \textcite{peskir-shiryaev},
+Chapter~I, and for the financial formulation \textcite{glasserman-mc}, Section~8.1.
+
+\begin{proposition}[From Bermudan to American]\label{prop:am-american}
+Let $g$ be continuous with $|g(s)|\le a(1+s)$, $Z_t=e^{-rt}g(S_t)$ for $t\in[0,T]$, and
+let the American price be $A=\sup_\tau\E[Z_\tau]$ over stopping times $\tau$ of $(\F_t)$
+with values in $[0,T]$. For a set of dates $\Pi$ as above, let $B(\Pi)$ be the Bermudan price
+\eqref{eq:am-price}. Then $B(\Pi)\le B(\Pi')\le A$ whenever $\Pi\subseteq\Pi'$, and
+$B(\Pi_n)\to A$ for every sequence $(\Pi_n)$ whose mesh tends to $0$.
+\end{proposition}
+
+\begin{proof}
+A stopping time with values in $\Pi$ is one with values in $\Pi'$, and one with values in
+$[0,T]$: the sets over which the suprema are taken increase. For the limit, $\E[\sup_{t\le
+T}|Z_t|]<\infty$: $|Z_t|\le a(1+S_t)$ and $S_t=S_0e^{(r-y)t}\mathcal E_t\le S_0e^{|r-y|T}\mathcal E_t$
+with the martingale $\mathcal E_t=e^{\sigma W_t-\sigma^2t/2}$, whose supremum over $[0,T]$ is
+square-integrable by Doob's maximal inequality \citep[Theorem~1.3.8]{karatzas-shreve}. Fix a stopping
+time $\tau$ and let $\tau_n=\min\{t\in\Pi_n:t\ge\tau\}$. Since
+$\{\tau_n\le t\}=\{\tau\le t\}\in\F_t$ for $t\in\Pi_n$, $\tau_n$ is a stopping time with
+values in $\Pi_n$, so $B(\Pi_n)\ge\E[Z_{\tau_n}]$. As the mesh tends to $0$, $\tau_n\to\tau$,
+so $Z_{\tau_n}\to Z_\tau$ by continuity of the paths, and dominated convergence (with the
+bound $\sup_t|Z_t|$) gives $\E[Z_{\tau_n}]\to\E[Z_\tau]$. Hence $\liminf_nB(\Pi_n)\ge\E[Z_\tau]$
+for every $\tau$, so $\liminf_nB(\Pi_n)\ge A$.
+\end{proof}
+
+The proposition gives no rate. On the Longstaff--Schwartz put with $S_0=40$, $\sigma=20\%$,
+$T=1$, our grid (\cref{rem:am-references}) gives $2.0664$ (European), $2.1991$, $2.2930$,
+$2.3141$, $2.3185$ for $m=1,2,10,50,250$ equally spaced dates, and the American price is
+$2.3196$: the gap falls from $0.027$ to $0.0055$ to $0.0011$ as $m$ goes from $10$ to $50$
+to $250$, roughly like $1/m$ in this example.
+
+\begin{remark}[Reference values]\label{rem:am-references}
+Our reference prices use no simulation (\texttt{bermudan\_reference} and
+\texttt{american\_binomial} in the code of this chapter). Bermudan prices come from \eqref{eq:am-markov} on a grid in $\log s$ of mesh $h$: the trapezoid rule
+against the exact Gaussian transition density (an FFT convolution), extrapolated in $h$; the
+error is below $10^{-6}$ here, and a binomial tree that exercises only at the $50$ dates
+agrees. American prices come from the binomial tree with the Black--Scholes value in its last
+step and Richardson extrapolation \citep{broadie-detemple}: with $2000$ steps in
+\cref{tab:am-ls}, quoted to $10^{-3}$, and $4000$ steps elsewhere, with an error of about
+$10^{-5}$. Grids are the subject of \cref{ch:20-grids}.
+\end{remark}
+
+\begin{remark}[Degenerate cases]\label{rem:am-degenerate}
+\begin{enumerate}[label=(\alph*)]
+  \item \emph{Calls without dividends are never exercised early.} If $y=0$, $r\ge0$ and
+    $K\ge0$, Jensen's inequality and the martingale property of $e^{-rt}S_t$ give
+    $\E[Z_{k+1}\mid\F_k]\ge\big(e^{-rt_k}S_{t_k}-e^{-rt_{k+1}}K\big)^+\ge Z_k$ for
+    $Z_k=e^{-rt_k}(S_{t_k}-K)^+$: $Z$ is a submartingale. So $V_k=\E[Z_m\mid\F_k]$ is a
+    martingale with $V\ge Z$, and \cref{thm:am-dp}(i) gives $U_0\le V_0=\E[Z_m]\le U_0$. The
+    Bermudan call, and by \cref{prop:am-american} the American call, is worth the European
+    call. With $y>0$ this fails: on the test case, where $y>r$, the Bermudan call with $50$
+    dates is worth $7.4567$ and the American call $7.4597$, against $7.36429$ for the
+    European call.
+  \item \emph{The test-case put.} It is worth $8.349406$ as a European option, $8.349408$ as a
+    Bermudan option with $50$ dates and as an American option: early exercise is worth
+    $2\times10^{-6}$. The reason is where the exercise region lies. Since
+    $c_k(s)\ge e^{-r\Delta}\E[K-S_{t_{k+1}}\mid S_{t_k}=s]=Ke^{-r\Delta}-se^{-y\Delta}$ with
+    $\Delta=t_{k+1}-t_k$, exercise at $t_k$ is suboptimal whenever
+    $s>\bar s=K(1-e^{-r\Delta})/(1-e^{-y\Delta})$, which is close to $Kr/y=50$ here. The
+    boundary rises from $44.9$ at $t_1$ to $\bar s=50.005$ just before maturity, prices that
+    $S$ rarely reaches within a year. A put deep enough in the money is still exercised.
+  \item \emph{Exercise at $t_0$.} $U_0=\max(Z_0,C_0)$, and immediate exercise is optimal
+    when $Z_0\ge C_0$, as for a put deep in the money. All simulated paths share $S_{t_0}$, so
+    no regression is possible at $t_0$: $C_0$ is estimated by a sample mean
+    (\exref{ex:am-exercise-now}).
+  \item \emph{Out of the money.} If $g\ge0$ then $C_k\ge0$, so stopping where $Z_k=0$ is
+    never better than continuing, and a rule may as well continue there.
+\end{enumerate}
+\end{remark}
+
+\section{Regression: the Longstaff--Schwartz algorithm}\label{sec:am-lsm}
+
+The recursion of \cref{thm:am-dp}(iv) needs the continuation value $C_k$ at the simulated
+state. Estimating it by a fresh simulation from every node of every path, as in the random
+tree of \textcite{broadie-glasserman-tree}, costs a number of paths exponential in $m$.
+The idea of \textcite{carriere}, \textcite{tsitsiklis-vanroy} and
+\textcite{longstaff-schwartz} is to estimate the function $c_k$ in one go, by regressing
+across paths: since $C_k=\E[Z_{\tau^*_{k+1}}\mid S_{t_k}]$, the realised discounted cash
+flows of the paths are noisy observations of it, and least squares onto functions of
+$S_{t_k}$ recovers their conditional mean. Let $\psi=(\psi_1,\dots,\psi_J)$ be a vector of
+basis functions.
+
+\paragraph{The algorithm.} Simulate $N$ training paths $S^{(i)}$ at the dates $t_k$ exactly
+(\cref{prop:ps-gbm-exact}), with discounted payoffs $Z^{(i)}_k$, and set
+$Y^{(i)}=Z^{(i)}_m$. For $k=m-1,\dots,1$:
+\begin{enumerate}[label=(\arabic*)]
+  \item let $I_k=\{i:Z^{(i)}_k>0\}$ be the paths in the money at $t_k$;
+  \item compute $\hat\beta_k\in\argmin_\beta\sum_{i\in I_k}\big(Y^{(i)}-\beta^\top\psi(S^{(i)}_{t_k})\big)^2$
+    and set $\hat C_k(s)=\hat\beta_k^\top\psi(s)$;
+  \item for $i\in I_k$ with $Z^{(i)}_k\ge\hat C_k(S^{(i)}_{t_k})$, replace $Y^{(i)}$ by
+    $Z^{(i)}_k$.
+\end{enumerate}
+Finally $\hat c_0=\frac1N\sum_iY^{(i)}$, and the \emph{in-sample estimate} is
+$\hat V^{\rm in}_N=\max(Z_0,\hat c_0)$. The coefficients define an exercise rule: for a
+path $S$,
+\begin{equation}\label{eq:am-rule}
+  \hat\tau=\begin{cases}0&\text{if }Z_0>0\text{ and }Z_0\ge\hat c_0,\\
+  \min\big\{k\ge1:\ k=m\text{ or }\big(Z_k>0\text{ and }Z_k\ge\hat C_k(S_{t_k})\big)\big\}&\text{otherwise.}\end{cases}
+\end{equation}
+The \emph{out-of-sample estimate} freezes $\hat\beta_1,\dots,\hat\beta_{m-1}$ and $\hat c_0$,
+simulates $n$ new paths independent of the training ones, and averages
+$Z^{(i)}_{\hat\tau^{(i)}}$: $\hat V^{\rm out}_n=\frac1n\sum_{i=1}^nZ^{(i)}_{\hat\tau^{(i)}}$.
+
+Step~(3) is \cref{thm:am-dp}(iv) with $\hat C_k$ in place of $C_k$: after it, $Y^{(i)}$ is the
+discounted cash flow of path $i$ under the estimated rule from $t_k$ on, and the regression
+at $t_{k-1}$ uses these cash flows, not the fitted values. Step~(2) is the least-squares
+regression of \cref{thm:cv-multiple}(iii), now used to estimate a conditional expectation
+rather than an unconditional one. Regressing on in-the-money paths only is the choice of
+\textcite{longstaff-schwartz}: the decision matters only there (\cref{rem:am-degenerate}(d)),
+and the fit is not spent on the region $S\ge K$ where the put is out of the money.
+
+\begin{incode}
+\begin{lstlisting}
+Y = D[m] * g(S[:, m])                     # discounted cash flows, time-0 units
+for k in range(m - 1, 0, -1):
+    Zk = D[k] * g(S[:, k]);  idx = np.flatnonzero(Zk > 0)
+    X = basis(S[idx, k])                  # scaled basis, e.g. x = S / K
+    beta, *_ = np.linalg.lstsq(X, Y[idx], rcond=None)
+    ex = Zk[idx] >= X @ beta;  Y[idx[ex]] = Zk[idx[ex]]
+\end{lstlisting}
+\texttt{lsm\_fit}, \texttt{policy\_cashflows} (the frozen rule) and \texttt{lsm\_price} (both
+estimates, and a control variate) in \coderef{code/src/mfe230d/american.py}.
+\end{incode}
+
+\begin{proposition}[Longstaff--Schwartz: which way the estimates are biased]\label{prop:am-lsm}
+Let $g\ge0$, $\E[Z_k]<\infty$ for every $k$, and let $\mathcal G$ be the $\sigma$-algebra
+generated by the training paths.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Out of sample: low.}) Let the evaluation paths each have the law of $S$, and
+    let them, as a family, be independent of $\mathcal G$. For every value of the training
+    data, the rule \eqref{eq:am-rule} is a stopping time in $\mathcal T_0$. Its value
+    $\hat L=\E[Z_{\hat\tau}\mid\mathcal G]$ satisfies $\hat L\le U_0$, the out-of-sample
+    estimator is conditionally unbiased for it, $\E[\hat V^{\rm out}_n\mid\mathcal G]=\hat L$,
+    and hence
+    \[
+      \E\big[\hat V^{\rm out}_n\big]\le U_0 .
+    \]
+    If the evaluation paths are i.i.d.\ (or i.i.d.\ antithetic pairs, whose averages are then
+    the samples), then $\hat V^{\rm out}_n\to\hat L$ almost surely as $n\to\infty$, and when
+    $\E[Z_k^2]<\infty$ the central limit theorem (\cref{thm:mc-clt}) applies conditionally
+    on $\mathcal G$. If
+    $\hat C_k(S_{t_k})=C_k$ almost surely on $\{Z_k>0\}$ for $1\le k\le m-1$ and
+    $\{Z_0>0,Z_0\ge\hat c_0\}=\{Z_0>0,Z_0\ge C_0\}$, then $\hat L=U_0$.
+  \item (\emph{In sample: no guarantee.}) Suppose that at every date the matrix
+    $\big(\psi_j(S^{(i)}_{t_k})\big)_{i\in I_k,\,j\le J}$ has rank $|I_k|$, so that least
+    squares interpolates the cash flows. Then after the backward pass
+    $Y^{(i)}=\max_{1\le k\le m}Z^{(i)}_k$ for every $i$, and
+    \[
+      \E\big[\hat V^{\rm in}_N\big]\ \ge\ \max\big(Z_0,\E[\max_{1\le k\le m}Z_k]\big)\ \ge\ U_0 .
+    \]
+    The last inequality is an equality if $Z_0\ge\E[\max_{k\ge1}Z_k]$; otherwise it is strict
+    unless the optimal rule from $t_1$ on stops, almost surely, at a date where the path
+    attains $\max_{k\ge1}Z_k$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Fix the training data, so that $\hat\beta_k$ and $\hat c_0$ are numbers. Then
+$\{\hat\tau=k\}$ is determined by $S_{t_0},\dots,S_{t_k}$, so $\hat\tau\in\mathcal T_0$, and
+$\E[Z_{\hat\tau}]\le U_0$ by \cref{thm:am-dp}(ii). The evaluation paths are independent of
+$\mathcal G$, so by the independence lemma $\hat L$ is this expectation evaluated at the
+training data, hence $\hat L\le U_0$; the same argument for each evaluation path gives
+$\E[\hat V^{\rm out}_n\mid\mathcal G]=\hat L$, and taking expectations gives the inequality.
+For i.i.d.\ paths (or pairs) the terms are conditionally i.i.d.\ given $\mathcal G$, so the
+strong law and the central limit theorem apply conditionally. For the equality case, use \cref{thm:am-dp}(iii): at
+$\hat\tau$ we have $Z=U$ (where the rule stops before $m$, $Z_k\ge C_k$); and on
+$\{\hat\tau>j\}$ either $Z_j>0$ and $Z_j<C_j$, or $Z_j=0\le C_j$ (as $g\ge0$), and in both
+cases $U_j=C_j$, so the stopped Snell envelope is a martingale as in the proof of
+\cref{thm:am-dp}(ii).
+
+(ii) Rank $|I_k|$ means the fitted values can match any vector of responses, so the
+least-squares residuals vanish: $\hat C_k(S^{(i)}_{t_k})$ is the current $Y^{(i)}$ for
+$i\in I_k$. Step~(3) then replaces $Y^{(i)}$ by $Z^{(i)}_k$ exactly when $Z^{(i)}_k\ge Y^{(i)}$,
+that is, $Y^{(i)}\leftarrow\max(Z^{(i)}_k,Y^{(i)})$; for $i\notin I_k$, $Z^{(i)}_k=0\le
+Y^{(i)}$ and the same formula holds. By induction, $Y^{(i)}=\max_{j\ge k}Z^{(i)}_j$ after
+date $k$. The map $x\mapsto\max(Z_0,x)$ is convex, so by Jensen's inequality
+$\E[\hat V^{\rm in}_N]\ge\max(Z_0,\E[\max_{k\ge1}Z_k])$. Finally
+$\E[\max_{k\ge1}Z_k]\ge\E[Z_{\tau^*_1}]=C_0$ by \cref{thm:am-dp}(iv), and
+$\max(Z_0,C_0)=U_0$. If $Z_0<\E[\max_{k\ge1}Z_k]$, the two maxima differ unless
+$C_0=\E[\max_{k\ge1}Z_k]$, that is, unless $\max_{k\ge1}Z_k=Z_{\tau^*_1}$ almost surely.
+\end{proof}
+
+Part~(ii) is an extreme case (our code skips the regression at dates with at most $J$
+in-the-money paths, so it never interpolates), but it shows the mechanism. In-sample, each
+path's own future enters the fit that decides when that path stops: a path whose future
+cash flow is high pulls its fitted continuation value up and is kept alive, and one whose
+future is low is exercised. That is foresight, and it biases upwards. Out of sample, the
+fitted function is just some function, the rule just some stopping time, and its value can
+only be below the optimum. \Cref{fig:am-bias} shows both effects on the
+Longstaff--Schwartz put with $S_0=40$, $\sigma=20\%$, $T=1$. With $N=100$ training paths
+and the basis $1,x,x^2$ ($J=3$, $x=S/K$), the in-sample estimate is on average $0.28$
+above the price $2.3141$, while the value of the fitted policy is on average $0.157$
+below it; each replication gives a policy worth less than the price, as (i) requires. The
+in-sample bias shrinks as $N$ grows; with $J=3$ it is $-0.011$ at $N=10^4$, with a standard
+error of $0.005$, as the in-sample estimate approaches the value of the limiting policy, which
+is below the price.
+More basis functions make the in-sample estimate worse for small $N$, and the policy better
+only once $N$ is large.
+\textcite{longstaff-schwartz} found in-sample and out-of-sample estimates ``virtually
+identical'' with $10^5$ paths and four basis functions, which \cref{tab:am-ls} confirms;
+with few paths or many basis functions only the out-of-sample estimate is a lower bound.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.82\textwidth]{ch14-bias}
+  \caption{Longstaff--Schwartz put, $S_0=K=40$, $\sigma=20\%$, $T=1$, $50$ dates (price
+    $2.3141$). For each number $N$ of training paths, LSM is fitted on $150$, $80$, $40$,
+    $30$ and $20$ independent sets of $N$ paths (for $N=100,300,1000,3000,10^4$) with the
+    monomials $1,x,\dots,x^{J-1}$ in $x=S/K$, $J=3$ and $J=9$. Solid: mean in-sample
+    estimate minus the price. Dashed: mean value of the fitted policy minus the price, the
+    value computed exactly on the grid, which is the conditional mean of the out-of-sample
+    estimator given the training paths. Bars: two standard errors across the sets. Our
+    implementation (NumPy \texttt{default\_rng}, seeds $[8,J-1,N,j]$).}
+  \label{fig:am-bias}
+\end{figure}
+
+\begin{remark}[Convergence]\label{rem:am-clp}
+\textcite{clement-lamberton-protter} analyse a variant that regresses on all paths, without
+the restriction $Z_k>0$, and exercises where $Z_k$ is at least the fitted value; it is not
+the rule \eqref{eq:am-rule}. Let $X_k=S_{t_k}$, $Z_k=f_k(X_k)$ with $\E[Z_k^2]<\infty$, and let
+$\psi_1,\psi_2,\dots$ be functions such that, at every date $1\le k\le m-1$,
+$\psi_1(X_k),\dots,\psi_J(X_k)$ are linearly independent in $L^2$ for every $J$. Let
+$\tau^{[J]}$ be their rule built from the exact $L^2$ projections onto the first $J$
+functions (the regression with infinitely many paths). Their Theorem~3.1: if moreover the
+whole sequence is total in $L^2(\sigma(X_k))$, then as $J\to\infty$,
+$\E[Z_{\tau^{[J]}_k}\mid\F_k]\to\E[Z_{\tau^*_k}\mid\F_k]$ in $L^2$ for every $k$, so the value
+of $\tau^{[J]}$ tends to $U_0$. Their Theorem~3.2, which needs linear independence but not
+totality: for fixed $J$, if the projected continuation value ties with the payoff with
+probability zero at every date, the in-sample estimate converges almost surely to the value
+of $\tau^{[J]}$ as $N\to\infty$, which is at most $U_0$ by \cref{thm:am-dp}(ii); they also
+prove a central limit theorem for this convergence. The two limits are taken one after the other. How fast $N$ must grow with $J$
+is studied by \textcite{glasserman-yu}: for polynomial bases, the number of paths needed
+for convergence in the worst case grows exponentially in the degree for Brownian motion, and
+faster for geometric Brownian motion. See also \textcite{glasserman-mc}, Section~8.6.
+\end{remark}
+
+\begin{remark}[Bases and conditioning]\label{rem:am-basis}
+The basis should be scaled. \textcite{longstaff-schwartz} use a constant and the weighted
+Laguerre functions $e^{-x/2}$, $e^{-x/2}(1-x)$ and $e^{-x/2}(1-2x+\frac{x^2}2)$; we use them
+in the scaled variable $x=S/K$, because unscaled columns of very different sizes make the
+regression matrix badly conditioned. On the
+in-the-money prices at $t=0.5$ of the put with $S_0=36$, $\sigma=20\%$ ($10^5$ paths, seed
+$0$), the condition number of the regression matrix is $2.6\times10^7$ for $1,S,S^2,S^3$ and
+$5.9\times10^3$ for $1,x,x^2,x^3$; $1.1\times10^8$ and $1.4\times10^5$ for the Laguerre basis
+in $S$ and in $x$; and $2.7\times10^9$ for the monomials of degree $8$ in $x$. Solving the
+normal equations squares these numbers; \texttt{numpy.linalg.lstsq} works with the matrix
+itself (by a singular value decomposition) and returns a least-squares solution even when
+the matrix is rank-deficient. Our code skips the regression, and never exercises, at a date
+with at most $J$ usable paths: any rule that depends only on the path up to $t_k$ is a
+stopping time, so \cref{prop:am-lsm}(i) is not affected.
+\end{remark}
+
+\paragraph{Table 1 of Longstaff and Schwartz.} \Cref{tab:am-ls} reproduces the table with
+which \textcite{longstaff-schwartz} introduced the method, with their setup: $10^5$ paths
+($5\times10^4$ and their antithetic images), $50$ dates per year, the four basis functions
+above. Our closed-form European prices agree with theirs to the three printed decimals. Two
+findings about their columns. First, their ``finite-difference American'' prices agree with
+our \emph{Bermudan} prices to within $0.0005$ in the $15$ rows with $\sigma=20\%$ or $T=1$,
+and lie between our Bermudan and American prices, up to the last printed digit, in the five
+rows with $\sigma=40\%$, $T=2$; the American prices exceed the Bermudan ones by $0.003$ to
+$0.009$. They do not say whether their grid allowed exercise at every time step; the
+comparison suggests that their column approximates the Bermudan price, which is also what
+LSM estimates. Second, their standard errors are close to the naive formula $\hat s_n/\sqrt
+n$ over all $10^5$ paths (we get $0.0092$, $0.0086$, $0.0206$ for the first, ninth and last
+rows; they print $0.010$, $0.009$, $0.021$). But antithetic pairs are negatively correlated:
+the correlation $\rho$ of the two cash flows of a pair is between $-0.68$ and $-0.56$ in these
+rows, and the standard error from the $5\times10^4$ pair averages
+(\cref{prop:cv-antithetic}), which we report, is $\sqrt{1+\rho}$ times the naive one, that
+is $0.57$ to $0.66$ times. All our in-sample estimates are within $1.3$
+of our standard errors of the Bermudan price, and the out-of-sample estimates within $2.4$,
+with mean deviations of $-0.2$ and $-0.3$ standard errors: the bias is small compared with
+the noise at this sample size.
+
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{4.2pt}
+  \begin{tabular}{@{}ccc@{\hspace{8pt}}cc@{\hspace{8pt}}cc@{\hspace{8pt}}cc@{}}
+    \toprule
+    & & & \multicolumn{2}{c}{ours, no simulation} & \multicolumn{2}{c}{Longstaff--Schwartz} & \multicolumn{2}{c}{ours, LSM (s.e.)}\\
+    \cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+    $S_0$ & $\sigma$ & $T$ & Bermudan & American & ``FD'' & LSM (s.e.) & in-sample & out-of-sample\\
+    \midrule
+36 & 0.2 & 1 & 4.478 & 4.487 & 4.478 & 4.472 (.010) & 4.482 (.006) & 4.470 (.006)\\
+36 & 0.2 & 2 & 4.840 & 4.848 & 4.840 & 4.821 (.012) & 4.839 (.007) & 4.841 (.007)\\
+36 & 0.4 & 1 & 7.101 & 7.109 & 7.101 & 7.091 (.020) & 7.104 (.008) & 7.088 (.008)\\
+36 & 0.4 & 2 & 8.507 & 8.514 & 8.508 & 8.488 (.024) & 8.517 (.010) & 8.507 (.010)\\
+38 & 0.2 & 1 & 3.250 & 3.257 & 3.250 & 3.244 (.009) & 3.247 (.005) & 3.253 (.005)\\
+38 & 0.2 & 2 & 3.745 & 3.751 & 3.745 & 3.735 (.011) & 3.745 (.006) & 3.751 (.006)\\
+38 & 0.4 & 1 & 6.148 & 6.155 & 6.148 & 6.139 (.019) & 6.138 (.008) & 6.145 (.008)\\
+38 & 0.4 & 2 & 7.668 & 7.675 & 7.670 & 7.669 (.022) & 7.675 (.010) & 7.674 (.010)\\
+40 & 0.2 & 1 & 2.314 & 2.320 & 2.314 & 2.313 (.009) & 2.309 (.005) & 2.310 (.005)\\
+40 & 0.2 & 2 & 2.885 & 2.890 & 2.885 & 2.879 (.010) & 2.879 (.006) & 2.877 (.006)\\
+40 & 0.4 & 1 & 5.312 & 5.318 & 5.312 & 5.308 (.018) & 5.309 (.009) & 5.305 (.009)\\
+40 & 0.4 & 2 & 6.917 & 6.923 & 6.920 & 6.921 (.022) & 6.906 (.010) & 6.919 (.010)\\
+42 & 0.2 & 1 & 1.617 & 1.621 & 1.617 & 1.617 (.007) & 1.624 (.006) & 1.607 (.006)\\
+42 & 0.2 & 2 & 2.212 & 2.217 & 2.212 & 2.206 (.010) & 2.207 (.007) & 2.219 (.007)\\
+42 & 0.4 & 1 & 4.582 & 4.588 & 4.582 & 4.588 (.017) & 4.578 (.010) & 4.559 (.010)\\
+42 & 0.4 & 2 & 6.244 & 6.250 & 6.248 & 6.243 (.021) & 6.231 (.011) & 6.254 (.011)\\
+44 & 0.2 & 1 & 1.110 & 1.113 & 1.110 & 1.118 (.007) & 1.111 (.006) & 1.112 (.006)\\
+44 & 0.2 & 2 & 1.690 & 1.693 & 1.690 & 1.675 (.009) & 1.690 (.007) & 1.690 (.007)\\
+44 & 0.4 & 1 & 3.948 & 3.953 & 3.948 & 3.957 (.017) & 3.950 (.011) & 3.931 (.011)\\
+44 & 0.4 & 2 & 5.641 & 5.647 & 5.647 & 5.622 (.021) & 5.634 (.012) & 5.644 (.012)\\
+    \bottomrule
+  \end{tabular}
+  \caption{American puts with $K=40$, $r=6\%$ and $50$ exercise dates per year. Bermudan:
+    grid of \cref{rem:am-references}; American: smoothed binomial tree with Richardson
+    extrapolation. Longstaff--Schwartz: their ``finite difference American'' and LSM columns,
+    as printed. Ours: $10^5$ antithetic paths and the four Laguerre basis functions for both
+    training and evaluation, standard errors from pair averages; our implementation (NumPy
+    \texttt{default\_rng}, seeds $[2001,i,0]$ for training and $[2001,i,1]$ for evaluation in
+    row $i=0,\dots,19$).}
+  \label{tab:am-ls}
+\end{table}
+
+\Cref{fig:am-boundary} looks inside the algorithm for the first row. At $t=0.5$, panel (a)
+shows the realised cash flows that step~(2) regresses (minus the exercise value $K-s$, so
+that the decision is the sign), the fitted continuation value and the exact one from the
+grid. The fit is within a few cents of the truth over the range where paths are, and it
+crosses the exercise value close to where the truth does. Panel (b) compares the exercise
+boundaries $b(t_k)$, the largest price at which each rule exercises. The LSM boundaries
+are noisy and miss the steep rise near maturity, where few paths are close to the
+boundary. The value lost is small. Heuristically, payoff and continuation value are equal at
+the exact boundary, so exercising on the wrong side of it by a distance $\delta$ loses an
+amount of order $\delta^2$ per date. The LSM policy is worth $4.4744$ against the price $4.4778$
+(\cref{tab:am-bounds}).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch14-boundary}
+  \caption{Longstaff--Schwartz put with $S_0=36$, $\sigma=20\%$, $T=1$, $50$ dates; LSM on
+    $10^5$ antithetic training paths (seed $[14,0]$). (a) At $t_k=0.5$: $1500$ randomly
+    chosen in-the-money realised cash flows (in time-$t_k$ units) minus $K-s$, the fitted
+    continuation value with the four Laguerre functions and the exact one, both minus $K-s$;
+    exercise where the curve is below zero. (b) Exercise boundary: the critical price from
+    the grid, and the largest price at which the LSM rule exercises, with the Laguerre basis
+    and with $1,x,x^2$, $x=s/K$.}
+  \label{fig:am-boundary}
+\end{figure}
+
+\begin{example}[Control variates, and the test case]\label{exa:am-test-case}
+The out-of-sample estimator averages independent copies of $Z_{\hat\tau}$, so every method
+of \cref{ch:08-antithetic-control} applies to it. The discounted European payoff
+$X=e^{-rT}g(S_T)$ has a known mean, the Black--Scholes price, and is computed along the
+same paths; we estimate its coefficient on the training paths, a pilot sample independent of
+the evaluation paths, so that the controlled estimator stays unbiased for $\hat L$ and
+\cref{prop:am-lsm}(i) is not disturbed (\cref{prop:cv-estimated-beta}). On the first row of
+\cref{tab:am-ls} with plain paths (seed $3$) the correlation is $0.56$ and the variance
+ratio $0.68$: deep in the money, many paths are exercised early and their cash flow is
+weakly related to $S_T$. On the test-case put (seed $1$, $10^5$ paths, the Laguerre basis
+in $x=S/100$) the correlation is $0.93$ and the variance ratio $0.13$: the control
+estimate is $8.3024$ with standard error $0.0110$, against $8.2766$ and $0.0308$ without it.
+Both are well below the price $8.34941$, and this is not noise: the fitted policy is worth
+$8.3079$ (computed on the grid) and exercises $35\%$ of the paths before maturity, where
+the optimal rule exercises essentially never (\cref{rem:am-degenerate}(b)). The early
+exercises happen in the last quarter of the year at prices around $80$ (between $76$ and
+$88$ for $90\%$ of them), where the time value of the put, measured by the European put, is
+between $2$ and $19$ cents: comparable with the error of the fit, which then exercises paths
+whose continuation value it underestimates. The policy loses $0.04$, some $10^4$ times the
+early-exercise premium, and the in-sample estimate, $8.2729$, does not reveal it. For the test-case call the same setup gives $7.4949$
+in sample and $7.4237$ ($0.0330$) out of sample, around the policy value $7.4462$ and below
+the Bermudan price $7.4567$.
+\end{example}
+
+\demo{14-american-mc.ipynb}{the regression of step~(2) at any date, the in-sample and
+out-of-sample estimates for any number of paths and basis, and the exercise boundaries.}
+
+\section{Duality: upper bounds}\label{sec:am-duality}
+
+A lower bound alone does not tell how far below the price it is. Upper bounds come from a
+dual problem. Its simplest case is perfect foresight: $\max_kZ_k\ge Z_\tau$ for every
+$\tau$, so $\E[\max_kZ_k]\ge U_0$. This bound is poor because the holder who sees the future
+exercises each path at its best date. Subtracting a martingale with mean zero before taking
+the maximum removes part of that foresight without changing the inequality.
+
+\begin{theorem}[Duality]\label{thm:am-duality}
+Let $Z$ be adapted with $\E[\max_k|Z_k|]<\infty$, $U$ its Snell envelope, and $M^*$ the
+martingale of \eqref{eq:am-doob}.
+\begin{enumerate}[label=(\roman*)]
+  \item (\emph{Upper bounds}.) For every martingale $M$ with $M_0=0$, and more generally every
+    supermartingale with $M_0=0$,
+    \[
+      U_0\le\E\Big[\max_{0\le k\le m}(Z_k-M_k)\Big].
+    \]
+  \item (\emph{The bound is attained, without variance}.)
+    $\max_k(Z_k-M^*_k)=U_0$ almost surely. Hence
+    $U_0=\min_M\E[\max_k(Z_k-M_k)]$ over martingales with $M_0=0$, attained at $M^*$.
+  \item (\emph{The gap}.) If $\E[Z_k^2]<\infty$ for every $k$ and $M$ is a square-integrable
+    martingale with $M_0=0$, then
+    \[
+      0\le\E\Big[\max_k(Z_k-M_k)\Big]-U_0\le\E\Big[\max_k|M_k-M^*_k|\Big]
+      \le2\,\big\|M_m-M^*_m\big\|_{L^2}.
+    \]
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) Every $M_k$ is integrable, so $|\max_k(Z_k-M_k)|\le\sum_k(|Z_k|+|M_k|)$ is integrable. For
+$\tau\in\mathcal T_0$, \cref{lem:am-optional} gives $\E[M_\tau]\le M_0=0$, so
+$\E[Z_\tau]\le\E[Z_\tau-M_\tau]\le\E[\max_k(Z_k-M_k)]$. Take the supremum over $\tau$.
+
+(ii) By \cref{thm:am-dp}(v), $Z_k-M^*_k\le U_k-M^*_k=U_0-A^*_k\le U_0$ for every $k$, so
+$\max_k(Z_k-M^*_k)\le U_0$ surely; by (i) its mean is at least $U_0$. A random variable
+bounded above by $U_0$ with mean at least $U_0$ equals $U_0$ almost surely.
+
+(iii) $Z_k-M_k=(Z_k-M^*_k)+(M^*_k-M_k)\le U_0+\max_j|M^*_j-M_j|$ by (ii). Under the
+hypothesis, $U$ and hence $M^*$ are square-integrable (by the proof of \cref{thm:am-dp}(i),
+$|U_k|\le\E[\max_j|Z_j|\mid\F_k]$), so $N=M^*-M$ is a square-integrable martingale, and by
+the Cauchy--Schwarz inequality and Doob's $L^2$ maximal inequality
+\citep[Section~4.4]{durrett}, $\E[\max_k|N_k|]\le\E[\max_kN_k^2]^{1/2}\le2\,\E[N_m^2]^{1/2}$.
+\end{proof}
+
+The theorem is due to \textcite{rogers-duality}, in continuous time, and
+\textcite{haugh-kogan}, in discrete time. Rogers states it over martingales $M$ with $M_0=0$ and
+$\E[\sup_t|M_t|]<\infty$, with $\sup_{t\le T}(Z_t-M_t)$ in place of the maximum, and Haugh and
+Kogan over supermartingales, with the bound written $\pi_0+\E[\max_k(Z_k-\pi_k)]$. Part (ii)
+is the striking part: the optimal martingale $M^*$ is the martingale part of the discounted
+option price, the gains of the seller's hedging portfolio, and with it every single path
+returns the price. This suggests that a martingale close to $M^*$ gives an upper bound with
+small variance, which makes the dual estimator cheap where it works. Part (iii) says the gap is controlled by how well $M$ approximates $M^*$ in
+mean square, which is how martingales are built in practice: from an approximation of the
+value process \citep{haugh-kogan}, or from an exercise policy \citep{andersen-broadie}.
+
+\paragraph{Martingales in closed form.} $M=0$ gives perfect foresight. Another martingale
+with $M_0=0$ that needs no simulation is the discounted European price minus its initial
+value, $M_k=e^{-rt_k}P(t_k,S_{t_k})-P(0,S_0)$ with $P(t,s)$ the Black--Scholes price of the
+European claim with payoff $g$ at $T$; for a put it removes the part of the foresight that a
+European put already prices. On the first row of \cref{tab:am-ls},
+\cref{tab:am-bounds} shows that perfect foresight gives $7.78$ for a price of $4.48$, and the
+European martingale $4.732$: better, but $5.7\%$ high. \exref{ex:am-rogers} improves it.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{ch14-duality}
+  \caption{Empirical distribution functions of the dual samples $\max_k(Z_k-M_k)$ for the
+    setting of \cref{tab:am-bounds}: the European put martingale ($2000$ outer paths), the
+    Andersen--Broadie martingale of the LSM policy estimated with $100$ inner paths ($400$
+    outer paths), the same martingale with exact continuation values, and the Doob
+    martingale of the grid value function ($2000$ outer paths). Dotted: the price $U_0$.
+    Dashed in (b): the value $L_0=4.4744$ of the policy. The nested sizes are kept small to
+    keep the figure cheap; \cref{tab:am-bounds} reports a run with $500$ inner paths.}
+  \label{fig:am-duality}
+\end{figure}
+
+\begin{proposition}[Andersen--Broadie]\label{prop:am-andersen-broadie}
+Let $Z$ be adapted with $\E[\max_k|Z_k|]<\infty$. Let a policy be given by events
+$A_k\in\F_k$ (exercise at $t_k$ on $A_k$), $k<m$, with $A_m=\Omega$, and let
+$\tau_k=\min\{j\ge k:\omega\in A_j\}$. Let
+\[
+  L_k=\E[Z_{\tau_k}\mid\F_k],\qquad\bar L_k=\E[Z_{\tau_{k+1}}\mid\F_k]\ (k<m),\qquad
+  M_0=0,\quad M_{k+1}=M_k+L_{k+1}-\bar L_k .
+\]
+\begin{enumerate}[label=(\roman*)]
+  \item $L_k=Z_k$ on $A_k$ and $L_k=\bar L_k$ off $A_k$; $M$ is a martingale; and with
+    $H=\E[\max_k(Z_k-M_k)]$,
+    \[
+      L_0\le U_0\le H .
+    \]
+  \item For every $k$, $Z_k-M_k=L_0+(Z_k-L_k)+\sum_{j<k}\1_{A_j}(\bar L_j-Z_j)$. Hence
+    $\max_k(Z_k-M_k)\ge L_0$ surely, and
+    \[
+      0\le H-L_0\le\E\Big[\sum_{k<m}\Big(\1_{A_k^c}(Z_k-\bar L_k)^++\1_{A_k}(\bar L_k-Z_k)^+\Big)\Big].
+    \]
+    In particular, if $A_k=\{Z_k\ge\bar L_k\}$ for every $k<m$, then $L_0=U_0=H$.
+  \item (\emph{Nested simulation is biased high}.) Let $\hat L_k$ ($k<m$) be random variables
+    with $\E[|\hat L_k|]<\infty$ and $\E[\hat L_k\mid\F_T]=\bar L_k$, and let $\hat M$ be
+    defined like $M$ with $\hat L_k$ in place of $\bar L_k$, both in the increments and in
+    $L_k$ off $A_k$. Then
+    \[
+      \E\Big[\max_k(Z_k-\hat M_k)\Big]\ \ge\ H,\qquad
+      \E\Big[\max_k(Z_k-\hat M_k)\Big]-H\le\sum_{k<m}\E\big[|\hat L_k-\bar L_k|\big].
+    \]
+  \item (\emph{A confidence interval}.) Let $\hat V^{\rm low}$ be the average of $n_1$
+    independent copies of $Z_{\tau_0}$ and $\hat V^{\rm up}$ the average of $n_2$ independent
+    copies of $\max_k(Z_k-\hat M_k)$ (outer paths with their own inner simulations), with
+    standard errors $\hat\sigma_1/\sqrt{n_1}$ and $\hat\sigma_2/\sqrt{n_2}$, and both variances
+    finite and positive. Then, as $n_1,n_2\to\infty$, the interval
+    $\big[\hat V^{\rm low}-z_\delta\hat\sigma_1/\sqrt{n_1},\ \hat V^{\rm up}+z_\delta\hat\sigma_2/\sqrt{n_2}\big]$
+    contains $U_0$ with probability at least $1-\delta+o(1)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) On $A_k$, $\tau_k=k$; off $A_k$, $\tau_k=\tau_{k+1}$; both are $\F_k$-measurable events,
+which gives the formula for $L_k$. By the tower property
+$\E[L_{k+1}\mid\F_k]=\E[Z_{\tau_{k+1}}\mid\F_k]=\bar L_k$, so $M$ has increments with
+conditional mean zero, and it is integrable because
+$|L_k|,|\bar L_k|\le\E[\max_j|Z_j|\mid\F_k]$. Then $L_0=\E[Z_{\tau_0}]\le U_0\le H$ by
+\cref{thm:am-dp}(ii) and \cref{thm:am-duality}(i).
+
+(ii) By (i), $\bar L_j=L_j+\1_{A_j}(\bar L_j-Z_j)$, so
+$M_k=\sum_{j<k}(L_{j+1}-L_j)-\sum_{j<k}\1_{A_j}(\bar L_j-Z_j)=L_k-L_0-\sum_{j<k}\1_{A_j}(\bar L_j-Z_j)$,
+which is the identity. At $k=\tau_0$ the last two terms vanish ($Z=L$ there, and no
+$A_j$ occurs before), so the maximum is at least $L_0$. For the bound, $Z_k-L_k$ is $0$ on
+$A_k$ and $Z_k-\bar L_k$ off it, and for real numbers
+$\max_k\big(a_k+\sum_{j<k}b_j\big)\le\sum_ka_k^++\sum_jb_j^+$. If $A_k=\{Z_k\ge\bar L_k\}$
+every term of the bound vanishes, so $H\le L_0$, and (i) gives equality throughout.
+
+(iii) Off $A_{j+1}$ the increment of $\hat M$ uses $\hat L_{j+1}$ for $L_{j+1}$. With
+$\delta_j=\hat L_j-\bar L_j$ for $j<m$ and $\delta_m=0$, the difference
+$\varepsilon_k=\hat M_k-M_k$ is
+\[
+  \varepsilon_k=\sum_{j<k}\big(\1_{A^c_{j+1}}\delta_{j+1}-\delta_j\big)
+  =\1_{A^c_k}\delta_k-\delta_0-\sum_{0<j<k}\1_{A_j}\delta_j\qquad(k\ge1),
+\]
+and $\E[\varepsilon_k\mid\F_T]=0$ because the events $A_j$ are in $\F_T$. The function
+$x\mapsto\max_k(Z_k-M_k-x_k)$ is convex, so by the conditional Jensen inequality
+$\E[\max_k(Z_k-\hat M_k)\mid\F_T]\ge\max_k(Z_k-M_k)$; take expectations. For the second
+claim, $|\max_k(Z_k-\hat M_k)-\max_k(Z_k-M_k)|\le\max_k|\varepsilon_k|\le\sum_{j<m}|\delta_j|$,
+since each $\delta_j$ appears at most once in $\varepsilon_k$.
+
+(iv) The two estimators are independent, $\E[\hat V^{\rm low}]=L_0\le U_0$ and
+$\E[\hat V^{\rm up}]\ge H\ge U_0$ by (i) and (iii). If $U_0$ is below the interval, then
+$\hat V^{\rm low}-z_\delta\hat\sigma_1/\sqrt{n_1}>L_0$, an event whose probability tends to
+$\delta/2$ by \cref{thm:mc-clt}(ii); likewise above. The union of the two events has
+probability at most $\delta+o(1)$.
+\end{proof}
+
+The policy of interest is the LSM rule, with $A_k$ the exercise region of \eqref{eq:am-rule}
+and the training paths held fixed (conditionally on $\mathcal G$, as in
+\cref{prop:am-lsm}). Then $\bar L_k$ is the continuation value of the LSM policy at the
+simulated state, an expectation that the regression did not compute. The algorithm of
+\textcite{andersen-broadie} estimates it, along each \emph{outer} path and at each date,
+by the mean of $n_{\rm in}$ \emph{inner} paths started from the current state and stopped
+by the policy; these estimates are conditionally unbiased, so (iii) applies. If $\hat L_k$ is the mean of
+$n_{\rm in}$ inner samples with conditional variance $v_k$, then
+$\E|\hat L_k-\bar L_k|\le(\E[v_k]/n_{\rm in})^{1/2}$, and the bias is at most
+$\sum_k(\E[v_k])^{1/2}/\sqrt{n_{\rm in}}$, of order $m/\sqrt{n_{\rm in}}$. The cost is of order $n_{\rm out}\,n_{\rm
+in}\,m^2/2$ simulated steps. Part~(ii) explains the quality of the bound: the gap is made of
+the policy's own mistakes, continuing where its continuation value is below the payoff or
+exercising where it is above, measured against its own continuation values. A
+self-consistent policy has no gap, and a policy that errs rarely and by little has a small one.
+
+\Cref{tab:am-bounds,fig:am-duality} put the pieces together for the put with $S_0=36$. The
+LSM policy of \cref{fig:am-boundary} is worth $4.4744$, $0.0034$ below the price. Its
+Andersen--Broadie martingale, with continuation values computed exactly on the grid, gives
+the upper bound $4.4786$ with a standard error of $0.0002$ from $2000$ outer paths: the
+duality gap of the policy is $0.0042$, and $75\%$ of the outer paths return exactly
+$L_0$, which part~(ii) predicts for every path on which the policy makes no mistake. Nested
+simulation is another matter: with $100$ inner paths per date the estimator is $4.705$, and
+with $500$ it is $4.537$. The inner noise enters through the maximum over $50$ dates and
+dominates the gap; reducing it takes many inner paths or variance reduction inside the inner
+simulation, at a cost that grows like $m^2$. We keep the nested runs small, with $400$ and
+$200$ outer paths, so that tests and figures stay cheap; the standard errors are those of
+these runs. With the out-of-sample LSM estimate and the nested estimator with $500$ inner paths,
+part~(iv) gives the $95\%$ interval $[4.461,4.558]$, which contains the price; with exact
+continuation values it would be $[4.461,4.479]$. The Doob martingale of the grid value
+function, finally, illustrates \cref{thm:am-duality}(ii): its $2000$ paths return
+$4.47781$ with a standard deviation of $1.6\times10^{-5}$, the error of the grid and of the
+linear interpolation.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}llccc@{}}
+    \toprule
+    & & estimate & s.e. & paths\\
+    \midrule
+    price & grid (Bermudan, $50$ dates) & $4.4778$ & & \\
+    \midrule
+    lower & LSM policy, exact value (grid) & $4.4744$ & & \\
+     & LSM policy, out of sample & $4.4793$ & $0.0094$ & $10^5$\\
+    \midrule
+    upper & $M=0$ (perfect foresight) & $7.779$ & $0.010$ & $10^5$\\
+     & European put martingale & $4.7322$ & $0.0014$ & $10^5$\\
+     & Andersen--Broadie, $100$ inner paths & $4.705$ & $0.017$ & $400$\\
+     & Andersen--Broadie, $500$ inner paths & $4.537$ & $0.011$ & $200$\\
+     & Andersen--Broadie, exact continuation values & $4.4786$ & $0.0002$ & $2000$\\
+     & Doob martingale of the grid value function & $4.47781$ & $<10^{-6}$ & $2000$\\
+    \bottomrule
+  \end{tabular}
+  \caption{Lower and upper bounds for the Longstaff--Schwartz put with $S_0=36$,
+    $\sigma=20\%$, $T=1$, $50$ dates. The LSM policy is the one of \cref{fig:am-boundary}.
+    The two closed-form bounds use $10^5$ paths of their own; the other upper bounds share
+    $2000$ outer paths (the nested estimators use the first $400$ or $200$). Our implementation (NumPy \texttt{default\_rng}, seeds $[14,j]$; see
+    \texttt{duality\_study}).}
+  \label{tab:am-bounds}
+\end{table}
+
+
+\demo{14-american-mc.ipynb}{upper bounds from perfect foresight, the European martingale,
+the Andersen--Broadie martingale with nested simulation and with exact continuation values,
+and the Doob martingale, for any strike and volatility.}
+
+\furtherreading
+\textcite{glasserman-mc}, Chapter~8, is the reference for this chapter: the problem in
+Section~8.1, regression in Section~8.6, duality in Section~8.7. \textcite{longstaff-schwartz}
+introduced the algorithm used here, after \textcite{carriere} and alongside
+\textcite{tsitsiklis-vanroy}, who regress values instead of cash flows.
+\textcite{clement-lamberton-protter} prove its convergence and \textcite{glasserman-yu}
+study the balance of paths and basis functions. Duality is due to \textcite{rogers-duality}
+and \textcite{haugh-kogan}, and the primal--dual algorithm to \textcite{andersen-broadie}.
+\textcite{peskir-shiryaev}, Chapter~I, and \textcite{follmer-schied}, Chapter~6, treat
+optimal stopping and American claims in general.

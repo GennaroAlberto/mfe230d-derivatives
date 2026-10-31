@@ -1,0 +1,136 @@
+% Exercises for Chapter 8 (antithetic variates, moment matching and control variates).
+% Statements only: solutions are kept privately.
+% Unless stated otherwise: the test case S = K = 100, T = 1, r = 1%, y = 2%, sigma = 20%,
+% S_T = S exp(nu T + sigma sqrt(T) Z) with nu = r - y - sigma^2/2 and Z ~ N(0,1).
+
+\begin{exercise}[Antithetic digitals]\label{ex:cv-digital}
+\easy Let $D=\1_{\{S_T>K\}}$ be a digital call in the Black--Scholes model, $p=\Q(S_T>K)$,
+and $\rho$ the correlation of $D$ computed from $Z$ and from $-Z$. You may use
+\noteref{prop:cv-antithetic} and \noteref{prop:cv-disjoint}.
+\begin{enumerate}[label=(\alph*)]
+  \item For $K$ at or above the median $Se^{\nu T}$ of $S_T$, show that
+    $\rho=-p/(1-p)$, and give the standard-error ratio of $n$ antithetic pairs to $n$ plain
+    draws and the efficiency at twice the cost.
+  \item For $K$ below the median, compute $\E[D(Z)D(-Z)]$ and show that
+    $\rho=-(1-p)/p$. Conclude that $\rho=-\min(p,1-p)/\max(p,1-p)$ for every $K$.
+  \item What happens at $K=Se^{\nu T}$? Explain without any formula why the antithetic
+    estimator is then exact.
+  \item Evaluate $p$, $\rho$ and the efficiency for $K=90$ and $K=110$ in the test case.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[When pairing hurts]\label{ex:cv-straddle}
+\medium This is a computational exercise. Consider the discounted straddle
+$f(Z)=e^{-rT}|S_T-K|$.
+\begin{enumerate}[label=(\alph*)]
+  \item Let $K=Se^{\nu T}$, the median of $S_T$, and $s=\sigma\sqrt T$. Show that
+    $e^{rT}f(Z)/(Ks)\to|Z|$ in $L^2$ as $s\to0$, and deduce that the antithetic correlation
+    tends to $1$. (You may use that correlations are continuous under $L^2$ convergence when
+    the limits have positive variance.)
+  \item With $10^5$ pairs, estimate the antithetic correlation $\rho(K)$ for strikes
+    $K\in[70,130]$ and find the range of strikes on which antithetic sampling is worse than
+    plain sampling with the same number of payoff evaluations. Explain the result with the
+    even--odd decomposition of \noteref{prop:cv-antithetic}.
+  \item At $K=100$, use instead the control $X=e^{-rT}(S_T-K)^2$. Compute its mean in closed
+    form, and compare the standard errors of: plain Monte Carlo with $2n$ draws; $n$
+    antithetic pairs; the control variate with estimated coefficient on $2n$ draws; and the
+    control variate applied to the $n$ antithetic pair averages.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Moment matching is a control variate]\label{ex:cv-skewness}
+\medium Let $Z_1,\dots,Z_n$ be i.i.d.\ $\mathcal N(0,1)$ and $Z'_i=(Z_i-\bar Z_n)/\tilde s_n$ the
+log-matched sample of \noteref{def:cv-mm}. Take $f(z)=z^3$, so that
+$\hat\mu^{\mathrm{mm}}_n=\frac1n\sum_iZ'^3_i$ estimates $\E Z^3=0$. You may use the strong
+law, the central limit theorem and Slutsky's lemma.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\hat\mu^{\mathrm{mm}}_n$ is exactly unbiased.
+  \item Show that $\sqrt n\,\hat\mu^{\mathrm{mm}}_n\Rightarrow\mathcal N(0,6)$.
+    \emph{Hint:} expand $\frac1n\sum_i(Z_i-\bar Z_n)^3$.
+  \item Compare with the plain estimator $\frac1n\sum_iZ_i^3$ and with the control-variate
+    estimator using the control $Z$ with its optimal coefficient. Why does the second matched
+    moment, that is the control $Z^2$, not help here?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[How many batches?]\label{ex:cv-mm-coverage}
+\medium This is a computational exercise. Estimate the test-case call by log moment
+matching with $n=4096$ draws split into $m\in\{4,16,64,256,1024\}$ separately matched
+batches, and form the nominal $95\%$ confidence interval from the batch means with the
+Student quantile on $m-1$ degrees of freedom.
+\begin{enumerate}[label=(\alph*)]
+  \item For each $m$, repeat the experiment $2000$ times and report the bias, the standard
+    deviation of the estimator, the average estimated standard error and the coverage.
+  \item Explain the results with \noteref{prop:cv-moment-matching} and
+    \noteref{rem:cv-mm-as-cv}. Predict, without simulating, the coverage for $m=128$.
+  \item Give a rule for choosing $m$ as a function of $n$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Comparing a call and a put]\label{ex:cv-crn-parity}
+\medium Let $C=e^{-rT}(S_T-K)^+$ and $P=e^{-rT}(K-S_T)^+$, both computed from the same
+$Z$, and suppose we estimate $\E C-\E P$ by simulation.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\Cov(C,P)=-\E[C]\,\E[P]$, and deduce that common random numbers
+    \emph{increase} the variance of the estimated difference compared with independent draws.
+  \item Using $S_T(-z)=(Se^{\nu T})^2/S_T(z)$, write $P(-Z)$ as a payoff in $S_T$ and explain why
+    it is strongly correlated with $C$. Evaluate, for the test case, the variance per draw of
+    the estimated difference with independent draws, with common random numbers, and with
+    $C(Z_i)$ paired with $P(-Z_i)$ (use closed forms or quadrature).
+  \item What is the best estimator of $\E C-\E P$? What does this suggest about using the
+    put as a control variate for the call?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A fixed coefficient]\label{ex:cv-fixed-beta}
+\easy Let $X,Y\in L^2$ with $\Var X>0$, and let $\beta^*=\Cov(X,Y)/\Var X$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\Var(Y-\beta X)<\Var Y$ if and only if $\beta$ lies strictly between $0$
+    and $2\beta^*$.
+  \item Take $\beta=1$ and $\Var X=\Var Y$. Show that the variance factor is $2(1-\rho)$, that
+    the control helps only if $\rho>\frac12$, and that if the control doubles the cost per
+    sample it improves efficiency only if $\rho>\frac34$.
+  \item Let $\beta=\beta^*(1+\varepsilon)$, a coefficient with relative error $\varepsilon$. Show
+    that the variance factor $\Var(Y-\beta X)/\Var Y$ is $1-\rho^2+\varepsilon^2\rho^2$. For
+    $\rho=0.9$ and $\rho=0.999$, compare $\varepsilon=0$ with $\varepsilon=0.2$, and comment on how
+    accurately the coefficient must be known when the correlation is high.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The price of estimating the coefficient]\label{ex:cv-lavenberg-welch}
+\medium Let $(X_i,Y_i)$, $i\le n$, be i.i.d.\ bivariate normal with correlation $\rho$ and
+$\Var Y=\sigma_Y^2$, let $\mu_X=\E X$ be known, and let $\hat\mu^{\mathrm{cv}}_n$ be the
+control-variate estimator with the least-squares coefficient, as in
+\noteref{prop:cv-estimated-beta}. You may use: $\bar X_n$ and
+$\sum_i(X_i-\bar X_n)^2$ are independent, $\sum_i(X_i-\bar X_n)^2/\Var X\sim\chi^2_{n-1}$, and
+$\E[1/\chi^2_k]=1/(k-2)$ for $k>2$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that, for $n\ge4$,
+    \[
+      \Var\hat\mu^{\mathrm{cv}}_n=\frac{\sigma_Y^2(1-\rho^2)}{n}\,\frac{n-2}{n-3}.
+    \]
+  \item For $\rho=0.5$, for which $n$ does the estimator beat the plain sample mean? And for
+    $\rho=0.1$?
+  \item Discuss what this suggests when the control-variate regression is run on many small
+    batches.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The asymptotic square-root call]\label{ex:cv-asc}
+\medium This is a computational exercise. The \emph{asymptotic square-root call} pays
+$F(S_T)=2K\big[1-\sqrt{K/S_T}\,\big]^+$. You may use its Black--Scholes price
+\[
+  e^{-rT}2K\Big[N(d_-)-\sqrt{K/S}\,e^{-\nu T/2+\sigma^2T/8}\,N\big(d_--\tfrac12\sigma\sqrt T\big)\Big].
+\]
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $F$ vanishes for $S_T\le K$ and that its right derivative at the strike is
+    $F'(K+)=1$, and explain why the at-the-money call $(S_T-K)^+$ is a natural control. What
+    does the replication of $F$ by calls say about the coefficient?
+  \item With $10^5$ draws, estimate the price by plain Monte Carlo, and by control variates
+    with the discounted call as control, with $\beta=1$ and with the estimated coefficient.
+    Test each estimate against the closed form.
+  \item Compute the correlation and $\beta^*$ (by quadrature or with many draws), and the
+    efficiencies of the two control-variate estimators at twice the cost. Why is the
+    estimated coefficient so much better than the replication coefficient here?
+\end{enumerate}
+\end{exercise}

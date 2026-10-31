@@ -1,0 +1,165 @@
+% Exercises for Chapter 7 (Simulating paths). Statements only: solutions are kept privately.
+% Throughout, W is a Brownian motion, Z, Z_1, Z_2, ... are independent N(0,1) variables, and
+% N is the standard normal distribution function.
+
+\begin{exercise}[Forward variances and calendar arbitrage]\label{ex:ps-forward-variance}
+\easy The at-the-money implied volatilities of an index are $20\%$ for six months, $18\%$ for
+one year and $15\%$ for two years. Take $r=y=0$ and the model
+$\dd S_t/S_t=\sigma(t)\,\dd W_t$ with a deterministic $\sigma$.
+\begin{enumerate}[label=(\alph*)]
+  \item Using \noteref{eq:ps-forward-variance}, find the forward volatilities
+    $\bar\sigma(0,\frac12)$, $\bar\sigma(\frac12,1)$ and $\bar\sigma(1,2)$ that reproduce the
+    three quotes.
+  \item Show that, in this model, $t\mapsto t\,\sigma_{0,t}^2$ is nondecreasing whatever
+    $\sigma$ is. Below which value of the two-year volatility can no deterministic $\sigma$
+    reproduce the quotes?
+  \item With $r=y=0$ the price process is a martingale. Use the conditional Jensen inequality
+    to show that, in \emph{any} arbitrage-free model with $r=y=0$, a call with fixed strike is
+    worth at least as much at maturity $2$ as at maturity $1$. If the two-year volatility were
+    quoted at $12\%$, compare the two Black--Scholes prices for $S_0=K=100$ and describe a
+    trade that exploits the quotes.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Bridges forget the drift]\label{ex:ps-bridge-drift}
+\easy Let $X_t=\nu t+\sigma W_t$ with constants $\nu\in\R$, $\sigma>0$, and $0\le s<u<t$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that, given $(X_r)_{r\notin(s,t)}$, $X_u$ is normal with mean
+    $\frac{(t-u)X_s+(u-s)X_t}{t-s}$ and variance $\sigma^2\frac{(u-s)(t-u)}{t-s}$; in
+    particular this conditional law does not depend on $\nu$. You may use
+    \noteref{prop:ps-bridge}.
+  \item Let $S=S_0e^X$ be a geometric Brownian motion. Compute
+    $\E[S_u\mid S_s,S_t]$ and evaluate it for $s=0$, $u=\frac12$, $t=1$, $S_0=100$,
+    $S_1=110$, $\sigma=20\%$.
+  \item A colleague claims that the conditional expectation in (b) must depend on the
+    interest rate, because $S$ grows on average at the rate $r-y$. What is wrong with the
+    claim?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Euler for the Ornstein--Uhlenbeck process]\label{ex:ps-ou-euler}
+\easy Let $\dd X_t=\kappa(\theta-X_t)\,\dd t+\xi\,\dd W_t$ with $\kappa,\xi>0$, and let
+$\bar X_{k+1}=\bar X_k+\kappa(\theta-\bar X_k)h+\xi\,\Delta W_k$ be its Euler scheme with step
+$h$.
+\begin{enumerate}[label=(\alph*)]
+  \item Find the mean and the variance of $\bar X_k$ as functions of $k$. Show that the mean
+    converges as $k\to\infty$ for every starting point if and only if $0<\kappa h<2$.
+  \item For $0<\kappa h<2$, find the limit $\bar v$ of $\Var\bar X_k$ and compare it with the
+    stationary variance $\xi^2/(2\kappa)$ of $X$. Expand the ratio to first order in $h$.
+  \item Evaluate the ratio for the Vasicek parameters $\kappa=2$, $\xi=2\%$ with monthly and
+    with quarterly steps. What would the exact step of \noteref{exa:ps-ou} give?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Simulating backwards in time]\label{ex:ps-backward}
+\medium Let $0<t_1<\dots<t_m$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that, given $(W_{t_{k+1}},\dots,W_{t_m})$, the variable $W_{t_k}$ is normal with
+    mean $\frac{t_k}{t_{k+1}}W_{t_{k+1}}$ and variance $\frac{t_k(t_{k+1}-t_k)}{t_{k+1}}$.
+  \item Write an algorithm that generates $(W_{t_1},\dots,W_{t_m})$ starting from
+    $W_{t_m}$ and moving backwards, and show that it is the construction of
+    \noteref{prop:ps-bridge}(iii) for a particular order of the points.
+  \item In backward induction (for instance for American options), the paths are needed at
+    $t_m$, then $t_{m-1}$, and so on. Compare the memory needed by $n$ paths when they are
+    generated forwards and stored, and when they are generated backwards one date at a time.
+    What must be stored to make the backward pass reproducible?
+  \item For a GBM with constant parameters, write the backward step for $\log S_{t_k}$ given
+    $\log S_{t_{k+1}}$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Euler and Milstein for GBM: exact moments]\label{ex:ps-euler-moments}
+\medium Let $\bar X$ and $\tilde X$ be the Euler and Milstein schemes for
+$\dd X=\mu X\,\dd t+\sigma X\,\dd W$, $X_0=S_0$, with $n$ steps of size $h=T/n$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E\bar X_T=\E\tilde X_T=S_0(1+\mu h)^n$,
+    $\E\bar X_T^2=S_0^2\big((1+\mu h)^2+\sigma^2h\big)^n$ and
+    $\E\tilde X_T^2=S_0^2\big((1+\mu h)^2+\sigma^2h+\frac12\sigma^4h^2\big)^n$.
+  \item Show that the relative errors of these three moments, compared with those of $X_T$,
+    are $-\frac12\mu^2Th$, $-(\mu^2+2\mu\sigma^2+\frac12\sigma^4)Th$ and
+    $-(\mu^2+2\mu\sigma^2)Th$, up to $O(h^2)$.
+  \item With the test case ($S_0=100$, $\mu=r-y=-1\%$, $\sigma=20\%$, $T=1$), compute the
+    error of $\E\bar X_T^2$ for $n=12$ and $n=24$, and the error of the Richardson combination
+    $2\E\bar X^2_{T,(24)}-\E\bar X^2_{T,(12)}$.
+  \item Show that one Euler step has a negative factor $1+\mu h+\sigma\Delta W_k$ with
+    probability $N\big(-(1+\mu h)/(\sigma\sqrt h)\big)$. Evaluate it for $\sigma=20\%$ with
+    $h=\frac1{12}$ and $h=1$, and for $\sigma=100\%$ with $h=\frac14$. What happens to a Monte
+    Carlo estimate of $\E\log\bar X_T$?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Richardson with the wrong exponent]\label{ex:ps-richardson-sqrt}
+\medium This exercise is partly computational. Let $M_n=\max_{0\le k\le n}W_{k/n}$, the
+maximum of a Brownian path on $[0,1]$ inspected at $n+1$ dates, and recall that
+$\E\max_{0\le t\le1}W_t=\sqrt{2/\pi}$. You may use Spitzer's identity for random walks,
+$\E M_n=\sum_{k=1}^n\frac1k\E\big[W_{k/n}^+\big]$, and the expansion
+$\sum_{k=1}^nk^{-1/2}=2\sqrt n+\zeta(\tfrac12)+\frac1{2\sqrt n}+O(n^{-3/2})$, where
+$\zeta(\frac12)\approx-1.46035$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\E M_n=(2\pi n)^{-1/2}\sum_{k=1}^nk^{-1/2}$, and deduce an expansion of
+    $\E M_n-\sqrt{2/\pi}$ in powers of $h^{1/2}$, $h=1/n$, up to $O(h^2)$.
+  \item Apply Richardson extrapolation \noteref{prop:ps-richardson} to $\E M_{64}$ and
+    $\E M_{32}$ with $p=1$ and with $p=\frac12$. Which exponent is right, and what is the
+    order of the remaining error in each case?
+  \item Estimate $\E M_{16}$, $\E M_{32}$ and $\E M_{64}$ by simulation, all three on the same
+    $10^6$ paths, and compare with (a). Then extrapolate your estimates with $p=\frac12$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Allocating effort with Milstein and extrapolation]\label{ex:ps-allocation-milstein}
+\medium This is a computational exercise. Take GBM with the test-case parameters and the
+payoff $f(x)=5\log(1+e^{(x-100)/5})$ of \noteref{fig:ps-orders}, whose variance is
+$v=\Var f(X_T)\approx154$. Count the cost of a path with $m$ steps as $m$, and that of a
+coupled pair for Richardson extrapolation as $1.5\,m$.
+\begin{enumerate}[label=(\alph*)]
+  \item Estimate the weak error constant $c$ of the Milstein scheme,
+    $\E f(\tilde X^h_T)-\E f(X_T)\approx c\,h$, and the constant $c_2$ of the coupled Richardson
+    estimator, $\E R^h-\E f(X_T)\approx c_2h^2$, by simulation on common paths.
+  \item Using \noteref{prop:ps-allocation}, find the optimal number of steps and paths and the
+    root-mean-square error for Milstein ($\beta=1$) and for Richardson-extrapolated Milstein
+    ($\beta=2$), with budgets $10^6$ and $10^8$. Compare with Euler and with exact
+    simulation, as in the notes.
+  \item For the budget $10^6$, run $100$ independent replications of the extrapolated
+    estimator with the allocation from (b) (rounded to an even number of fine steps), and
+    compare its root-mean-square error with the prediction. Explain any discrepancy.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The principal components of Brownian motion]\label{ex:ps-pca-eigen}
+\hard Let $t_i=ih$, $i=1,\dots,m$, $h=T/m$, and $C_{ij}=\min(t_i,t_j)=h\min(i,j)$.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $C^{-1}=h^{-1}J$, where $J$ is tridiagonal with $J_{ii}=2$ for $i<m$,
+    $J_{mm}=1$ and $J_{i,i\pm1}=-1$.
+  \item Show that $v^{(k)}_i=\sin\big((2k-1)i\pi/(2m+1)\big)$, $k=1,\dots,m$, are eigenvectors
+    of $J$, and deduce the eigenvalues of $C$:
+    $\lambda_k=\dfrac{h}{4\sin^2\big((2k-1)\pi/(2(2m+1))\big)}$.
+  \item Show that the share of the total variance carried by the first principal component,
+    $\lambda_1/\operatorname{tr}C$, tends to $8/\pi^2$ as $m\to\infty$, and compute it for
+    $m=64$. Compare with the first normal of the Brownian bridge construction.
+  \item Let $T=1$ and fix $k$. Show that $\lambda_k/m\to1/\big((k-\frac12)^2\pi^2\big)$ and that
+    $v^{(k)}_i=\sin\big((k-\frac12)\pi t_i\big)+O(1/m)$ uniformly in $i$. Use this to explain,
+    without proving convergence, the expansion
+    $W_t=\sum_{k\ge1}\frac{\sqrt2\,\sin((k-\frac12)\pi t)}{(k-\frac12)\pi}\,Z_k$ of a Brownian
+    path on $[0,1]$, and check that its variance at $t=1$ is $1$, using
+    $\sum_{k\ge1}(2k-1)^{-2}=\pi^2/8$.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The strong error of Euler for GBM]\label{ex:ps-strong-constant}
+\hard This exercise is partly computational. Let $\bar X$ be the Euler scheme for
+$\dd X=\mu X\,\dd t+\sigma X\,\dd W$ with $n$ steps of size $h=T/n$, driven by the same
+Brownian motion as $X$.
+\begin{enumerate}[label=(\alph*)]
+  \item Expand $\log(1+\mu h+\sigma\Delta W_k)$ to show that
+    $\log\bar X_T-\log X_T=-\frac12\sigma^2\sum_{k}\big((\Delta W_k)^2-h\big)+R_h$. You may
+    take for granted that $h^{-1/2}R_h\to0$ in probability.
+  \item Show that $\big(W_T,(2Th)^{-1/2}\sum_k((\Delta W_k)^2-h)\big)$ converges in distribution
+    to $(W_T,N)$ with $N\sim\mathcal N(0,1)$ independent of $W_T$.
+  \item Deduce that $h^{-1/2}(\bar X_T-X_T)$ converges in distribution to
+    $-\sigma^2\sqrt{T/2}\,X_TN$, and, assuming uniform integrability, that
+    $\E|\bar X_T-X_T|=\sigma^2\,\E[X_T]\sqrt{Th/\pi}+o(h^{1/2})$.
+  \item Compare the constant with the strong errors measured in \noteref{fig:ps-orders} (test
+    case) by your own simulation. Why does the same argument give strong order $1$ for the
+    Milstein scheme?
+\end{enumerate}
+\end{exercise}

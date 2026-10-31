@@ -1,0 +1,602 @@
+% Chapter 20: Trees and finite differences.
+
+Monte Carlo samples paths forward in time. Grids compute the same expectation backwards:
+they discretize the state, replace the conditional expectation over one time step by a
+weighted average of neighbouring values, and step from the payoff to the price today. A
+\emph{tree} takes the weights from a discrete-time model that converges to the diffusion; a
+\emph{finite-difference scheme} from difference quotients in the pricing equation. The two meet
+in the explicit scheme, a trinomial tree up to its discounting. Grids give the price for all spots at once,
+the Greeks almost for free, and early exercise for one maximum per node. This is why \cref{ch:14-american-mc} took its American reference values
+from a smoothed binomial tree, studied in \cref{sec:fd-binomial}, and its Bermudan ones from a
+backward induction on a grid in log price with the exact Gaussian transition density, a
+quadrature cousin of the schemes of \cref{sec:fd-schemes}. Their cost grows exponentially with the number
+of state variables (\cref{prop:mc-dimension}), so they are the method of choice in one or two
+dimensions and of no use in ten.
+
+Throughout, $S$ is the stock with yield $y$ of \cref{def:sm-model} under $\Q$, with log-drift
+$\nu=r-y-\sigma^2/2$, and $r\ge0$. The price at time to maturity $\tau$ of the European payoff
+$g(S_T)$, as a function of the log price $x=\log S$, is
+$u(\tau,x)=e^{-r\tau}\EQ\big[g\big(e^{x+\nu\tau+\sigma\sqrt\tau Z}\big)\big]$ with $Z\sim\mathcal N(0,1)$, and by
+\cref{thm:sm-feynman-kac} (whose code checks it with difference quotients) it solves
+\begin{equation}\label{eq:fd-pde}
+  \partial_\tau u=\tfrac12\sigma^2\partial_{xx}u+\nu\,\partial_xu-ru,\qquad u(0,x)=g(e^x),
+\end{equation}
+whenever $g$ is regular enough for the equation to make sense. The running example is the
+course's test case $S_0=K=100$, $T=1$, $r=1\%$, $y=2\%$, $\sigma=20\%$, with call $7.36429$
+and put $8.34941$.
+
+\section{Binomial trees}\label{sec:fd-binomial}
+
+\begin{definition}[Binomial tree]\label{def:fd-tree}
+Fix $n\ge1$ steps of length $\Delta t=T/n$ and factors $0<d<u$. The tree has the nodes
+$S_0u^jd^{i-j}$, $0\le j\le i\le n$, at time $i\Delta t$, and the \emph{risk-neutral probability}
+$q=(e^{(r-y)\Delta t}-d)/(u-d)$. The values $V_n(j)=g(S_0u^jd^{n-j})$ are propagated backwards by
+\begin{equation}\label{eq:fd-tree}
+  V_i(j)=e^{-r\Delta t}\big[q\,V_{i+1}(j+1)+(1-q)\,V_{i+1}(j)\big],
+\end{equation}
+and the tree price is $V_0(0)$; for an American option each $V_i(j)$ is replaced by its maximum
+with the payoff $g(S_0u^jd^{i-j})$. The \emph{Cox--Ross--Rubinstein} (CRR) tree has $u=e^{\sigma\sqrt{\Delta t}}$ and
+$d=1/u$ \citep{crr1979}; the Jarrow--Rudd tree has $u,d=e^{\nu\Delta t\pm\sigma\sqrt{\Delta t}}$ \citep{jarrow-rudd-1983}.
+\end{definition}
+
+The tree is a model in its own right when $q\in(0,1)$, that is when $d<e^{(r-y)\Delta t}<u$: this is
+the no-arbitrage condition of the one-period model, and $V_i(j)$ is then the price in the
+binomial model whose stock moves by the factor $u$ or $d$ and pays dividends at the rate $y$
+(the IEOR 222 notes treat $y=0$). For the European payoff, \eqref{eq:fd-tree} unrolls into
+$V_0(0)=e^{-rT}\sum_{j=0}^n\binom nj q^j(1-q)^{n-j}g(S_0u^jd^{n-j})$, which our code evaluates in $O(n)$
+operations. For the CRR tree the terminal log prices are $\log S_0+(2j-n)\delta$ with
+$\delta=\sigma\sqrt{T/n}$, a lattice of spacing $2\delta$, and we write
+\[
+  \theta_n=\operatorname{frac}\Big(\frac{\log(K/S_0)+n\delta}{2\delta}\Big)\in[0,1)
+\]
+for the position of $\log K$ between two consecutive terminal nodes: $\theta_n=0$ when $K$ is a
+node. At $S_0=K$, $\theta_n=0$ for even $n$ and $\theta_n=\frac12$ for odd $n$.
+
+\begin{proposition}[Binomial trees]\label{prop:fd-binomial}
+Let $\sigma>0$ and let $C_n$ be the CRR price of a European payoff $g$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{Validity.} $q\in(0,1)$ if and only if $n>(r-y)^2T/\sigma^2$; if $r=y$, $q=1/(1+u)$ for
+    every $n$. As $n\to\infty$, $q=\frac12+\frac{\nu}{2\sigma}\sqrt{\Delta t}+O(\Delta t)$.
+  \item \emph{Convergence.} If $g$ is continuous with $|g(s)|\le a(1+s)$, then
+    $C_n\to e^{-rT}\EQ[g(S_T)]$. The same holds for a bounded $g$ whose discontinuities form a
+    finite set (digitals).
+  \item \emph{Oscillation.} For the call with strike $K>0$, $C_n-C=O(1/n)$, where $C$ is the
+    Black--Scholes price, but $n(C_n-C)$ has no limit in general:
+    \begin{equation}\label{eq:fd-oscillation}
+      n\,(C_n-C)=A+B\,\theta_n(1-\theta_n)+o(1),\qquad B=2\sigma\sqrt T\,Ke^{-rT}N'(d_-),
+    \end{equation}
+    with a constant $A$ depending on $(S_0,K,T,r,y,\sigma)$ only.
+  \item \emph{Better trees.} (a) The BBS tree of \textcite{broadie-detemple} replaces the values one
+    step before maturity by the Black--Scholes prices with maturity $\Delta t$; BBSR is the
+    extrapolation $2C^{\mathrm{BBS}}_n-C^{\mathrm{BBS}}_{n/2}$. (b) The tree of
+    \textcite{leisen-reimer-1996} takes $n$ odd, $q=h_n^{-1}(d_-)$, $q'=h_n^{-1}(d_+)$ with the
+    Peizer--Pratt inversion $h_n^{-1}(z)=\frac12+\frac12\operatorname{sign}(z)
+    \big[1-\exp\big(-\big(\frac{z}{n+1/3+0.1/(n+1)}\big)^2\big(n+\frac16\big)\big)\big]^{1/2}$
+    \citep{peizer-pratt-1968}, $u=e^{(r-y)\Delta t}q'/q$ and $d=(e^{(r-y)\Delta t}-qu)/(1-q)$. Its call
+    prices converge at order $1/n^2$, without oscillation.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $q\in(0,1)$ if and only if $e^{-\sigma\sqrt{\Delta t}}<e^{(r-y)\Delta t}<e^{\sigma\sqrt{\Delta t}}$, that is
+$|r-y|\Delta t<\sigma\sqrt{\Delta t}$, that is $n>(r-y)^2T/\sigma^2$. If $r=y$,
+$q=(1-u^{-1})/(u-u^{-1})=1/(1+u)$. With $\delta=\sigma\sqrt{\Delta t}$, the numerator of $q$ is
+$\delta-\frac12\delta^2+(r-y)\Delta t+O(\Delta t^{3/2})=\delta+\nu\Delta t+O(\Delta t^{3/2})$ and the denominator is
+$2\delta+O(\delta^3)$.
+
+(ii) $\log(S_n/S_0)=X_n=\xi_1+\dots+\xi_n$ with independent $\xi_i=\pm\delta$, $\Q(\xi_i=\delta)=q$. By (i),
+$\E[\xi_i]=(2q-1)\delta=\nu\Delta t+O(\Delta t^{3/2})$ and $\E[\xi_i^2]=\sigma^2\Delta t$, so, as $|\xi_i|\le\delta$,
+$\E[e^{is\xi_i}]=1+is\nu\Delta t-\frac12s^2\sigma^2\Delta t+O(\Delta t^{3/2})$ for each real $s$, and
+$\E[e^{isX_n}]=\E[e^{is\xi_1}]^n\to e^{is\nu T-s^2\sigma^2T/2}$. By Lévy's continuity theorem $X_n$ converges in
+law to $\mathcal N(\nu T,\sigma^2T)$, so $S_n$ to $S_T$. Likewise
+$\E[S_n^2]=S_0^2\big(qu^2+(1-q)u^{-2}\big)^n=S_0^2\big(1+(2\nu+2\sigma^2)\Delta t+O(\Delta t^{3/2})\big)^n$ is
+bounded in $n$, so $(g(S_n))_n$ is bounded in $L^2$, hence uniformly integrable. By the mapping
+theorem, $g(S_n)$ converges in law to $g(S_T)$ when the discontinuities of $g$ have probability zero
+under the law of $S_T$, which has a density \citep[Theorem~2.7]{billingsley}; uniform
+integrability then gives convergence of the means \citep[Theorem~3.5]{billingsley}.
+
+(iii) and (iv) are cited. \textcite{diener-diener-2004} compute the expansion for the CRR tree;
+\textcite{walsh-2003}, Corollary~4.1, proves \eqref{eq:fd-oscillation} with this $B$ (his
+$2\sigma^2T\tilde K\hat p$, with $\tilde K=Ke^{-rT}$) for $n$ even in the CRR tree of the discounted price, where $\theta_n$
+is the position of the discounted strike. For (iv)(b),
+\textcite{leisen-reimer-1996} observed the order $1/n^2$ and conjectured it, and
+\textcite{joshi-2010} proved it; part (iv)(a) is a definition, discussed after
+\cref{fig:fd-trees}.
+\end{proof}
+
+\begin{remark}[Where the oscillation comes from]\label{rem:fd-oscillation}
+By a local central limit theorem the tree puts mass close to $H\,f(x_j)$ on the terminal node $x_j$,
+where $H=2\delta$ and $f$ is a smooth density close to that of $\log S_T$. The call is then
+$e^{-rT}H\sum_jF(x_j)$ with $F(x)=f(x)(e^x-K)^+$, a function that vanishes at $\log K$ with slope
+$Kf(\log K)$ to the right. The Euler--Maclaurin formula for a lattice whose first point lies $\alpha H$
+above $c$, $H\sum_{m\ge0}F(c+(m+\alpha)H)=\int_c^\infty F-HB_1(\alpha)F(c)-\frac{H^2}2B_2(\alpha)F'(c)+O(H^3)$, with the
+Bernoulli polynomials $B_1(\alpha)=\alpha-\frac12$ and $B_2(\alpha)=\alpha^2-\alpha+\frac16$, applied at $c=\log K$ with
+$\alpha=1-\theta_n$ and $B_2(1-\theta_n)=B_2(\theta_n)$, leaves $e^{-rT}\frac{H^2}2\theta_n(1-\theta_n)Kf(\log K)$ besides terms that do not depend
+on $\theta_n$; with $H^2=4\sigma^2T/n$ and $f(\log K)=N'(d_-)/(\sigma\sqrt T)$ this is the $B$ of
+\eqref{eq:fd-oscillation}. The argument does not control the error of the local expansion
+(Walsh's proof does, by Skorokhod embedding), but it shows where $B$ comes from, and it applies to
+the CRR tree as defined here: on the test case $B=15.6222$, and fitting $n(C_n-C)$ on $1$ and
+$\theta_n(1-\theta_n)$ over $n=1000,\dots,2000$ gives $A=-1.964$, $B=15.6222$; for $K=110$, $B=14.2815$ against
+fits of $14.2859$ ($n=1000,\dots,2000$) and $14.2800$ ($n=8000,\dots,8400$). For a digital the same computation leaves the
+first-order term $-HB_1(\alpha)F(c)$: its error oscillates at order $n^{-1/2}$ (\exref{ex:fd-digital}).
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch20-trees}
+  \caption{CRR trees on the test case. (a) $n(C_n-C)$ for the calls with $K=100$ (two branches:
+    $n$ even and odd) and $K=110$; the black marks are $A+B\theta_n(1-\theta_n)$ with $B$ from
+    \eqref{eq:fd-oscillation} and $A$ fitted on $n=1000,\dots,2000$. (b) Absolute errors of the European
+    call: CRR for $n$ even and odd, BBS for $n$ even, BBSR and Leisen--Reimer, and the trinomial
+    tree of \cref{sec:fd-trinomial} with $\kappa=\sqrt{3/2}$; $n$ runs over multiples of $4$
+    between $20$ and $4000$ ($n+1$ for the odd-$n$ trees; up to $2000$ for the trinomial tree).}
+  \label{fig:fd-trees}
+\end{figure}
+
+\paragraph{Parity, smoothing, extrapolation.} At $S_0=K$ the two parities give two smooth
+sequences, $nC_n-nC\to A=-1.964$ for $n$ even and $A+B/4=1.942$ for $n$ odd: the CRR price is below the
+Black--Scholes price for even $n$ and above it for odd $n$ (\cref{fig:fd-trees}(a)), and
+Richardson extrapolation across consecutive $n$ fails. Away from the money $\theta_n$ wanders
+through $[0,1)$, and doubling $n$ can increase the error. The remedies of (iv) attack the kink of
+the payoff. The BBS tree, whose last step is smooth on the scale of the lattice, does not remove
+the oscillation, but on the test case it shrinks the parity effect
+from $B/4=3.906$ to $0.023$ in units of $1/n$ ($nC^{\mathrm{BBS}}_n-nC$ is $0.6498$ at $n=400$ and
+$0.6266$ at $n=401$). At the money BBSR is then of order $1/n^2$ for $n$ divisible by $4$ (so that $n$
+and $n/2$ have the same parity) and of order $1/n$ for $n\equiv2\pmod4$ ($n$ times its error is $0.061$
+at $n=102$, $0.047$ at $n=1602$). For $K=110$, $n$ times the BBS error moves between $0.467$ and $0.488$,
+and BBSR is first order ($n^2$ times its error: $5.8$, $-1.6$, $-28.0$ at $n=400$, $800$, $1600$). The Leisen--Reimer tree places the strike between
+the two middle terminal nodes for every odd $n$ (we checked this for strikes from $80$ to $130$)
+and chooses $q$ and $q'$ so that the binomial probabilities of finishing above the strike, under
+the two measures of the call formula, approximate $N(d_-)$ and $N(d_+)$: $n^2(C_n-C)=-0.3955$ at
+$n=201$ and $-0.3978$ at $n=801$ (\cref{fig:fd-trees}(b)). Neither survives early exercise
+unchanged: on the first Longstaff--Schwartz put of \cref{tab:fd-american}, the Leisen--Reimer error
+halves when $n$ doubles ($-4.8\times10^{-3}$ at $n=101$, $-2.9\times10^{-4}$ at $n=1601$), because the American
+price is not smooth across the exercise boundary.
+
+\paragraph{American options on trees.} With the projection $V_i(j)\leftarrow\max(V_i(j),g)$ the
+CRR tree converges to the American price; for the put, \textcite{lamberton-2018}, Theorem~1.1 (arXiv version),
+bounds the error by a constant times $(\log n)^{3/2}/n$ ($(\log n)/n$ if $y>r$). The American
+references of \cref{ch:14-american-mc} are BBSR trees (its code and ours agree to rounding);
+\cref{tab:fd-american} compares them with the grids of \cref{sec:fd-american}.
+
+\section{Trinomial trees and the explicit scheme}\label{sec:fd-trinomial}
+
+A trinomial tree moves the log price by $+h$, $0$ or $-h$ in each step. Following
+\textcite{kamrad-ritchken-1991} (and the three-jump process of \textcite{boyle-1986}), take
+$h=\kappa\sigma\sqrt{\Delta t}$ with a \emph{stretch} $\kappa>0$ and
+\begin{equation}\label{eq:fd-kr}
+  p_\pm=\frac1{2\kappa^2}\pm\frac{\nu\sqrt{\Delta t}}{2\kappa\sigma},\qquad p_0=1-\frac1{\kappa^2},
+\end{equation}
+with backward induction $V\leftarrow e^{-r\Delta t}(p_+V_++p_0V_0+p_-V_-)$ on the nodes
+$\log S_0+mh$, $|m|\le i$, at step $i$. The tree needs no boundary condition: in $n$ steps it reaches
+$n$ nodes away.
+
+\begin{proposition}[Trinomial trees]\label{prop:fd-trinomial}
+Let $\kappa>0$, $\Delta t=T/n$ and $h=\kappa\sigma\sqrt{\Delta t}$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{Moments and positivity.} An increment $\xi$ has $\E[\xi]=\nu\Delta t$ and
+    $\E[\xi^2]=\sigma^2\Delta t$ exactly. The three weights are probabilities if and only if $\kappa\ge1$ and
+    $h|\nu|\le\sigma^2$. If $\nu=0$, then $\E[\xi^4]=\kappa^2\sigma^4\Delta t^2$, which equals the Gaussian value
+    $3\sigma^4\Delta t^2$ if and only if $\kappa=\sqrt3$, and then $(p_+,p_0,p_-)=(\frac16,\frac23,\frac16)$.
+  \item \emph{The explicit scheme.} The explicit finite-difference scheme for \eqref{eq:fd-pde}
+    with time step $k=\Delta t$ and mesh $h$ (\cref{sec:fd-schemes}) is
+    $U^{n+1}_j=p_+U^n_{j+1}+p_0U^n_j+p_-U^n_{j-1}-rk\,U^n_j$ with the weights \eqref{eq:fd-kr}: the tree with
+    the discount $e^{-rk}$ replaced by a subtraction of $rkU^n_j$, which differs by $O(k^2)$ per step.
+    Its parameter $\sigma^2k/(2h^2)$ equals $1/(2\kappa^2)$, so $\kappa\ge1$ is the stability condition
+    $\sigma^2k\le h^2$ of \cref{thm:fd-schemes}(i).
+  \item \emph{Convergence.} If $\kappa\ge1$ and $h|\nu|\le\sigma^2$, the tree is a positive operator
+    with $\|V\|_\infty$ nonincreasing from step to step, and if $\partial_\tau^iu$ ($i\le2$) and
+    $\partial_x^ju$ ($j\le4$) are continuous and bounded on $[0,T]\times\R$, its error is at most
+    $c\,T\Delta t$ uniformly in the nodes, with $c$ depending on these bounds and on $\kappa$. If $\kappa<1$, the
+    backward induction multiplies the alternating sequence $(-1)^m$ by a factor tending to
+    $2/\kappa^2-1>1$ in modulus as $\Delta t\to0$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\E[\xi]=h(p_+-p_-)=\kappa\sigma\sqrt{\Delta t}\,\nu\sqrt{\Delta t}/(\kappa\sigma)$ and $\E[\xi^2]=h^2(p_++p_-)=h^2/\kappa^2$.
+$p_0\ge0$ if and only if $\kappa\ge1$, and $p_\pm\ge0$ if and only if $\sigma\ge\kappa|\nu|\sqrt{\Delta t}$, that is
+$\sigma^2\ge|\nu|h$. If $\nu=0$, $\E[\xi^4]=h^4/\kappa^2=\kappa^2\sigma^4\Delta t^2$.
+(ii) With $p_\pm^{\mathrm{fd}}=\sigma^2/(2h^2)\pm\nu/(2h)$ and $p_0^{\mathrm{fd}}=-\sigma^2/h^2-r$ (\cref{sec:fd-schemes}), the
+explicit step is $U^{n+1}=U^n+k(p_-^{\mathrm{fd}}U^n_{j-1}+p_0^{\mathrm{fd}}U^n_j+p_+^{\mathrm{fd}}U^n_{j+1})$, and
+$kp^{\mathrm{fd}}_\pm=\sigma^2\Delta t/(2\kappa^2\sigma^2\Delta t)\pm\nu\Delta t/(2\kappa\sigma\sqrt{\Delta t})=p_\pm$, $1+kp^{\mathrm{fd}}_0=p_0-rk$.
+(iii) Under the conditions the weights are nonnegative with sum $e^{-r\Delta t}\le1$, which gives the
+first claims. Taylor's formula with $\E[\xi]$, $\E[\xi^2]$ from (i), $|\E[\xi^3]|=h^2|\E[\xi]|$ and
+$\E[\xi^4]=h^2\sigma^2\Delta t$ gives $e^{-r\Delta t}\E[u(\tau,x+\xi)]=u(\tau+\Delta t,x)+O(\Delta t^2)$, with a constant
+depending on the bounds; a positive step with weights summing to at most one adds these local
+errors without amplifying them, and $n\Delta t=T$. If $\kappa<1$, one step maps $(-1)^m$ to
+$\big(e^{-r\Delta t}(p_0-p_+-p_-)\big)(-1)^m$, and $p_0-p_+-p_-=1-2/\kappa^2<-1$.
+\end{proof}
+
+The identity (ii) is the synthesis of \textcite{brennan-schwartz-1978}: an explicit scheme is a
+jump process (our tests check it to $10^{-11}$). For $\kappa=0.9$ the backward induction returns
+$-3\times10^{64}$ for the call after $400$ steps. On the test case $n(C_n-C)$ stays within $0.01$ of
+$-1.97$, $-0.53$ and $-2.06$ for $\kappa=1$, $\sqrt{3/2}$ and $\sqrt3$ and $n$ from $400$ to $1600$ (the strike
+stays a node, so there is no oscillation): the choice $\kappa=\sqrt3$ of the course's trinomial walk, best for one step of a smooth
+payoff (see the exercises of \cref{ch:01-standard-model}), is not the best for a kink.
+
+\section{Finite differences: stability and order}\label{sec:fd-schemes}
+
+A finite-difference grid separates what a tree ties together: the mesh $h$ and the time step
+$k$. Take $J$ intervals of a domain $[x_0,x_J]$ in log price, nodes $x_j=x_0+jh$, times $\tau_n=nk$,
+$N=T/k$, and replace the derivatives in \eqref{eq:fd-pde} by central differences:
+\[
+  (L_hV)_j=p_-V_{j-1}+p_0V_j+p_+V_{j+1},\qquad p_\pm=\frac{\sigma^2}{2h^2}\pm\frac{\nu}{2h},\qquad p_0=-\frac{\sigma^2}{h^2}-r .
+\]
+
+\begin{definition}[The $\theta$-scheme]\label{def:fd-theta}
+For $\theta\in[0,1]$, the $\theta$-scheme for \eqref{eq:fd-pde} is
+\begin{equation}\label{eq:fd-theta}
+  \frac{U^{n+1}_j-U^n_j}{k}=\theta\,(L_hU^{n+1})_j+(1-\theta)\,(L_hU^n)_j,\qquad 0<j<J,
+\end{equation}
+with $U^0_j=g(e^{x_j})$ and boundary values $U^n_0$, $U^n_J$ (\cref{sec:fd-boundary}). It is
+\emph{explicit} for $\theta=0$, \emph{implicit} for $\theta=1$, and \emph{Crank--Nicolson} for $\theta=\frac12$
+\citep{crank-nicolson-1947}. We write $\lambda=\sigma^2k/(2h^2)$. In matrix form,
+$BV^{n+1}=CV^n+kF^n$ with $B=I-\theta kA$, $C=I+(1-\theta)kA$, $A$ tridiagonal with rows $(p_-,p_0,p_+)$, and
+$F^n$ carrying the boundary values; the \emph{amplification operator} is $G=B^{-1}C$.
+\end{definition}
+
+For $\theta>0$ each step solves a tridiagonal system in $O(J)$ operations. To separate the
+discretization from the truncation of the domain, the theorem considers the scheme on the
+infinite grid $h\Z$, with the norms $\|V\|_\infty=\sup_j|V_j|$ and $\|V\|_{2,h}=(h\sum_jV_j^2)^{1/2}$. The scheme
+is \emph{stable} in a norm, along a family of grids with $k\to0$, if there is $C_s$ with
+$\|G^m\|\le C_s$ and $\|G^mB^{-1}\|\le C_s$ for all $mk\le T$; the \emph{truncation error} is
+$T^n_j=(u^{n+1}_j-u^n_j)/k-\theta(L_hu^{n+1})_j-(1-\theta)(L_hu^n)_j$ with $u^n_j=u(\tau_n,x_j)$.
+
+\begin{theorem}[Explicit, implicit and Crank--Nicolson schemes]\label{thm:fd-schemes}
+Let $\sigma>0$, $r\ge0$ and $\theta\in[0,1]$, and consider the $\theta$-scheme on $h\Z$.
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{Von Neumann stability.} The scheme maps $e^{\mathrm i j\xi h}$ to $g(\xi)e^{\mathrm i j\xi h}$, with
+    \begin{equation}\label{eq:fd-symbol}
+      g(\xi)=\frac{1+(1-\theta)z}{1-\theta z},\qquad
+      z=k\Big(-\frac{2\sigma^2}{h^2}\sin^2\frac{\xi h}2-r+\mathrm i\frac{\nu}{h}\sin\xi h\Big),
+    \end{equation}
+    and it is stable in $\|\cdot\|_{2,h}$ if and only if $|g(\xi)|\le1+c\,k$ for all $\xi$ and some $c$. If
+    $\theta\ge\frac12$, $|g(\xi)|\le1$ for all $\xi$, $k$ and $h$: implicit and Crank--Nicolson are
+    \emph{unconditionally} stable in $\|\cdot\|_{2,h}$. If $\theta<\frac12$, along grids with $\lambda$ fixed the
+    scheme is stable if and only if $(1-2\theta)\lambda\le\frac12$; the explicit scheme if and only if
+    $\sigma^2k\le h^2$.
+  \item \emph{Consistency.} If $\partial^i_\tau u$ ($i\le3$) and $\partial^j_xu$ ($j\le4$) are continuous and bounded by $M$
+    on $[0,T]\times\R$, then
+    $|T^n_j|\le M\big[(\frac12+\theta)k+(\frac{\sigma^2}{24}+\frac{|\nu|}6)h^2\big]$, and for $\theta=\frac12$,
+    $|T^n_j|\le M\big[\frac16k^2+(\frac{\sigma^2}{24}+\frac{|\nu|}6)h^2\big]$: orders $O(k+h^2)$ and $O(k^2+h^2)$.
+  \item \emph{Convergence.} If the scheme is stable in a norm, then
+    $\|u^n-U^n\|\le C_sT\max_{m<n}\|T^m\|$ for $nk\le T$. Conversely, a consistent scheme for a well-posed
+    linear problem that is not stable does not converge for every initial value
+    \citep{lax-richtmyer-1956}.
+  \item \emph{Positivity.} If $h|\nu|\le\sigma^2$ and $(1-\theta)k(\sigma^2/h^2+r)\le1$, then $B^{-1}$ and $G$ map
+    nonnegative sequences to nonnegative sequences, $\|B^{-1}\|_\infty\le1$ and $\|G\|_\infty\le1$. Without
+    the second condition positivity can fail: for Crank--Nicolson applied to
+    $\partial_\tau u=\frac12\sigma^2\partial_{xx}u$, $G$ is positive if and only if $\lambda\le\frac32$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) $(L_he^{\mathrm i\cdot\xi h})_j=\big(\frac{\sigma^2}{2h^2}(e^{\mathrm i\xi h}-2+e^{-\mathrm i\xi h})+\frac{\nu}{2h}(e^{\mathrm i\xi h}-e^{-\mathrm i\xi h})-r\big)e^{\mathrm ij\xi h}$,
+which is $(z/k)e^{\mathrm ij\xi h}$; solve \eqref{eq:fd-theta} for $U^{n+1}$. For $V\in\ell^2(\Z)$, the Fourier series
+$\hat V(\xi)=h\sum_jV_je^{-\mathrm ij\xi h}$ satisfies Parseval's identity $\|V\|_{2,h}^2=\frac1{2\pi}\int_{-\pi/h}^{\pi/h}|\hat V|^2$, and
+the scheme multiplies $\hat V$ by $g$, so $\|G^m\|_{2,h}=\max_\xi|g(\xi)|^m$. If $|g|\le1+ck$ this is at most
+$e^{cT}$ for $mk\le T$; conversely, $\max|g|^{\lfloor T/k\rfloor}\le C_s$ forces $\max|g|\le C_s^{1/\lfloor T/k\rfloor}=1+O(k)$. Also
+$B^{-1}$ multiplies by $1/(1-\theta z)$, of modulus at most $1$ because $\operatorname{Re}z\le0$. Write $z=x+\mathrm iw$. Then
+\[
+  |1+(1-\theta)z|^2-|1-\theta z|^2=2x+(1-2\theta)|z|^2 .
+\]
+If $\theta\ge\frac12$, this is at most $2x\le0$, so $|g|\le1$. Let $\theta<\frac12$ and $s=\sin^2(\xi h/2)$, so that
+$x=-4\lambda s-rk$ and $w^2=(\nu k/h)^2\,4s(1-s)\le2\nu^2\lambda k/\sigma^2$. If $(1-2\theta)\lambda\le\frac12$, then
+$(1-2\theta)(4\lambda s+rk)\le2s+rk$ and
+\[
+  2x+(1-2\theta)|z|^2\le(4\lambda s+rk)(2s+rk-2)+w^2\le(4\lambda+rk)rk+2\nu^2\lambda k/\sigma^2,
+\]
+while $|1-\theta z|\ge1$; so $|g|^2\le1+c'k$. If $(1-2\theta)\lambda>\frac12$, at $\xi h=\pi$ we have $w=0$ and
+$g=\frac{1-(1-\theta)(4\lambda+rk)}{1+\theta(4\lambda+rk)}\to\frac{1-4(1-\theta)\lambda}{1+4\theta\lambda}<-1$ as $k\to0$, so $|g|\le1+ck$ fails.
+
+(ii) By Taylor's formula, $\frac1{h^2}(f(x+h)-2f(x)+f(x-h))=f''(x)+\frac{h^2}{12}f''''(\eta)$ and
+$\frac1{2h}(f(x+h)-f(x-h))=f'(x)+\frac{h^2}6f'''(\eta')$ for some $\eta,\eta'$, so $L_hu$ differs from
+$\frac12\sigma^2\partial_{xx}u+\nu\partial_xu-ru=\partial_\tau u$ by at most $Mh^2(\frac{\sigma^2}{24}+\frac{|\nu|}6)$. In time,
+$\frac1k(u^{n+1}-u^n)=\partial_\tau u^n+\frac k2\partial_{\tau\tau}u(\zeta)$ and
+$\theta\partial_\tau u^{n+1}+(1-\theta)\partial_\tau u^n=\partial_\tau u^n+\theta k\partial_{\tau\tau}u(\zeta')$, which differ by at most
+$(\frac12+\theta)kM$. For $\theta=\frac12$, expanding about $\tau_n+\frac k2$ instead, the two quantities differ from
+$\partial_\tau u(\tau_n+\frac k2)$ by $\frac{k^2}{24}\partial^3_\tau u$ and $\frac{k^2}8\partial^3_\tau u$ at intermediate points.
+
+(iii) The exact values satisfy $Bu^{n+1}=Cu^n+kT^n$, the scheme $BU^{n+1}=CU^n$, so $e^n=u^n-U^n$
+satisfies $e^{n+1}=Ge^n+kB^{-1}T^n$ and $e^0=0$. Hence $e^n=k\sum_{m<n}G^{n-1-m}B^{-1}T^m$ and
+$\|e^n\|\le nk\,C_s\max_m\|T^m\|$. For the converse see \textcite{strikwerda-finite-difference},
+Theorem~1.5.1, proved in Chapter~10.
+
+(iv) $B$ has diagonal $b_0=1+\theta k(\sigma^2/h^2+r)$ and off-diagonal entries $-\theta kp_\pm\le0$ (as
+$h|\nu|\le\sigma^2$ means $p_\pm\ge0$). Write $B=b_0(I-N)$, where $N\ge0$ entrywise and
+$\|N\|_\infty=\theta k\sigma^2h^{-2}/b_0<1$; the Neumann series $B^{-1}=b_0^{-1}\sum_mN^m$ is positive, with
+$\|B^{-1}\|_\infty\le1/(b_0(1-\|N\|_\infty))=1/(1+\theta kr)\le1$. $C$ has entries $(1-\theta)kp_\pm\ge0$ and
+$1-(1-\theta)k(\sigma^2/h^2+r)\ge0$, with row sums $1-(1-\theta)kr\le1$. So $G=B^{-1}C$ is positive with
+$\|G\|_\infty\le1$. For Crank--Nicolson and $\nu=r=0$, $B+C=2I$, so $G=2B^{-1}-I$. The entries of
+$B^{-1}$ off the diagonal are positive (Neumann series) and its diagonal entry is the mean of
+$1/(1-\frac12z)=1/(1+2\lambda\sin^2\frac\varphi2)$ over $\varphi=\xi h\in[-\pi,\pi]$:
+\[
+  \frac1{2\pi}\int_{-\pi}^{\pi}\frac{\dd\varphi}{1+\lambda-\lambda\cos\varphi}=\frac1{\sqrt{(1+\lambda)^2-\lambda^2}}=\frac1{\sqrt{1+2\lambda}},
+\]
+by the standard integral $\int_{-\pi}^\pi(\alpha-\beta\cos\varphi)^{-1}\dd\varphi=2\pi(\alpha^2-\beta^2)^{-1/2}$, $\alpha>|\beta|$. So the
+diagonal entry of $G$ is $2/\sqrt{1+2\lambda}-1$, nonnegative if and only if $\lambda\le\frac32$.
+\end{proof}
+
+With (ii), part (iii) gives the rates in the maximum norm whenever the scheme is positive:
+$|u^n_j-U^n_j|\le TM[(\frac12+\theta)k+(\frac{\sigma^2}{24}+\frac{|\nu|}6)h^2]$. In $\|\cdot\|_{2,h}$, $\|T^m\|_{2,h}$ is of the same
+order when the derivatives of (ii) are also square-integrable in $x$ (write the Taylor remainders
+in integral form and use the Cauchy--Schwarz inequality). Von Neumann analysis is in Section~2.2
+of \textcite{strikwerda-finite-difference}.
+
+\begin{remark}[Stable is not positive]\label{rem:fd-positivity}
+The implicit scheme is positive for every $k$; Crank--Nicolson only for $\lambda$ of order one,
+$k\lesssim h^2/\sigma^2$, the very restriction it was chosen to escape. No scheme does better:
+\textcite{bolley-crouzeix-1978}, Theorem~1, show that no linear one-step time discretization of
+order two or more preserves positivity for all step sizes (their sufficient condition for
+Crank--Nicolson is $\lambda\le1$). On a finite grid with zero boundary values the row next to the
+boundary binds: there one needs $\lambda\le4-2\sqrt2\approx1.17$ (\exref{ex:fd-theta-positivity}; for $J\ge11$
+our grids agree to ten digits). A negative weight is a negative state price. The discrete gamma of a
+call at maturity is a spike at the strike, and one Crank--Nicolson step with $\lambda>\frac32$ makes its
+centre negative (\cref{fig:fd-schemes}(b)). The other condition, $h|\nu|\le\sigma^2$, fails as $\sigma\to0$, when
+the equation becomes a transport equation: the positive alternative to central differences,
+upwinding, is only first order, and by Godunov's theorem no linear positive scheme for
+transport is better \citep{godunov-1959}. CRR trees meet the same wall at $n\le(r-y)^2T/\sigma^2$
+(\exref{ex:fd-upwind}).
+\end{remark}
+
+\begin{remark}[Kinks and Rannacher's start]\label{rem:fd-rannacher}
+The theorem assumes a smooth solution; a call is not smooth at $(0,\log K)$. Its kink feeds the
+highest frequencies, which the implicit scheme damps at each step, but Crank--Nicolson multiplies
+the mode $\xi h=\pi$ by $(1-2\lambda)/(1+2\lambda)\to-1$ (with $r=\nu=0$): with $k$ proportional to $h$, the natural choice for a
+second-order scheme, $\lambda$ grows like $1/h$ and the sawtooth survives. On the test case with
+$k=h/\sigma$, the Crank--Nicolson price error is of first order ($3.8\times10^{-3}$, $2.0\times10^{-3}$, $1.0\times10^{-3}$ for
+$J=800,1600,3200$ intervals over $\pm6\sigma\sqrt T$) and the error of its gamma at $S_0$ grows ($-0.15$, $-0.31$,
+$-0.60$, while the gamma is $0.0195$). \textcite{rannacher-1984}'s remedy replaces the first Crank--Nicolson
+steps by implicit ones. \textcite{giles-carter-2006} prove that four implicit half-steps in
+place of the first two steps restore second order in the maximum norm for the value, delta
+and gamma of calls and puts; on the grids above the price errors become $-4.0\times10^{-4}$,
+$-1.0\times10^{-4}$, $-2.5\times10^{-5}$ and the gamma errors $1.5\times10^{-6}$, $3.9\times10^{-7}$, $9.6\times10^{-8}$. Short
+maturities are the worst case: for $T=0.05$ ($J=800$ over $\pm10\sigma\sqrt T$, $N=20$) the plain gamma at $S_0$ is
+$2.93$, the Rannacher gamma $0.0892$, the true one $0.0891$.
+Placing the strike on a node or midway between two, and averaging discontinuous payoffs over
+a cell, complete the treatment \citep{pooley-vetzal-forsyth-2003}; the solvers of
+\cref{ch:04-static-replication} use a variant (two implicit steps at each end), and the BBS tree is
+its analogue.
+\end{remark}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch20-schemes}
+  \caption{(a) Absolute error of the test-case call at $S_0$ on grids of $J$ intervals over
+    $\log S_0\pm6\sigma\sqrt T$: explicit with $\lambda=0.4$, implicit, Crank--Nicolson and Crank--Nicolson with
+    Rannacher's start, the last three with $k\approx h/\sigma$. (b) One Crank--Nicolson step of
+    $\partial_\tau u=\frac12\sigma^2\partial_{xx}u$ applied to a unit spike at node $0$, for $\lambda=1$, $\frac32$, $4$: the centre
+    weight is $2/\sqrt{1+2\lambda}-1$. (c) The gamma at $t=0$ of the test-case call against the spot, on
+    the grid $J=800$, $N=25$ ($\lambda=89$): plain Crank--Nicolson (between $-1.49$ and $0.68$ near
+    the strike, clipped), with Rannacher's start (on top of the Black--Scholes gamma, within
+    $8\times10^{-6}$).}
+  \label{fig:fd-schemes}
+\end{figure}
+
+\section{Boundaries and the choice of grid}\label{sec:fd-boundary}
+
+A grid must stop somewhere. On $D=(x_\ell,x_u)$ the scheme needs values at the two ends, and the
+question is how much a wrong value there costs at the spot. Let $X_s=x+\nu s+\sigma W_s$,
+$\vartheta=\inf\{s\ge0:X_s\notin D\}$, and, for bounded measurable boundary data $\beta(\tau,x_\ell)$, $\beta(\tau,x_u)$,
+\begin{equation}\label{eq:fd-dirichlet}
+  u_D(\tau,x)=\EQ\Big[e^{-r\tau}g(e^{X_\tau})\1_{\{\vartheta>\tau\}}+e^{-r\vartheta}\beta(\tau-\vartheta,X_\vartheta)\1_{\{\vartheta\le\tau\}}\Big],
+\end{equation}
+the price of the option that pays $\beta$ when the log price leaves $D$ first. When the Dirichlet
+problem for \eqref{eq:fd-pde} on $D$ with data $g$ and $\beta$ has a bounded classical solution, Itô's
+formula and optional stopping at $\vartheta\wedge\tau$, as in the proof of \cref{thm:sm-feynman-kac}, show that it is
+$u_D$; this is the function that the grids of \cref{sec:fd-schemes} approximate.
+
+\begin{proposition}[Far-field boundary conditions]\label{prop:fd-boundary}
+Let $g$ be measurable with $|g(s)|\le a(1+s)$, $r\ge0$, $x\in D$, and suppose
+$|\beta(t,x_b)-u(t,x_b)|\le\varepsilon$ for $t\in[0,\tau]$ and $x_b\in\{x_\ell,x_u\}$. Then
+\[
+  |u_D(\tau,x)-u(\tau,x)|\le\varepsilon\,\Q(\vartheta\le\tau)
+  \le\varepsilon\Big[e^{-(x_u-x-\nu^+\tau)^2/(2\sigma^2\tau)}+e^{-(x-x_\ell-\nu^-\tau)^2/(2\sigma^2\tau)}\Big],
+\]
+where the bound holds when $x_u-x\ge\nu^+\tau$ and $x-x_\ell\ge\nu^-\tau$ (a term with $x_\ell=-\infty$ or
+$x_u=\infty$ is absent). For the call with the asymptotic values $\beta(t,x_\ell)=0$ and
+$\beta(t,x_u)=e^{x_u-yt}-Ke^{-rt}$, $\varepsilon$ is the larger of the call price at $e^{x_\ell}$ and the put price at
+$e^{x_u}$ over $t\le\tau$.
+\end{proposition}
+
+\begin{proof}
+By the Markov property, $M_s=e^{-rs}u(\tau-s,X_s)=\EQ[e^{-r\tau}g(e^{X_\tau})\mid\F_s]$, $s\le\tau$, is a
+martingale, closed by an integrable variable (the growth bound and $\EQ[e^{X_\tau}]<\infty$); optional
+stopping at the bounded time $\vartheta\wedge\tau$ gives
+$u(\tau,x)=\EQ\big[e^{-r\tau}g(e^{X_\tau})\1_{\{\vartheta>\tau\}}+e^{-r\vartheta}u(\tau-\vartheta,X_\vartheta)\1_{\{\vartheta\le\tau\}}\big]$. Subtracting from
+\eqref{eq:fd-dirichlet}, $u_D-u=\EQ\big[e^{-r\vartheta}(\beta-u)(\tau-\vartheta,X_\vartheta)\1_{\{\vartheta\le\tau\}}\big]$, which is at most
+$\varepsilon\,\Q(\vartheta\le\tau)$ in absolute value since $r\ge0$. The path leaves through $x_u$ before $\tau$ only if
+$\max_{s\le\tau}\sigma W_s\ge x_u-x-\nu^+\tau=:m$, which by the reflection principle
+(\cref{thm:bar-reflection}) has probability $2N(-m/(\sigma\sqrt\tau))\le e^{-m^2/(2\sigma^2\tau)}$; the last
+inequality holds for $m\ge0$ because $e^{-z^2/2}-2N(-z)$ vanishes at $0$ and at $\infty$ and increases and
+then decreases on $[0,\infty)$. The lower end is symmetric. For the call, $u-\beta$ at $x_u$ is the put
+price, by put--call parity.
+\end{proof}
+
+The bound is Gaussian in the distance to the boundary in units of $\sigma\sqrt\tau$, and it multiplies
+the error of the boundary data: on $\pm m\sigma\sqrt T$ around the spot even the crude choice $\beta=g$
+costs at most about $\max|g-u|\cdot2e^{-m^2/2}$, $3\times10^{-8}\max|g-u|$ for $m=6$, the default of our code.
+\Cref{fig:fd-american}(b) measures the truncation error of the Crank--Nicolson grid. For positive
+schemes the same argument runs on the Markov chain of the scheme, whose steps are kernels with
+nonnegative weights summing to at most one; \textcite{kangro-nicolaides-2000} prove the
+exponential decay for the Black--Scholes equation itself.
+
+\emph{The course's example.} The PINN of the course's discussion notebook prices the call with
+$K=40$, $r=7\%$, $\sigma=60\%$, $T=1$ on $S\in[0,120]$ with the value $S_{\max}-K=80$ at the top, whereas the
+asymptotic value is $82.70$ and the price $83.08$. On a Crank--Nicolson grid in $S$ ($1200$ intervals,
+$600$ steps) the value $80$ makes the price too low by $0.036$ at $S_0=40$ and by $0.75$ at $S_0=80$; the
+asymptotic value reduces these to $0.0007$ and $0.050$. The proposition, with $\varepsilon=3.08$ and $0.378$
+and the exact exit probabilities $0.047$ and $0.44$, bounds them by $0.15$, $1.35$, $0.018$ and $0.17$.
+A grid in $S$ needs no condition at $S=0$, where the equation reduces to $\partial_\tau V=-rV$, but its
+local $\lambda$ grows like $S^2$, so its explicit version needs $k\lesssim h_S^2/(\sigma S_{\max})^2$ for a mesh $h_S$; in log
+price $\lambda$ is the same everywhere.
+
+\section{American options on a grid}\label{sec:fd-american}
+
+The American price is the value of an optimal stopping problem (\cref{ch:14-american-mc}), and
+it solves the linear complementarity problem
+$u\ge g$, $\partial_\tau u-\mathcal Lu\ge0$, $(u-g)(\partial_\tau u-\mathcal Lu)=0$, with $\mathcal L$ the right side of \eqref{eq:fd-pde}
+\citep{jaillet-lamberton-lapeyre-1990}. Each step of the $\theta$-scheme becomes a finite-dimensional
+complementarity problem: given $q=CV^n+kF^n$ and the payoff vector $g$, find $z=V^{n+1}$ with
+\begin{equation}\label{eq:fd-lcp}
+  z\ge g,\qquad Bz-q\ge0,\qquad(z-g)\cdot(Bz-q)=0,
+\end{equation}
+inequalities entry by entry. With $\Phi_j(z)=\max\big(g_j,(q_j-\sum_{l\ne j}B_{jl}z_l)/B_{jj}\big)$,
+\emph{projected SOR} (PSOR, \textcite{cryer-1971}) sweeps through the nodes with a relaxation
+$\omega\in(0,2)$, $z_j\leftarrow\max\big(g_j,z_j+\omega(\Phi^0_j(z)-z_j)\big)$, where $\Phi^0_j$ is $\Phi_j$ without the maximum and
+uses the entries already updated; $\omega=1$ is \emph{projected Gauss--Seidel},
+$z_j\leftarrow\Phi_j(z)$. The algorithm of \textcite{brennan-schwartz-1977} eliminates the
+super-diagonal of $B$ from the top, $d'_{J-1}=B_{J-1,J-1}$, $q'_{J-1}=q_{J-1}$ and, for
+$j=J-2,\dots,1$,
+\begin{equation}\label{eq:fd-bs}
+  m_j=\frac{B_{j,j+1}}{d'_{j+1}},\quad d'_j=B_{jj}-m_jB_{j+1,j},\quad q'_j=q_j-m_jq'_{j+1},
+\end{equation}
+and then, upwards for $j=1,\dots,J-1$ with $B_{1,0}z_0:=0$,
+$z_j=\max\big(g_j,(q'_j-B_{j,j-1}z_{j-1})/d'_j\big)$: one elimination and one projected substitution,
+$O(J)$ operations.
+
+\begin{proposition}[American options on a grid]\label{prop:fd-american}
+Let $\theta\in(0,1]$, $r\ge0$, $h|\nu|\le\sigma^2$, and let $B=I-\theta kA$ be the matrix of one step on the
+interior nodes $1,\dots,J-1$. Then $B_{jl}\le0$ for $l\ne j$ and every row sum of $B$ is at least
+$1+\theta kr$.
+\begin{enumerate}[label=(\roman*)]
+  \item For all $q,g$, \eqref{eq:fd-lcp} has exactly one solution $z^*$. It is the smallest
+    \emph{supersolution}: $z^*\le s$ for every $s$ with $s\ge g$ and $Bs\ge q$; and $z^*=\Phi(z^*)$.
+  \item Projected Gauss--Seidel started at $z^{(0)}=g$ produces a nondecreasing sequence, bounded by
+    every supersolution, that converges to $z^*$, for every order of the sweep. If $h|\nu|<\sigma^2$,
+    PSOR converges to $z^*$ for every $\omega\in(0,2)$ and every starting point.
+  \item If $z^*$ has its exercise region at the bottom, that is, for some $j^*$, $z^*_j=g_j$ for
+    $j\le j^*$ and $(Bz^*-q)_j=0$ for $j>j^*$, then \eqref{eq:fd-bs} returns $z^*$. The mirror image,
+    eliminating from the bottom, holds for an exercise region at the top.
+  \item For $\rho>0$, the penalized equation $Bz=q+\rho(g-z)^+$ has a unique solution $z_\rho$, the
+    policy iteration of \textcite{forsyth-vetzal-2002} finds it in finitely many steps (their
+    Theorem~6.1), and $z_\rho\le z^*\le z_\rho+\|(Bg-q)^+\|_\infty/\rho$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+The off-diagonal entries are $-\theta kp_\pm\le0$, and the row sums are $1+\theta kr$ for interior rows and
+larger for the first and the last, which miss a neighbour.
+
+(i) A solution $z$ satisfies $z_j>g_j\Rightarrow(Bz)_j=q_j$ and $z_j=g_j\Rightarrow(Bz)_j\ge q_j$; dividing by $B_{jj}>0$, this
+is $z_j=\Phi_j(z)$, and conversely. Let $s$ be a supersolution and suppose $w=z-s$ has a positive
+maximum at $j_0$. Then $z_{j_0}>s_{j_0}\ge g_{j_0}$, so $(Bz)_{j_0}=q_{j_0}\le(Bs)_{j_0}$ and $(Bw)_{j_0}\le0$; but
+$(Bw)_{j_0}\ge(\sum_lB_{j_0l})w_{j_0}>0$ because $B_{j_0l}\le0$ and $w_l\le w_{j_0}$. So $z\le s$. A solution is a
+supersolution, so two solutions are each below the other: there is at most one, and it is the
+smallest supersolution. Existence follows from (ii).
+
+(ii) $\Phi$ is continuous and nondecreasing in each entry, because $B_{jl}\le0$. A sweep replaces the
+entries one by one by $\Phi_j$ of the current vector, so the sweep map is nondecreasing too. Since
+$\Phi(g)\ge g$, the first sweep does not decrease any entry, and by induction the sequence is
+nondecreasing. If $s$ is a supersolution, $\Phi(s)\le s$ entrywise, so $z^{(i)}\le s$ implies
+$z^{(i+1)}\le s$; and $s=c\mathbf 1$ is one as soon as $c\ge\max(\max_jg_j,\max_jq_j,0)$, since $B\mathbf 1\ge\mathbf 1$. The
+bounded nondecreasing sequence converges to a fixed point of $\Phi$, which solves
+\eqref{eq:fd-lcp}. For PSOR: if $p_\pm>0$, $D=\operatorname{diag}((p_-/p_+)^{j/2})$ makes $P=D^{-1}BD$ symmetric, with
+off-diagonal entries $-\theta k\sqrt{p_-p_+}$, and positive definite by Gershgorin, since
+$2\sqrt{p_-p_+}\le p_-+p_+$. PSOR for $B$, $q$, $g$ is PSOR for $P$, $D^{-1}q$, $D^{-1}g$, which converges for
+$\omega\in(0,2)$ by \textcite{cryer-1971}.
+
+(iii) By induction from the top, $d'_j\ge1+|B_{j,j-1}|$ and $m_j\le0$: $d'_{J-1}=B_{J-1,J-1}$, and if
+$d'_{j+1}\ge1+|B_{j+1,j}|$, then $0\le m_jB_{j+1,j}\le|B_{j,j+1}|$, so $d'_j\ge B_{jj}-|B_{j,j+1}|\ge1+|B_{j,j-1}|$.
+Row $j$ of the eliminated system, $B_{j,j-1}z_{j-1}+d'_jz_j=q'_j$, is row $j$ of $Bz=q$ plus $|m_j|$ times
+row $j+1$ of the eliminated system. So the residuals $r'_j=B_{j,j-1}z^*_{j-1}+d'_jz^*_j-q'_j$ satisfy
+$r'_{J-1}=r_{J-1}$ and $r'_j=r_j+|m_j|r'_{j+1}$, where $r=Bz^*-q\ge0$ vanishes above $j^*$. Hence $r'_j=0$ for
+$j>j^*$ and $r'_j\ge0$ for $j\le j^*$. For $j>j^*$ this says $z^*_j=(q'_j-B_{j,j-1}z^*_{j-1})/d'_j$, which is at least $g_j$;
+for $j\le j^*$, $z^*_j=g_j\ge(q'_j-B_{j,j-1}z^*_{j-1})/d'_j$. In both cases
+$z^*_j=\max\big(g_j,(q'_j-B_{j,j-1}z^*_{j-1})/d'_j\big)$, so the upward recursion, started at $j=1$, reproduces $z^*$.
+
+(iv) Existence, uniqueness and termination are Theorem~6.1 of \textcite{forsyth-vetzal-2002}; the
+bracket is \exref{ex:fd-penalty}.
+\end{proof}
+
+The hypothesis of (iii) is not automatic. For the put in the implicit scheme it is justified
+by \textcite{jaillet-lamberton-lapeyre-1990}; our code checks the residual of \eqref{eq:fd-lcp}: below
+$10^{-12}$ for the options of \cref{tab:fd-american}, but $5\times10^{-3}$ and $7\times10^{-3}$, with the exercise region
+assumed at the top and at the bottom, for an American straddle with $r=y=5\%$, which has an exercise region at
+each end (\exref{ex:fd-straddle}). Bermudan exercise
+replaces the complementarity problem by a maximum after the linear solve at the dates. Convergence of the discrete American prices to the American price holds
+for positive schemes by the theory of monotone schemes of \textcite{barles-souganidis-1991}, and
+for the implicit scheme by \textcite{jaillet-lamberton-lapeyre-1990}; Crank--Nicolson on our grids,
+with $\lambda$ from $3$ to $23$, is outside both, and its convergence is observed, not proved here.
+
+\begin{table}[ht]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+& European & grid & corrected & BBSR & LR & trinomial & Ch.~14\\
+\midrule
+test case, put & $8.349406$ & $8.349393$ & $8.349408$ & $8.349408$ & $8.349408$ & $8.349154$ & $8.349408$\\
+test case, call & $7.364290$ & $7.459694$ & $7.459709$ & $7.459739$ & $7.459766$ & $7.459608$ & $7.4597$\\
+LS $36$, $0.2$, $1$ & $3.844308$ & $4.486662$ & $4.486666$ & $4.486679$ & $4.486560$ & $4.486642$ & $4.487$\\
+LS $40$, $0.2$, $1$ & $2.066401$ & $2.319556$ & $2.319562$ & $2.319579$ & $2.319535$ & $2.319522$ & $2.320$\\
+LS $44$, $0.4$, $2$ & $5.201995$ & $5.646682$ & $5.646696$ & $5.646747$ & $5.646698$ & $5.646838$ & $5.647$\\
+\bottomrule
+\end{tabular}
+\caption{American puts and calls. Grid: Crank--Nicolson with Rannacher's start, $J=3200$
+  intervals over $\pm6\sigma\sqrt T$, $N=1600$ steps, Brennan--Schwartz (PSOR and the penalty method
+  agree to $2\times10^{-6}$); corrected: plus the Black--Scholes price minus the European price on the
+  same grid. BBSR: $n=4000$ (the tree of \cref{ch:14-american-mc}, which used $2000$ steps for
+  \cref{tab:am-ls}); LR: Leisen--Reimer,
+  $n=4001$; trinomial: $\kappa=\sqrt{3/2}$, $n=2000$. LS $S_0$, $\sigma$, $T$: the puts of Longstaff and
+  Schwartz, $K=40$, $r=6\%$, $y=0$. \Cref{ch:14-american-mc} quotes the test-case values and
+  \cref{tab:am-ls} to the digits shown.}
+\label{tab:fd-american}
+\end{table}
+
+\paragraph{The numbers.} \Cref{tab:fd-american} reproduces the converged American values of
+\cref{ch:14-american-mc}: the test-case put $8.349408$ (early-exercise premium $2.0\times10^{-6}$ on the
+grid, as in \cref{ch:14-american-mc}), the test-case call $7.4597$ ($y>r$, so early exercise of the call pays),
+and the Longstaff--Schwartz rows. With exercise at $50$ dates per year the grid gives the
+Bermudan values of \cref{ch:14-american-mc} within $10^{-4}$ ($4.477807$ against $4.477810$ for the first LS row).
+Brennan--Schwartz costs one pass, the penalty method about $1.1$ tridiagonal solves per step on
+average (at most $5$), and PSOR with $\omega=1.2$ up to $16$, $36$ and $70$ sweeps per step ($15$, $34$, $65$ on
+average) for $J=400$, $800$, $1600$ with $N=J/2$: an iterative solver slows down as $\lambda$ grows. The American errors fall by
+about $3$ when $J$ and $N$ double (order about $1.6$), against $4$ for the European ones: the price is
+not twice differentiable across the exercise boundary of \cref{fig:fd-american}(a).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch20-american}
+  \caption{(a) Exercise boundary of the Longstaff--Schwartz put ($S_0=36$, $K=40$, $r=6\%$, $\sigma=20\%$,
+    $T=1$): grid ($J=1600$, $N=800$, Brennan--Schwartz; largest exercised node) and CRR tree ($2000$
+    steps, every tenth shown); $K$ dashed, $L^*=2rK/(2r+\sigma^2)=30$ dotted. (b) Test-case call: the
+    Crank--Nicolson price ($k=1/400$, $h=0.003$) on $\log S_0\pm m\sigma\sqrt T$ minus that on $\log S_0\pm10\sigma\sqrt T$,
+    for asymptotic and payoff boundary values, and the bounds of \cref{prop:fd-boundary} (dashed);
+    differences below $10^{-11}$ (rounding) are not shown.}
+  \label{fig:fd-american}
+\end{figure}
+
+\section{Path dependence and several factors}\label{sec:fd-extensions}
+
+\paragraph{Barriers.} A continuously monitored knock-out is a Dirichlet condition: the grid ends
+at the barrier, a node, with value zero. A discretely monitored one sets the values beyond the
+barrier to zero at the monitoring dates; we place the barrier midway between two nodes and
+repeat Rannacher's start after each date. On the course's monthly down-and-out call ($B=95$)
+the Crank--Nicolson grid with $J=1600$, $N=960$ gives $5.32995$ against the exact $5.32979$ of \cref{ch:16-barriers}, and $3.75411$ against $3.75412$ for
+continuous monitoring (compare \cref{prop:bar-bgk}). In a tree the error oscillates in $n$ unless
+a layer of nodes lies on the barrier \citep{boyle-lau-1994}.
+
+\paragraph{Other path dependence and several factors.} A running maximum or average becomes an
+extra state variable. In two dimensions (Heston,
+\cref{prop:sv-pde}; two assets) the implicit step is a sparse system rather than a tridiagonal one;
+alternating-direction implicit methods split it into tridiagonal solves along each axis
+\citep{peaceman-rachford-1955}, with the mixed derivative of correlated factors treated
+explicitly \citep{craig-sneyd-1988,in-t-hout-foulon-2010}. For a target error $\varepsilon$ and a smooth
+solution, the explicit scheme needs $h\approx\varepsilon^{1/2}$ and $k\approx h^2$, Crank--Nicolson with Rannacher's
+start $h\approx k\approx\varepsilon^{1/2}$; in $d$ space dimensions they cost $\varepsilon^{-(d+2)/2}$ and $\varepsilon^{-(d+1)/2}$
+operations, the course's rule $\varepsilon^{-(d+1)/\alpha}$ for lattices with $\alpha=2$, against $\varepsilon^{-2}$ for Monte
+Carlo (\cref{prop:mc-dimension}).
+
+\begin{incode}
+\coderef{code/src/mfe230d/grids.py} implements the trees, \texttt{fd\_solve} (the $\theta$-scheme with
+barriers and American exercise by \texttt{psor}, \texttt{brennan\_schwartz} or \texttt{penalty}) and the
+stability tools; \coderef{code/tests/test_grids.py} checks every number quoted here.
+\end{incode}
+
+\demo{20-grids.ipynb}{trees, stability, the far field and the American put.}
+
+\furtherreading
+Finance: \textcite{wilmott-howison-dewynne}; stability: \textcite{strikwerda-finite-difference}.

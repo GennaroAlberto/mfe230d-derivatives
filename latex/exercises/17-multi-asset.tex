@@ -1,0 +1,140 @@
+% Exercises for Chapter 17 (FX and multi-asset options). Statements only: solutions are kept privately.
+% Throughout, the notation is that of the notes: Black(F, K, v) is the function of eq. (ma-black),
+% Q is the domestic risk-neutral measure and Q_f the foreign one.
+\providecommand{\Black}{\operatorname{Black}}
+\providecommand{\Corr}{\operatorname{Corr}}
+
+\begin{exercise}[Forwards seen from both sides]\label{ex:ma-siegel}
+\easy In the Garman--Kohlhagen model \noteref{eq:ma-gk}, let $F=X_0e^{(r_d-r_f)T}$. You may use
+\noteref{prop:ma-numeraire}.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $\EQ[X_T]=F$ and $\E^{\Q_f}[1/X_T]=1/F$. Why is each identity the natural one for
+    an investor in the corresponding currency?
+  \item Compute $\EQ[1/X_T]$ and compare it with $1/F$.
+  \item Suppose that under the real-world measure $\Prob$, $\dd X_t/X_t=\mu\,\dd t+\sigma\,\dd W^{\Prob}_t$.
+    For which $\mu$ is $F$ an unbiased forecast of $X_T$? Can $F$ and $1/F$ be unbiased forecasts of
+    $X_T$ and $1/X_T$ at the same time? (This is Siegel's paradox.)
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Working under the share measure]\label{ex:ma-share}
+\easy Work in the standard model with dividend yield $y$, and in the two-asset model of
+\noteref{thm:ma-margrabe}. You may use \noteref{prop:ma-numeraire} and \noteref{thm:ma-margrabe}.
+\begin{enumerate}[label=(\alph*)]
+  \item \noteref{rem:ma-mc-numeraire} estimates the call by averaging $S_0e^{-yT}(1-K/S_T)^+$ with $S_T$
+    drawn under $\Q^S$. Show that the variance of one such draw is at most $\frac14(S_0e^{-yT})^2$ for every
+    $K>0$ and $\sigma>0$, while the variance of the plain draw $e^{-rT}(S_T-K)^+$ under $\Q$ tends to infinity as
+    $\sigma\to\infty$ with the other inputs fixed. Is the share measure always the better choice?
+  \item Let $N$ and $N'$ be two num\'eraires as in \noteref{prop:ma-numeraire}. Show that
+    $\dd\Q^{N'}/\dd\Q^N=(N'_T/N_T)/(N'_0/N_0)$.
+  \item In Margrabe's formula, show that $N(d_+)$ is the probability that $S_{1,T}>S_{2,T}$ under the
+    measure with num\'eraire $e^{y_1t}S_{1,t}$, and $N(d_-)$ the same probability under the one with
+    num\'eraire $e^{y_2t}S_{2,t}$. Explain with (b), without computing, why the first is the larger.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[The better and the worse of two assets]\label{ex:ma-max}
+\medium Two assets follow \noteref{eq:ma-model} with $d=2$. Payoffs are paid at $T$.
+\begin{enumerate}[label=(\alph*)]
+  \item Express the prices of $\max(S_{1,T},S_{2,T})$ and of $\min(S_{1,T},S_{2,T})$ with Margrabe's
+    formula \noteref{thm:ma-margrabe}, and check that they add up to the right amount.
+  \item Show that the price of the best-of is nonincreasing in $\rho$. What are its limits as
+    $\rho\to-1$ and as $\rho\to1$? What happens at $\rho=1$ when $\sigma_1=\sigma_2$, and why is this
+    obvious without any formula?
+  \item Compute both prices for $S_{1,0}=S_{2,0}=100$, $r=1\%$, $y_1=y_2=2\%$, $T=1$, $\sigma_1=20\%$,
+    $\sigma_2=30\%$ and $\rho=0.5$, and check them by simulation.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[A currency option on a foreign share]\label{ex:ma-elf}
+\medium Work in the market of \noteref{prop:ma-quanto}. An \emph{equity-linked} currency call pays
+$S_T(X_T-\bar X)^+$ units of domestic currency: a call on the exchange rate, struck at $\bar X$, whose
+notional is one foreign share.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $N_t=X_tS_te^{yt}$ is a num\'eraire as in \noteref{prop:ma-numeraire}(iii) and find
+    the dynamics of $X$ under $\Q^N$.
+  \item Show that the price is
+    \[
+      X_0S_0e^{-yT}N(e_+)-\bar XS_0e^{-(y+r_d-r_f+\rho\sigma_S\sigma_X)T}N(e_-),
+    \]
+    with $e_\pm=\big(\log(X_0/\bar X)+(r_d-r_f+\rho\sigma_S\sigma_X\pm\frac12\sigma_X^2)T\big)/(\sigma_X\sqrt T)$,
+    and write it as a Black--Scholes price with ``pre-washed'' inputs. Interpret the second term
+    with \noteref{prop:ma-quanto}(ii).
+  \item Evaluate it with the inputs of \noteref{exa:ma-quanto} and $\bar X=X_0=1.2$, and check it by
+    simulation.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Hedging a quanto]\label{ex:ma-quanto-hedge}
+\hard Work in the market of \noteref{prop:ma-quanto} with $|\rho|<1$, now under the real-world measure $\Prob$, with
+$\dd X_t/X_t=\mu^{\Prob}_X\,\dd t+\sigma_X\,\dd W_{X,t}$ and $\dd S_t/S_t=\mu^{\Prob}_S\,\dd t+\sigma_S\,\dd W_{S,t}$, arbitrary
+constant drifts, and $\dd\langle W_X,W_S\rangle=\rho\,\dd t$. Three assets are traded: the foreign share with
+dividends reinvested (domestic value $P^1_t=X_tS_te^{yt}$), the foreign money market ($P^2_t=X_te^{r_ft}$)
+and the domestic money market. Let $V(t,s)$ be smooth, and consider the self-financing portfolio holding
+$\phi_t$ units of $P^1$, $\psi_t$ units of $P^2$ and the rest of its value in domestic cash.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that its value can track $V(t,S_t)$ exactly only if $\phi_tP^1_t=S_t\,\partial_sV$ and
+    $\psi_tP^2_t=-S_t\,\partial_sV$: the shares are financed by borrowing foreign currency.
+  \item Show that it then tracks $V(t,S_t)$ if and only if
+    \[
+      \partial_tV+(r_f-y-\rho\sigma_S\sigma_X)\,s\,\partial_sV+\tfrac12\sigma_S^2s^2\,\partial_s^2V=r_dV,
+    \]
+    and that the quanto price of \noteref{prop:ma-quanto}(ii) solves this equation. Where in your
+    computation does the quanto adjustment come from, and why do the real-world drifts drop out?
+  \item A hedger who buys the $\phi_t$ shares with domestic cash, without the foreign loan, keeps a
+    position in the currency. Write the extra term in the change of the portfolio's value, and say
+    which risk it carries.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Static bounds for a cross-currency option]\label{ex:ma-triangle}
+\medium Use the inputs of \noteref{exa:ma-cross}. Consider three at-the-money-forward options with
+$T=1$, all valued in USD: the GBP/USD call paying $(X_{1,T}-F_1)^+$; the EUR/USD call and put paying
+$(X_{2,T}-F_2)^+$ and $(F_2-X_{2,T})^+$; and the GBP/EUR call paying $(X_{1,T}-F_{12}X_{2,T})^+$, where
+$F_1$, $F_2$ and $F_{12}=F_1/F_2$ are the forwards.
+\begin{enumerate}[label=(\alph*)]
+  \item Show that $(a-c)^+-(b-c)^+\le(a-b)^+\le(a-c)^++(c-b)^+$ for all real $a,b,c$. Deduce bounds on the
+    price $C_{12}$ of the GBP/EUR call in terms of the prices $C_1$, $C_2$, $P_2$ of the other three,
+    valid in every arbitrage-free model.
+  \item In the Garman--Kohlhagen models for the three rates, with volatilities $\sigma_1$, $\sigma_2$,
+    $\sigma_{12}$, show that $C_1$, $F_{12}C_2$, $F_{12}P_2$ and $C_{12}$ are all of the form
+    $\kappa\,g(\sigma)$ for one constant $\kappa$ and $g(\sigma)=2N(\frac12\sigma)-1$. Show that the bounds of (a)
+    admit every $\sigma_{12}\in[|\sigma_1-\sigma_2|,\sigma_1+\sigma_2]$.
+  \item The GBP/EUR call is quoted at a volatility of $0.5\%$, and on another day at $21.5\%$. In each
+    case, give a portfolio of the four options with a nonnegative payoff and a negative price, and that
+    price.
+  \item Which quotes outside $[1\%,21\%]$ admit no arbitrage of the kind in (a)? What does this say
+    about the triangle of \noteref{sec:ma-exchange}?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Spread options]\label{ex:ma-spread}
+\medium This is a computational exercise. Take two assets as in \noteref{eq:ma-model} with
+$S_{1,0}=S_{2,0}=100$, $r=1\%$, $y_1=y_2=2\%$, $T=1$, $\sigma_1=20\%$, $\sigma_2=25\%$, $\rho=0.6$, and the
+spread call paying $(S_{1,T}-S_{2,T}-K)^+$.
+\begin{enumerate}[label=(\alph*)]
+  \item Price it by plain Monte Carlo for $K=0,5,10,20$, with $2^{18}$ draws.
+  \item Use the exchange option $(S_{1,T}-S_{2,T})^+$, priced by \noteref{thm:ma-margrabe}, as a control
+    variate. Report the correlation, the coefficient and the reduction of the standard error for each $K$,
+    and explain the trend.
+  \item \emph{Kirk's approximation} treats $S_{2,T}+K$ as lognormal: with $F_i=\EQ S_{i,T}$, $u=F_2/(F_2+K)$
+    and $\sigma_K^2=\sigma_1^2-2\rho\sigma_1\sigma_2u+\sigma_2^2u^2$, it prices the spread at
+    $e^{-rT}\Black(F_1,F_2+K,\sigma_K^2T)$. Compare it with your estimates. Is it exact for $K=0$?
+  \item Price the spread to six decimals by conditioning on $S_{2,T}$ and integrating in one dimension,
+    and use the result to judge (a)--(c). Why can \noteref{prop:ma-basket}(iii) not be used here?
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Dispersion and the geometric control]\label{ex:ma-dispersion}
+\medium This is a computational exercise. Take the basket of \noteref{exa:ma-basket}, with $K=100$,
+but with the correlations $\rho_{12}=-0.3$, $\rho_{13}=0.2$, $\rho_{23}=-0.4$.
+\begin{enumerate}[label=(\alph*)]
+  \item Check that this is a correlation matrix, and compute $\sqrt{v_G}$, $\sqrt{v_2}$ and the bound of
+    \noteref{prop:ma-basket}(ii).
+  \item Price the call by plain Monte Carlo and with the geometric control, with $2^{18}$ draws. Compare
+    the correlation and the variance reduction with those of \noteref{exa:ma-basket}.
+  \item Compute the two-moment and Gentle approximations and the geometric call, and compare them with
+    a reference price (the method of \noteref{rem:ma-reference}, or a long run with the control).
+  \item Explain why lower correlations hurt both the control and the approximations.
+\end{enumerate}
+\end{exercise}

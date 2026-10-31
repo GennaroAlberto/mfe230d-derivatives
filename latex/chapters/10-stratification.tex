@@ -1,0 +1,748 @@
+% Chapter 10: Stratified sampling and conditional Monte Carlo.
+
+The methods of \cref{ch:08-antithetic-control} use a symmetry of the input law or a
+quantity with a known mean. This chapter uses the structure of the variance itself. For any
+random variable $\xi$ computed along with the payoff $Y$, the law of total variance splits
+\begin{equation}\label{eq:st-total-variance}
+  \Var Y=\underbrace{\E\big[\Var(Y\mid\xi)\big]}_{\text{within}}+\underbrace{\Var\big(\E[Y\mid\xi]\big)}_{\text{between}} .
+\end{equation}
+\emph{Stratified sampling} cuts the range of $\xi$ into pieces and fixes in advance how
+many draws land in each piece; it removes the variance between the pieces, and in the limit
+of many pieces the whole between part. \emph{Conditional Monte Carlo} computes $\E[Y\mid\xi]$ in closed form and
+averages that instead of $Y$; it removes the within part. The two are complementary, and
+the art is in the choice of $\xi$: the terminal value of a Brownian path, a direction in the
+space of normals, every coordinate at once (Latin hypercube sampling), or the whole
+volatility path of a stochastic volatility model, given which the Black--Scholes formula
+applies.
+
+Throughout, $Y$ is a real random variable with $\E[Y^2]<\infty$, mean $\mu$ and variance
+$\sigma^2$, and $\hat\mu_n$ is the plain estimator from $n$ independent copies, with
+variance $\sigma^2/n$ (\cref{def:mc-estimator}). In pricing, $Y$ is a discounted payoff and
+the samples are drawn under $\Q$; as in \cref{ch:06-monte-carlo} we write $\Prob$ and $\E$
+for the sampling measure. The test case is $S=K=100$, $T=1$, $r=1\%$, $y=2\%$,
+$\sigma=20\%$, with $S_T=S\exp(\nu T+\sigma\sqrt T Z)$, $\nu=r-y-\frac{\sigma^2}2$, and the
+discounted call has mean $7.36429$ and variance $158.006$.
+
+\section{Stratified sampling}\label{sec:st-strata}
+
+Let $\xi$ be a random element of a measurable space $E$ (the \emph{stratification
+variable}) and let $A_1,\dots,A_H$ be a measurable partition of $E$ into \emph{strata}, with
+$p_h=\Prob(\xi\in A_h)$. A stratum with $p_h=0$ is almost surely never visited and
+contributes nothing to $\mu$; we discard such strata and assume $p_h>0$ for every $h$. Let
+\[
+  \mu_h=\E[Y\mid\xi\in A_h]=\frac{\E[Y\1_{A_h}(\xi)]}{p_h},\qquad
+  \sigma_h^2=\E\big[(Y-\mu_h)^2\mid\xi\in A_h\big]
+\]
+be the mean and the variance of $Y$ in stratum $h$. Given integers $n_h\ge1$ with
+$\sum_hn_h=n$, draw $Y_{h,1},\dots,Y_{h,n_h}$ independently from the conditional law of $Y$
+given $\xi\in A_h$, independently across strata, and set
+\begin{equation}\label{eq:st-estimator}
+  \hat\mu^{\mathrm{st}}_n=\sum_{h=1}^Hp_h\,\bar Y_h,\qquad \bar Y_h=\frac1{n_h}\sum_{i=1}^{n_h}Y_{h,i}.
+\end{equation}
+Two things are needed: the probabilities $p_h$ exactly, and a way to sample in a stratum.
+Both are easy when $\xi$ is a uniform. Suppose $Y=g(U,U')$, where $U$ is uniform on $(0,1)$
+and independent of the rest $U'$ of the randomness, and take strata
+$I_h=(a_{h-1},a_h]$ with $0=a_0<\dots<a_H=1$, so $p_h=a_h-a_{h-1}$. If $V$ is uniform and
+independent of $U'$, then $g(a_{h-1}+p_hV,U')$ has the conditional law of $Y$ given
+$U\in I_h$: for bounded measurable $F$, Fubini's theorem gives
+$\E[F(Y)\1_{I_h}(U)]=\int_{I_h}\E[F(g(u,U'))]\,\dd u=p_h\E[F(g(a_{h-1}+p_hV,U'))]$. With
+$Z=N^{-1}(U)$ (\cref{prop:rng-inversion}) this stratifies a normal; equiprobable strata
+$a_h=h/H$ are the usual choice. Defining the strata in $u$-space makes every $p_h$ exact
+even when the variable built from $U$ has atoms or gaps.
+
+\begin{theorem}[Stratified sampling]\label{thm:st-variance}
+In the setting above:
+\begin{enumerate}[label=(\roman*)]
+  \item $\mu=\sum_hp_h\mu_h$ and
+    $\sigma^2=\sum_hp_h\sigma_h^2+\sum_hp_h(\mu_h-\mu)^2$ (within plus between).
+  \item If $n_h\ge1$ for every $h$, $\hat\mu^{\mathrm{st}}_n$ is unbiased and
+    $\Var\hat\mu^{\mathrm{st}}_n=\sum_hp_h^2\sigma_h^2/n_h$. If $n_h=0$ for the strata in a set
+    $E_0$ and their terms are dropped, the bias is $-\sum_{h\in E_0}p_h\mu_h$.
+  \item (\emph{Proportional allocation.}) If $n_h=np_h$ for every $h$ (integers), then
+    \[
+      \Var\hat\mu^{\mathrm{st}}_n=\frac1n\sum_hp_h\sigma_h^2=\frac{\sigma^2}n-\frac1n\sum_hp_h(\mu_h-\mu)^2\le\frac{\sigma^2}{n},
+    \]
+    with equality if and only if $\mu_h=\mu$ for every $h$.
+  \item Splitting strata further never increases $\sum_hp_h\sigma_h^2$.
+  \item (\emph{Many strata.}) Let $\xi=U$ be uniform and $I_h=((h-1)/H,h/H]$. As
+    $H\to\infty$, $\sum_hp_h\sigma_h^2\to\E[\Var(Y\mid U)]=\sigma^2-\Var(\E[Y\mid U])$. In
+    particular, if $Y$ is a function of $U$ alone and $H=H_n\to\infty$ with proportional
+    allocation, then $n\Var\hat\mu^{\mathrm{st}}_n\to0$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) $\E Y=\sum_h\E[Y\1_{A_h}(\xi)]=\sum_hp_h\mu_h$. Expanding $Y-\mu=(Y-\mu_h)+(\mu_h-\mu)$ on
+$\{\xi\in A_h\}$, the cross term has expectation
+$2(\mu_h-\mu)\E[(Y-\mu_h)\1_{A_h}(\xi)]=0$, so
+$\E[(Y-\mu)^2\1_{A_h}(\xi)]=p_h\sigma_h^2+p_h(\mu_h-\mu)^2$; sum over $h$.
+
+(ii) The $\bar Y_h$ are independent, with means $\mu_h$ and variances $\sigma_h^2/n_h$; use
+(i). Without draws in the strata of $E_0$ the estimator misses their terms $p_h\mu_h$ in (i).
+
+(iii) Substitute $n_h=np_h$ in (ii) and use (i). The difference is
+$\frac1n\sum_hp_h(\mu_h-\mu)^2$, which vanishes exactly when every $\mu_h$ equals $\mu$,
+since every $p_h>0$.
+
+(iv) If $A_h$ is split into pieces $A_{h,k}$, apply (i) to the conditional law given
+$\xi\in A_h$: $\sigma_h^2$ is at least the within-piece part
+$\sum_k(p_{h,k}/p_h)\sigma_{h,k}^2$. Multiply by $p_h$ and sum over $h$.
+
+(v) Let $g(U)=\E[Y\mid U]$ and let $\mathcal G_H$ be generated by the events
+$\{U\in I_h\}$. On $\{U\in I_h\}$, $\E[Y\mid\mathcal G_H]=\mu_h$, so
+$\sum_hp_h\sigma_h^2=\E[(Y-\E[Y\mid\mathcal G_H])^2]$. Since $\mathcal G_H\subset\sigma(U)$,
+$\E[Y\mid\mathcal G_H]=\E[g(U)\mid\mathcal G_H]=:(P_Hg)(U)$, where $P_Hg$ is the average of $g$
+over each cell $I_h$. The variable $Y-g(U)$ is orthogonal to every square-integrable function of $U$, so
+\[
+  \sum_hp_h\sigma_h^2=\E\big[(Y-g(U))^2\big]+\|g-P_Hg\|^2_{L^2(0,1)} .
+\]
+The first term is $\E[\Var(Y\mid U)]$. For the second, $P_H$ is an orthogonal projection, so
+$\|P_Hk\|\le\|k\|$; for a continuous $c$ on $[0,1]$, $|c-P_Hc|\le\omega_c(1/H)$, the modulus
+of continuity of $c$ at $1/H$. Hence
+$\|g-P_Hg\|\le\|g-c\|+\|c-P_Hc\|+\|P_H(c-g)\|\le2\|g-c\|+\omega_c(1/H)$. Continuous functions
+are dense in $L^2(0,1)$, so the second term tends to $0$.
+\end{proof}
+
+Under plain sampling the number of draws that land in $A_h$ is random, binomial with
+mean $np_h$; proportional allocation fixes it at its mean, and the between-strata variance,
+which came from that randomness, disappears. The word ``never'' in (iii) belongs to
+proportional allocation. With other allocations stratification can lose: take two
+equiprobable strata with $\mu_1=\mu_2$, $\sigma_1=0$ and $\sigma_2>0$, so that
+$\sigma^2=\sigma_2^2/2$; the allocation $n_1=n-1$, $n_2=1$ gives the variance
+$\sigma_2^2/4>\sigma^2/n$ for every $n\ge3$. Part (v) says that with many strata on a uniform,
+stratification removes all the variance that the uniform explains. By
+\cref{prop:rng-inversion} the same holds for equiprobable strata of any scalar $\xi=F^{-1}(U)$
+with a continuous distribution function $F$, since then $U=F(\xi)$ and $\sigma(\xi)=\sigma(U)$. No rate is
+claimed: how fast $\sum_hp_h\sigma_h^2$ approaches its limit depends on the smoothness of
+$u\mapsto\E[Y\mid U=u]$ (\exref{ex:st-one-point}).
+
+\begin{example}[The test-case call]\label{exa:st-call}
+Stratify $Z=N^{-1}(U)$ into $H$ equiprobable strata. The call pays off when
+$Z>z^*=0.15$, so every stratum below $z^*$ has $\mu_h=\sigma_h=0$: with $H=2$ the lower
+half is worthless, and the variance factor $\sum_hp_h\sigma_h^2/\sigma^2$ is $0.657$. With
+$H=10$, $100$ and $1000$ it is $0.1007$, $0.0081$ and $0.00073$, standard-error ratios
+$0.317$, $0.090$ and $0.027$ (\cref{fig:st-strata}). The stratum moments are computed by
+Gauss--Legendre quadrature on each stratum (\texttt{stratum\_moments}), which avoids the
+cancellation of the closed forms in narrow strata. A stratified draw costs one inversion. On
+our machine \texttt{rng.norm\_inv} costs about seven times NumPy's normal generator, and the
+whole stratified estimator about $4.5$ times the plain one with NumPy normals (machine-dependent;
+\texttt{laboratory\_costs} and the notebook time it), so the efficiency
+(\cref{def:mc-efficiency}) is about $1/(4.5\times0.1007)\approx2.2$ with $10$ strata, not $10$,
+and about $27$ with $100$.
+\end{example}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch10-strata}
+  \caption{(a) The discounted test-case call as a function of the uniform $u$,
+    $g(u)=e^{-rT}(S_T(N^{-1}(u))-K)^+$, and its means on $8$ equiprobable strata; the curve
+    leaves the frame near $u=1$. Proportional stratification samples only the deviations
+    from the step function. (b) Variance factors $n\Var\hat\mu^{\mathrm{st}}_n/\sigma^2$
+    against the number $H$ of equiprobable strata: lines are exact
+    (\cref{thm:st-variance,prop:st-optimal}), dots are measured over $400$ independent
+    replications of $n=2000$ draws, seed $1010$ (filled: proportional; open: Neyman, with at
+    least one draw per stratum). The deep out-of-the-money call is the course's example.}
+  \label{fig:st-strata}
+\end{figure}
+
+\paragraph{The course's experiment.} The course's notebook prices a deep
+out-of-the-money call, $S=100$, $K=150$, $T=1$, $r=5\%$, $y=0$, $\sigma=20\%$ (price
+$0.35963$), with $n=10^5$ draws in $10$, $50$ or $100$ equiprobable strata, and compares the
+variances of $100$ repeated estimates. The exact variance factors are $0.856$, $0.318$ and
+$0.158$. Only $3.0\%$ of the mass lies above the strike ($z^*=1.877$), so with $10$ strata
+the whole payoff sits in the top stratum, and stratification removes only the randomness of
+the number of draws that reach it; Neyman allocation repairs this (\exref{ex:st-neyman-otm}). Repeating the course's protocol in our implementation
+(\texttt{course\_otm\_experiment}, numpy \texttt{default\_rng}, seed $5$), the variances of
+the $100$ estimates are $9.61$, $8.05$, $2.64$ and $1.46$ (in units of $10^{-5}$) for plain
+sampling and $10$, $50$, $100$ strata, against the exact $8.08$, $6.92$, $2.57$ and $1.28$; a
+variance estimated from $100$ estimates has a relative standard error of about $14\%$.
+
+\subsection{Optimal allocation}
+
+Proportional allocation ignores the $\sigma_h$. Strata where the payoff varies more deserve
+more draws.
+
+\begin{proposition}[Neyman allocation]\label{prop:st-optimal}
+Let $\bar\sigma=\sum_hp_h\sigma_h>0$.
+\begin{enumerate}[label=(\roman*)]
+  \item For all real $n_h>0$ with $\sum_hn_h=n$,
+    \[
+      \sum_h\frac{p_h^2\sigma_h^2}{n_h}\ge\frac{\bar\sigma^2}{n},
+    \]
+    with equality if and only if $n_h=np_h\sigma_h/\bar\sigma$ for every $h$. If every
+    $\sigma_h>0$, this \emph{Neyman allocation} is the unique minimiser. If $\sigma_h=0$ for
+    $k\ge1$ strata, the bound is not attained by an allocation with all $n_h>0$; one draw in
+    each such stratum and the Neyman allocation of the other $n-k$ draws give
+    $\bar\sigma^2/(n-k)$.
+  \item $\displaystyle \frac{\sigma^2}{n}-\frac{\bar\sigma^2}{n}
+    =\frac1n\sum_hp_h(\mu_h-\mu)^2+\frac1n\sum_hp_h(\sigma_h-\bar\sigma)^2$; the second term
+    is the gain over proportional allocation, zero if and only if all $\sigma_h$ are equal.
+  \item If the $n_h\ge1$ are computed from a pilot run independent of the draws used in
+    \eqref{eq:st-estimator}, the estimator is unbiased, and conditionally on the pilot the
+    allocation, though random, is fixed, so that \cref{prop:st-error}(i)--(ii) below apply.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) By the Cauchy--Schwarz inequality,
+\[
+  \bar\sigma^2=\Big(\sum_h\frac{p_h\sigma_h}{\sqrt{n_h}}\sqrt{n_h}\Big)^2
+  \le\Big(\sum_h\frac{p_h^2\sigma_h^2}{n_h}\Big)\Big(\sum_hn_h\Big),
+\]
+with equality if and only if the vectors $(p_h\sigma_h/\sqrt{n_h})_h$ and $(\sqrt{n_h})_h$ are
+proportional, that is $n_h=cp_h\sigma_h$ for a constant $c$, which $\sum_hn_h=n$ fixes as
+$n/\bar\sigma$. If some $\sigma_h=0$ this would require $n_h=0$. Strata with $\sigma_h=0$
+contribute nothing to the variance whatever $n_h\ge1$, and the bound applied to the others
+with $n-k$ draws gives $\bar\sigma^2/(n-k)$.
+
+(ii) By \cref{thm:st-variance}(i),
+$\sigma^2-\bar\sigma^2=\sum_hp_h(\mu_h-\mu)^2+\sum_hp_h\sigma_h^2-\bar\sigma^2$, and
+$\sum_hp_h\sigma_h^2-\bar\sigma^2=\sum_hp_h(\sigma_h-\bar\sigma)^2$ is the variance of
+$\sigma_h$ under the weights $p_h$.
+
+(iii) Conditionally on the pilot run the $n_h$ are constants and the main draws keep their
+law, so \cref{thm:st-variance}(ii) and \cref{prop:st-error} hold conditionally; for the mean,
+take expectations.
+\end{proof}
+
+The $\sigma_h$ are estimated from a pilot run. If the pilot draws are reused in the final
+estimate, the allocation depends on them, and both the estimate and its variance estimate are
+in general biased (typically at order $1/n$, which we do not prove). Rounding to integers and
+keeping $n_h\ge2$ costs little when $np_h\sigma_h/\bar\sigma\gg1$. For the test-case call with $10$ strata the Neyman
+factor is $0.0234$ against $0.1007$ for proportional allocation (standard-error ratios
+$0.153$ and $0.317$), and with $100$ strata $0.00044$ against $0.0081$. Half of the
+$10$ strata lie below $z^*$; Neyman gives them nothing in the limit, and they could even be
+skipped since $\mu_h=0$ is known. Neyman allocation is a form of importance sampling
+(\cref{ch:09-importance-sampling}) restricted to a partition: it oversamples the strata where
+the payoff varies, and the weights $p_hn/n_h$ implicit in \eqref{eq:st-estimator} are its
+likelihood ratios, constant on each stratum. With unequal costs per stratum the rule changes
+(\exref{ex:st-costs}).
+
+\subsection{Error estimates}
+
+\begin{proposition}[Standard errors for stratified estimators]\label{prop:st-error}
+\begin{enumerate}[label=(\roman*)]
+  \item If $n_h\ge2$ for every $h$ and $\hat s_h^2$ is the sample variance in stratum $h$,
+    then $\hat v=\sum_hp_h^2\hat s_h^2/n_h$ is an unbiased estimator of
+    $\Var\hat\mu^{\mathrm{st}}_n$.
+  \item Let $H$ be fixed and $n_h/n\to q_h>0$ as $n\to\infty$, and let
+    $v=\sum_hp_h^2\sigma_h^2/q_h>0$. Then $\sqrt n(\hat\mu^{\mathrm{st}}_n-\mu)\Rightarrow\mathcal N(0,v)$
+    and $(\hat\mu^{\mathrm{st}}_n-\mu)/\sqrt{\hat v}\Rightarrow\mathcal N(0,1)$.
+  \item $R$ independent replications of any stratified estimator (for instance with one draw
+    per stratum) are i.i.d.\ with mean $\mu$, and \cref{thm:mc-clt} applies to their average
+    as $R\to\infty$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $\E\hat s_h^2=\sigma_h^2$ for $n_h\ge2$. (ii) By the central limit theorem in each
+stratum, independently across $h$, $\sqrt{n_h}(\bar Y_h-\mu_h)\Rightarrow\mathcal N(0,\sigma_h^2)$,
+a point mass if $\sigma_h=0$. As
+$\sqrt n(\hat\mu^{\mathrm{st}}_n-\mu)=\sum_hp_h\sqrt{n/n_h}\,\sqrt{n_h}(\bar Y_h-\mu_h)$, the
+characteristic functions multiply and the limit is $\mathcal N(0,v)$. By the strong law
+$n\hat v\to v$ almost surely; Slutsky's lemma \citep[Lemma~2.8]{vandervaart-asymptotic}
+concludes. (iii) is immediate.
+\end{proof}
+
+With one draw per stratum no $\hat s_h$ exists; (iii) is then the way to a confidence
+interval, at the price of fewer strata per replication. Merging pairs of adjacent strata
+gives a conservative alternative (\exref{ex:st-collapsed}).
+
+\demo{10-stratification.ipynb}{stratify a call or a put at any strike with any number of
+strata, compare proportional and Neyman allocation, and see where the draws go.}
+
+\section{Post-stratification}\label{sec:st-post}
+
+Sometimes the stratum of a draw can be observed but not prescribed: the paths are simulated
+forward, and only afterwards do we see in which range their terminal value fell. If the
+$p_h$ are known, the draws can still be reweighted. Let $X_1,\dots,X_n$ be i.i.d.\ copies of
+$(\xi,Y)$, $N_h$ the number of draws with $\xi\in A_h$, $\bar Y_h$ the mean of their $Y$, and
+$\mathcal E=\{N_h\ge1\text{ for every }h\}$. The \emph{post-stratified estimator} is
+\[
+  \hat\mu^{\mathrm{post}}_n=\sum_hp_h\bar Y_h\ \text{ on }\mathcal E,\qquad
+  \hat\mu^{\mathrm{post}}_n=\hat\mu_n\ \text{ (the plain mean) on }\mathcal E^c .
+\]
+
+\begin{lemma}\label{lem:st-binomial}
+If $N$ is binomial with parameters $n$ and $p\in(0,1]$, then
+\[
+  \E\big[N^{-1}\1_{\{N\ge1\}}\big]=\frac1{np}+\frac{1-p}{n^2p^2}+O(n^{-3}).
+\]
+\end{lemma}
+
+\begin{proof}
+Let $q=1-p$ and $j\ge1$. Since $\binom nk\frac{k!}{(k+j)!}=\frac{n!}{(n+j)!}\binom{n+j}{k+j}$,
+the binomial theorem gives
+\[
+  \E\Big[\frac{1}{(N+1)\cdots(N+j)}\Big]=\frac{1-R_j}{(n+1)\cdots(n+j)\,p^j},
+\]
+where $R_j$ is the probability that a binomial$(n+j,p)$ variable is below $j$, so
+$0\le R_j\le(n+j)^jq^{n}$. For $N\ge1$,
+\[
+  \frac1N=\frac1{N+1}+\frac1{(N+1)(N+2)}+\frac2{N(N+1)(N+2)},
+\]
+and $0\le\frac2{N(N+1)(N+2)}\le\frac8{(N+1)(N+2)(N+3)}$, whose expectation is $O(n^{-3})$.
+Restricting the first two expectations to $\{N\ge1\}$ changes them by at most $q^n$. Hence
+$\E[N^{-1}\1_{\{N\ge1\}}]=\frac1{(n+1)p}+\frac1{(n+1)(n+2)p^2}+O(n^{-3})$; finally
+$\frac1{(n+1)p}=\frac1{np}-\frac1{n^2p}+O(n^{-3})$ and
+$\frac1{(n+1)(n+2)p^2}=\frac1{n^2p^2}+O(n^{-3})$.
+\end{proof}
+
+\begin{proposition}[Post-stratification]\label{prop:st-post}
+In this setting, with every $p_h>0$:
+\begin{enumerate}[label=(\roman*)]
+  \item Given the stratum labels of the $n$ draws, on $\mathcal E$ the estimator has
+    conditional mean $\mu$ and conditional variance $\sum_hp_h^2\sigma_h^2/N_h$.
+  \item $|\E\hat\mu^{\mathrm{post}}_n-\mu|\le\frac{\sigma}{\sqrt n}\big(\sum_h(1-p_h)^n\big)^{1/2}$:
+    the bias is exponentially small.
+  \item $\displaystyle\E\big[(\hat\mu^{\mathrm{post}}_n-\mu)^2\big]
+    =\frac1n\sum_hp_h\sigma_h^2+\frac1{n^2}\sum_h(1-p_h)\sigma_h^2+O(n^{-3})$.
+  \item $\sqrt n(\hat\mu^{\mathrm{post}}_n-\mu)\Rightarrow\mathcal N\big(0,\sum_hp_h\sigma_h^2\big)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) The pairs (label, draw) are i.i.d., and given its label $h$ a draw has the conditional
+law of $(\xi,Y)$ given $\xi\in A_h$; so, given all labels, the draws are independent with
+these laws. On $\mathcal E$, $\bar Y_h$ is then a mean of $N_h$ independent draws from
+stratum $h$; apply \cref{thm:st-variance}(ii) with $n_h=N_h$.
+
+(ii) $\mathcal E$ is determined by the labels, so by (i)
+$\E[(\hat\mu^{\mathrm{post}}_n-\mu)\1_{\mathcal E}]=0$, and
+$|\E\hat\mu^{\mathrm{post}}_n-\mu|=|\E[(\hat\mu_n-\mu)\1_{\mathcal E^c}]|\le\frac{\sigma}{\sqrt n}\Prob(\mathcal E^c)^{1/2}$
+by Cauchy--Schwarz, with $\Prob(\mathcal E^c)\le\sum_h(1-p_h)^n$.
+
+(iii) By (i),
+$\E[(\hat\mu^{\mathrm{post}}_n-\mu)^2]=\sum_hp_h^2\sigma_h^2\E[N_h^{-1}\1_{\mathcal E}]
++\E[(\hat\mu_n-\mu)^2\1_{\mathcal E^c}]$. Given the labels, the plain mean has conditional
+mean $\sum_h\frac{N_h}n\mu_h$ and conditional variance $\sum_hN_h\sigma_h^2/n^2$, so
+$\E[(\hat\mu_n-\mu)^2\mid\text{labels}]\le\max_h\sigma_h^2+\max_h(\mu_h-\mu)^2$, and the last
+term is $O(\Prob(\mathcal E^c))$. Also
+$0\le\E[N_h^{-1}\1_{\{N_h\ge1\}}]-\E[N_h^{-1}\1_{\mathcal E}]\le\Prob(\mathcal E^c)$. As
+$\Prob(\mathcal E^c)\le H\max_h(1-p_h)^n=O(n^{-3})$, \cref{lem:st-binomial} with $N_h$
+binomial$(n,p_h)$ gives
+$\sum_hp_h^2\sigma_h^2\big(\frac1{np_h}+\frac{1-p_h}{n^2p_h^2}\big)+O(n^{-3})$, which is the claim.
+
+(iv) On $\mathcal E$, whose probability tends to $1$,
+$\hat\mu^{\mathrm{post}}_n=\varphi(\bar a,\bar b)$ with $\varphi(a,b)=\sum_hp_ha_h/b_h$,
+$\bar a_h=\frac1n\sum_iY_i\1_{A_h}(\xi_i)$ and $\bar b_h=N_h/n$. The vectors
+$(Y\1_{A_h}(\xi),\1_{A_h}(\xi))_h$ are i.i.d.\ and square integrable, so by the multivariate
+central limit theorem and the delta method \citep[Theorem~3.1]{vandervaart-asymptotic},
+$\sqrt n(\varphi(\bar a,\bar b)-\mu)$ converges to a centred normal law with the variance of
+$\sum_h(\partial_{a_h}\varphi\,Y\1_{A_h}(\xi)+\partial_{b_h}\varphi\,\1_{A_h}(\xi))$ at
+$(a_h,b_h)=(p_h\mu_h,p_h)$, where $\partial_{a_h}\varphi=1$ and $\partial_{b_h}\varphi=-\mu_h$.
+That variable is $\sum_h\1_{A_h}(\xi)(Y-\mu_h)$, whose variance is $\sum_hp_h\sigma_h^2$.
+\end{proof}
+
+Post-stratification is therefore asymptotically as good as proportional stratification;
+it loses the term $\frac1{n^2}\sum_h(1-p_h)\sigma_h^2$, the price of the random counts,
+which is negligible when every $np_h$ is large. It breaks down when strata are so many that
+some are often empty. It needs no conditional sampling, so it keeps whatever fast generator
+the plain estimator uses. It is also a control variate in disguise, with the stratum
+indicators as controls (\exref{ex:st-post-regression}). For the test-case call with $10$ strata and
+$n=2\times10^5$, (iii) gives the standard-error ratio $0.3174$, larger than for proportional
+allocation only in the sixth digit; the measured $0.311$ (\cref{tab:st-lab}) is below both by
+sampling noise.
+
+\section{Stratifying paths}\label{sec:st-paths}
+
+A path-dependent payoff depends on many normals, $Y=f(Z)$ with $Z\sim\mathcal N(0,I_d)$.
+Stratifying all of them on a product grid needs $H^d$ cells, which is hopeless beyond a few
+dimensions. Two ways around this: stratify one well-chosen direction, or stratify every
+coordinate separately (\cref{sec:st-lhs}).
+
+\begin{proposition}[Stratifying a direction; terminal stratification]\label{prop:st-bridge}
+\begin{enumerate}[label=(\roman*)]
+  \item Let $Z\sim\mathcal N(0,I_d)$, $v\in\R^d$ a unit vector and $\xi=v^\top Z$. Then
+    $\xi\sim\mathcal N(0,1)$, and $Z-v\xi$ is independent of $\xi$ with law
+    $\mathcal N(0,I_d-vv^\top)$. Consequently, if $\xi'$ has the conditional law of $\xi$
+    given $\xi\in A$ and $Z'\sim\mathcal N(0,I_d)$ is independent of $\xi'$, then
+    $v\xi'+(I_d-vv^\top)Z'$ has the conditional law of $Z$ given $v^\top Z\in A$.
+  \item Let $0<t_1<\dots<t_m=T$. In the Brownian-bridge construction of
+    \cref{prop:ps-bridge}(iii), fill $t_m=T$ first, so that the first normal is $Z_1=W_T/\sqrt T$.
+    If $Z_1$ is drawn from its conditional law given $Z_1\in A$ and $Z_2,\dots,Z_m$ are
+    independent standard normals, the construction produces a vector with the conditional law
+    of $(W_{t_1},\dots,W_{t_m})$ given $W_T/\sqrt T\in A$. With the increments construction,
+    $W_T/\sqrt T=v^\top Z$ with $v_j=\sqrt{(t_j-t_{j-1})/T}$, and (i) gives the same law.
+  \item Hence, for $f(W_{t_1},\dots,W_{t_m})\in L^2$ and $H$ equiprobable strata of $W_T$ with
+    proportional allocation, the stratified estimator is unbiased with variance
+    $\frac1n\sum_hp_h\sigma_h^2$, and $n\Var\hat\mu^{\mathrm{st}}_n\to\E[\Var(f\mid W_T)]$
+    as $H\to\infty$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) $(\xi,Z-v\xi)$ is a linear image of $Z$, hence Gaussian, and
+$\Cov(Z-v\xi,\xi)=v-v\,v^\top v=0$, so the two are independent; $\Var\xi=v^\top v=1$ and
+$\Cov(Z-v\xi)=I_d-2vv^\top+vv^\top=I_d-vv^\top$. As $I_d-vv^\top$ is a symmetric projection,
+$(I_d-vv^\top)Z'\sim\mathcal N(0,I_d-vv^\top)$. For bounded measurable $F$, independence gives
+$\E[F(Z)\1_A(\xi)]=\E[F(v\xi+R)\1_A(\xi)]$ with $R=Z-v\xi$ independent of $\xi$; dividing by
+$\Prob(\xi\in A)$ this is $\E[F(v\xi'+R')]$ with $\xi'$ and $R'\eqd R$ independent.
+
+(ii) The construction is a fixed linear map, $W=AZ$, and $Z_1=W_T/\sqrt T$ because the
+first step sets $W_T=\sqrt T Z_1$. The vector $(Z_1,\dots,Z_m)$ has independent components,
+so conditioning on $Z_1\in A$ changes the law of $Z_1$ only; apply the map $A$. For the
+increments construction $W_T=\sum_j\sqrt{t_j-t_{j-1}}Z_j$.
+
+(iii) follows from (ii), \cref{thm:st-variance}(iii) and (v), with $\xi=N(W_T/\sqrt T)$.
+\end{proof}
+
+For geometric Brownian motion with deterministic parameters, the paths of
+\cref{prop:ps-gbm-exact} built by the bridge on the variance clock have $\ln S_T$ set by
+the first normal, so terminal stratification stratifies $S_T$; for a European payoff the
+limit in (iii) is $0$. In the code, the function \texttt{terminal\_stratified\_normals}
+draws $Z_1$ in its strata and the rest freely, and \texttt{paths.gbm\_paths} with
+\texttt{method="bridge"} builds the paths (\cref{fig:st-paths}a).
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch10-paths}
+  \caption{(a) Sixteen Brownian paths on $64$ steps, one in each of $16$ equiprobable
+    strata of $W_1$ (ticks: stratum boundaries), completed by the Brownian bridge.
+    (b) The arithmetic Asian call on $12$ monthly fixings in the test case: standard-error
+    ratio to plain sampling at equal $n$ against the number $H$ of equiprobable strata, with
+    proportional allocation and $n=2^{17}$ paths per point (seed $1021$). Stratified variables: $W_T$ through
+    the bridge (blue), the first increment $Z_1$ of the increments construction (gold), and
+    the direction of $\sum_jW_{t_j}$ (\cref{prop:st-bridge}(i); green). Horizontal lines:
+    Latin hypercube sampling with the two constructions, from $2000$ independent designs of
+    $2^{10}$ points.}
+  \label{fig:st-paths}
+\end{figure}
+
+\begin{example}[An Asian call]\label{exa:st-asian}
+The course's Asian example averages the stock at $t_j=j/12$, $j=1,\dots,12$, with strike
+$100$ in the test case. The course reports $4.56058$, a Monte Carlo estimate from $10^8$
+paths (standard error about $0.0008$); our geometric-control-variate estimate
+(\texttt{asian\_reference}, two runs of $2^{25}$ paths, seeds $2026$ and $7$) is $4.56122$ and
+$4.56127$, each with standard error $0.00003$, against the exact value $4.5612893$ computed in
+\cref{exa:as-reference} (the first run is $2.0$ standard errors low); the course's estimate is
+within its standard error. The plain standard deviation per path is $7.49$.
+With $64$ strata of $W_T$ the standard-error ratio is $0.530$ (\cref{tab:st-lab}): terminal stratification removes about $72\%$ of the
+variance of the payoff, and more strata add little (\cref{fig:st-paths}b), so this is nearly
+all of the part that $W_T$ explains. Stratifying the first normal of the
+increments construction instead fixes only $W_{1/12}$, and the ratio is $0.92$. The average
+of the path matters more than its end: stratifying the direction $v\propto L^\top\mathbf 1$ of
+$\sum_jW_{t_j}$, where $L$ is the increments matrix, gives $0.108$ with $64$ strata and about
+$0.055$ with $256$ (\cref{fig:st-paths}b). That direction is, to within a cosine of $0.9999$,
+the optimal importance-sampling drift of the payoff (\cref{prop:is-optimal-drift}), the
+direction along which \textcite{glasserman-heidelberger-shahabuddin} stratify.
+\end{example}
+
+\subsection{Latin hypercube sampling}\label{sec:st-lhs}
+
+Instead of one direction finely, Latin hypercube sampling stratifies every coordinate,
+each into $n$ strata, with $n$ points in total.
+
+\begin{definition}[Latin hypercube sample]\label{def:st-lhs}
+Let $\pi_1,\dots,\pi_d$ be independent uniformly random permutations of $\{1,\dots,n\}$ and
+$U_{ij}$, $i\le n$, $j\le d$, i.i.d.\ uniforms on $(0,1)$, independent of the permutations. The
+points $V_i=(V_{i1},\dots,V_{id})$ with $V_{ij}=(\pi_j(i)-1+U_{ij})/n$ form a \emph{Latin
+hypercube sample}, and $\hat\mu^{\mathrm{LHS}}_n=\frac1n\sum_if(V_i)$ estimates
+$\mu=\int_{[0,1]^d}f$. Normals are obtained as $N^{-1}(V_{ij})$.
+\end{definition}
+
+Every column has exactly one point in each interval $[(k-1)/n,k/n)$, and the permutations
+pair the columns at random (\cref{fig:st-lhs}a). For $f\in L^2([0,1]^d)$ write
+$f_j(u_j)=\E[f(U)\mid U_j=u_j]-\mu$ for $U$ uniform on the cube, the \emph{additive part}
+$f_{\mathrm{add}}=\mu+\sum_jf_j$ and the residual $e=f-f_{\mathrm{add}}$. The $f_j(U_j)$ are
+independent and centred, and $e(U)$ is uncorrelated with each of them, so
+$\sigma^2=\sum_j\Var f_j(U_j)+\int e^2$.
+
+\begin{proposition}[Latin hypercube sampling]\label{prop:st-lhs}
+Let $f\in L^2([0,1]^d)$ with variance $\sigma^2$ under the uniform law.
+\begin{enumerate}[label=(\roman*)]
+  \item Each $V_i$ is uniform on $[0,1]^d$, so $\hat\mu^{\mathrm{LHS}}_n$ is unbiased.
+  \item If $f$ is additive, $f=\mu+\sum_jf_j$, then
+    $\Var\hat\mu^{\mathrm{LHS}}_n=\sum_{j=1}^d\frac1{n^2}\sum_{k=1}^n\sigma_{j,k}^2$, with
+    $\sigma_{j,k}^2$ the variance of $f_j(U)$ given $U\in[(k-1)/n,k/n)$: each additive term is
+    integrated as by one-dimensional stratification with one point per stratum, and
+    $n\Var\hat\mu^{\mathrm{LHS}}_n\to0$.
+  \item \citep{stein-lhs} For every $f\in L^2$,
+    $\Var\hat\mu^{\mathrm{LHS}}_n=\frac1n\int e^2+o(1/n)$: asymptotically, Latin hypercube
+    sampling removes the variance of the additive part.
+  \item \citep{mckay-beckman-conover} If $f$ is monotone in each coordinate,
+    $\Var\hat\mu^{\mathrm{LHS}}_n\le\sigma^2/n$ for every $n$.
+    \citep{owen-scrambled-nets} For every $f\in L^2$ and $n\ge2$,
+    $\Var\hat\mu^{\mathrm{LHS}}_n\le\sigma^2/(n-1)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) For fixed $i$, $\pi_j(i)$ is uniform on $\{1,\dots,n\}$ and independent of $U_{ij}$, so
+$\Prob(V_{ij}\le x)=\frac1n\sum_k\Prob(k-1+U\le nx)=x$; the pairs $(\pi_j(i),U_{ij})$ are
+independent across $j$.
+
+(ii) Fix $j$ and list the points of column $j$ by stratum: the point in
+$[(k-1)/n,k/n)$ is $(k-1+U_{\pi_j^{-1}(k)j})/n$. Given $\pi_j$, the $U_{\pi_j^{-1}(k)j}$,
+$k=1,\dots,n$, are i.i.d.\ uniforms, and their conditional law does not depend on $\pi_j$. So
+$\frac1n\sum_if_j(V_{ij})$ is the stratified estimator of $\int f_j$ with $n$ equiprobable
+strata and one point each, whose variance is $\frac1{n^2}\sum_k\sigma_{j,k}^2$ by
+\cref{thm:st-variance}(ii). Different columns are built from independent ingredients, so
+the variances add. Finally
+$n\Var\hat\mu^{\mathrm{LHS}}_n=\sum_j\sum_k\frac1n\sigma_{j,k}^2\to0$ by
+\cref{thm:st-variance}(v) applied to $Y=f_j(U)$, for which $\Var(Y\mid U)=0$.
+
+(iii) is \textcite{stein-lhs}; see also \citet[Proposition~10.1]{owen-mcbook}, where it
+is stated for $\int f^2<\infty$. (iv) The first statement is the theorem stated in
+Section~2.1 of \textcite{mckay-beckman-conover} and proved in their appendix (Section~8.3).
+The second is due to \textcite{owen-scrambled-nets}, see \citet[Proposition~10.4]{owen-mcbook},
+stated there for $n>2$; for $n=2$ it is immediate, since
+$\Var\frac{f(V_1)+f(V_2)}2\le\frac12(\Var f(V_1)+\Var f(V_2))=\sigma^2$ by Cauchy--Schwarz.
+\end{proof}
+
+The $n$ points of a design are dependent, so the variance is estimated from independent
+replications of the whole design, as in \cref{prop:st-error}(iii). The bound
+$\sigma^2/(n-1)$ cannot be improved to $\sigma^2/n$: for a function with no additive part
+Latin hypercube sampling can be slightly worse than plain sampling
+(\exref{ex:st-lhs-interaction}). For the Asian call of \cref{exa:st-asian}, Latin hypercube
+sampling of the $12$ normals gives standard-error ratios of $0.54\pm0.01$ with the increments
+construction and $0.354\pm0.006$ with the bridge ($2000$ designs of $2^{10}$ points), which puts the most important variables first and
+makes the payoff more nearly additive in them (\cref{tab:st-lab}). Latin hypercube sampling
+balances only the one-dimensional projections of the design; the randomised quasi-Monte Carlo
+point sets of \cref{ch:11-quasi-monte-carlo} also balance the higher-dimensional ones.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch10-lhs}
+  \caption{(a) A Latin hypercube sample of $10$ points in $[0,1]^2$: one point in each row
+    and each column of the grid. (b) $n\Var\hat\mu^{\mathrm{LHS}}_n/\sigma^2$ against $n$ in
+    dimension $5$, from $400$ independent designs for each $n$ (seed $1040$), for $\sum_je^{u_j}$ (additive),
+    the same plus $6(u_1-\frac12)(u_2-\frac12)$, and $\prod_j2u_j$. Dashed: the limits
+    $\int e^2/\sigma^2$ of \cref{prop:st-lhs}(iii), $0.17$ and $0.48$; the solid line is plain
+    sampling.}
+  \label{fig:st-lhs}
+\end{figure}
+
+\demo{10-stratification.ipynb}{stratify Brownian paths on their endpoint or on any linear
+combination of the path, and draw Latin hypercube designs.}
+
+\section{Conditional Monte Carlo}\label{sec:st-conditional}
+
+If part of the randomness can be integrated out in closed form, it should be.
+
+\begin{theorem}[Conditional Monte Carlo]\label{thm:st-conditional}
+Let $Y\in L^2$, let $\mathcal G$ be a sub-$\sigma$-algebra, and $Y^{\mathrm c}=\E[Y\mid\mathcal G]$.
+\begin{enumerate}[label=(\roman*)]
+  \item $\E Y^{\mathrm c}=\E Y$ and $\Var Y=\Var Y^{\mathrm c}+\E[\Var(Y\mid\mathcal G)]$,
+    where $\Var(Y\mid\mathcal G)=\E[(Y-Y^{\mathrm c})^2\mid\mathcal G]$. Hence
+    $\Var Y^{\mathrm c}\le\Var Y$, with equality if and only if $Y=Y^{\mathrm c}$ almost
+    surely, that is, if and only if $Y$ is almost surely equal to a $\mathcal G$-measurable variable.
+  \item If $\mathcal G_1\subset\mathcal G_2$, then
+    $\Var\E[Y\mid\mathcal G_1]\le\Var\E[Y\mid\mathcal G_2]$.
+  \item The average $\hat\mu^{\mathrm c}_n$ of $n$ i.i.d.\ copies of $Y^{\mathrm c}$ is
+    unbiased with variance $\Var Y^{\mathrm c}/n$; if a copy of $Y^{\mathrm c}$ costs $\lambda$
+    times a copy of $Y$, its efficiency relative to plain sampling is
+    $\Var Y/(\lambda\Var Y^{\mathrm c})$, which may be below $1$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(i) $\E Y^{\mathrm c}=\E Y$ by the tower property. $Y-Y^{\mathrm c}$ is orthogonal in $L^2$ to
+every square-integrable $\mathcal G$-measurable variable, in particular to
+$Y^{\mathrm c}-\E Y$, so
+$\E(Y-\E Y)^2=\E(Y^{\mathrm c}-\E Y)^2+\E(Y-Y^{\mathrm c})^2$, and
+$\E(Y-Y^{\mathrm c})^2=\E[\Var(Y\mid\mathcal G)]$. The last term vanishes if and only if
+$Y=Y^{\mathrm c}$ almost surely. (ii) Apply (i) to $\E[Y\mid\mathcal G_2]$ and $\mathcal G_1$, using
+$\E[\E[Y\mid\mathcal G_2]\mid\mathcal G_1]=\E[Y\mid\mathcal G_1]$. (iii) is
+\cref{def:mc-efficiency}.
+\end{proof}
+
+In statistics this is the Rao--Blackwell theorem \citep[Theorem~7.3.17]{casella-berger},
+where $\mathcal G$ is generated by a sufficient statistic so that $Y^{\mathrm c}$ does not
+depend on the unknown parameter. Here $\mathcal G$ is ours to choose, and the only
+requirement is that $Y^{\mathrm c}$ be computable. Part (ii) is the trade-off: conditioning
+on less information removes more variance but leaves a harder conditional expectation.
+\Cref{eq:st-total-variance} shows how conditioning and stratification divide the work. For
+a scalar $\xi$ with a continuous law and many equiprobable strata, stratifying on $\xi$
+gives $n\Var\to\E[\Var(Y\mid\xi)]$ (\cref{thm:st-variance}(v)), and conditioning on $\xi$ gives
+$n\Var=\Var(\E[Y\mid\xi])$; the two add up to $\sigma^2$. Stratify on what cannot be integrated,
+integrate out what can, and, when $\E[Y\mid\xi]=g(\xi)$ is available, do both: stratifying
+$\xi$ in $g(\xi)$ has variance $o(1/n)$. Further examples in these notes are the
+Brownian-bridge correction for barriers, which integrates out the path between monitoring
+dates (\cref{prop:bar-bridge-crossing}), conditioning a two-asset payoff on one asset
+(\exref{ex:st-spread}) and Curran's conditioning on the geometric average
+(\cref{prop:as-curran}). Conditional values are smooth in the parameters even when the payoff
+is not, which is what pathwise Greeks need (\cref{thm:gr-pathwise}).
+
+\subsection{Conditioning on the volatility path}
+
+In a stochastic volatility model, given the whole path of the variance the log-price is
+Gaussian, and the Black--Scholes formula gives the conditional price
+\citep{hull-white-sv,romano-touzi,willard}.
+
+\begin{proposition}[Mixing: conditioning on the volatility path]\label{prop:st-mixing}
+Let $W$ and $W^\perp$ be independent Brownian motions under $\Q$, $(\F^W_t)$ the
+filtration generated by $W$, and $V\ge0$ an $(\F^W_t)$-progressively measurable process
+with $Q_T=\int_0^TV_t\,\dd t<\infty$ almost surely. Let $\rho\in[-1,1]$, $\bar\rho=\sqrt{1-\rho^2}$,
+$I_T=\int_0^T\sqrt{V_t}\,\dd W_t$, and
+\[
+  S_T=S\exp\Big((r-y)T-\tfrac12Q_T+\rho I_T+\bar\rho\int_0^T\sqrt{V_t}\,\dd W^\perp_t\Big),
+\]
+the solution of $\dd S_t=S_t\big((r-y)\,\dd t+\sqrt{V_t}(\rho\,\dd W_t+\bar\rho\,\dd W^\perp_t)\big)$. Set
+\[
+  \tilde S=S\exp\big(\rho I_T-\tfrac12\rho^2Q_T\big),\qquad \tilde\sigma=\bar\rho\sqrt{Q_T/T}.
+\]
+\begin{enumerate}[label=(\roman*)]
+  \item There is a standard normal $N$, independent of $\F^W_T$, with
+    $\ln S_T=\ln\tilde S+(r-y-\frac12\tilde\sigma^2)T+\tilde\sigma\sqrt TN$.
+  \item For every Borel $f$ with $\E|f(S_T)|<\infty$,
+    $\E[f(S_T)\mid\F^W_T]=\int_\R f\big(\tilde Se^{(r-y-\tilde\sigma^2/2)T+\tilde\sigma\sqrt Tz}\big)N'(z)\,\dd z$.
+    In particular the conditional price of a call is the Black--Scholes price at spot
+    $\tilde S$ and volatility $\tilde\sigma$, $e^{-rT}\E[(S_T-K)^+\mid\F^W_T]=C_{\mathrm{BS}}(\tilde S,K,T,r,y,\tilde\sigma)$,
+    and likewise for a put; when $\tilde\sigma=0$ (for $\rho=\pm1$ or $Q_T=0$) it is the
+    discounted payoff at the forward $\tilde Se^{(r-y)T}$.
+  \item (\emph{Hull and White}.) If $\rho=0$, the call price is
+    $\E\big[C_{\mathrm{BS}}(S,K,T,r,y,\sqrt{Q_T/T})\big]$: a mixture of Black--Scholes prices
+    over the law of the realised volatility (\exref{ex:st-hull-white} expands it for small
+    volatility of variance).
+  \item (\emph{On a grid}.) If $\ln S$ is advanced by the log-Euler step
+    $\Delta\ln S=(r-y-\frac12V_{t_k})\Delta_k+\sqrt{V_{t_k}}(\rho\Delta W_k+\bar\rho\Delta W^\perp_k)$
+    with $V_{t_k}$ functions of $W$ only, (i) and (ii) hold exactly with $Q_T$ and $I_T$ replaced
+    by $\sum_kV_{t_k}\Delta_k$ and $\sum_k\sqrt{V_{t_k}}\Delta W_k$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) Let $\mathcal G_t=\F^W_T\vee\sigma(W^\perp_s:s\le t)$, completed. Since $W^\perp$ is
+independent of $W$ and has independent increments, $W^\perp_t-W^\perp_s$ is independent of
+$\mathcal G_s$, so $W^\perp$ is a $(\mathcal G_t)$-Brownian motion. Let $h_t=\sqrt{V_t/Q_T}$
+on $\{Q_T>0\}$ and $h_t=1/\sqrt T$ on $\{Q_T=0\}$. It is measurable in $(t,\omega)$ with
+respect to $\mathcal B([0,T])\otimes\F^W_T$, hence $(\mathcal G_t)$-progressive, and
+$\int_0^Th_t^2\,\dd t=1$. Let $N=\int_0^Th\,\dd W^\perp$ in the filtration $(\mathcal G_t)$.
+For $u\in\R$, It\^o's formula shows that
+$M_t=\exp\big(iu\int_0^th\,\dd W^\perp+\frac{u^2}2\int_0^th^2\,\dd s\big)$ is a local martingale;
+it is bounded by $e^{u^2/2}$, hence a martingale, and $\E[M_T\mid\mathcal G_0]=1$, that is,
+$\E[e^{iuN}\mid\mathcal G_0]=e^{-u^2/2}$. A deterministic conditional characteristic function
+means that $N$ is standard normal and independent of $\mathcal G_0\supset\F^W_T$. Finally,
+$\int_0^T\sqrt V\,\dd W^\perp=\sqrt{Q_T}\,N$ almost surely: $\sqrt V=\sqrt{Q_T}\,h$, the
+$\mathcal G_0$-measurable factor $\sqrt{Q_T}$ can be taken out of the integral (check it on
+simple integrands), and the integral of the $(\F^W_t\vee\F^{W^\perp}_t)$-progressive
+process $\sqrt V$ is the same in either filtration, since $W^\perp$ is a Brownian motion for
+both and the integral is the limit in probability of the integrals of the same simple
+processes. Substitute in $\ln S_T$: $\bar\rho\sqrt{Q_T}=\tilde\sigma\sqrt T$ and
+$-\frac12Q_T+\rho I_T=\ln(\tilde S/S)-\frac12\tilde\sigma^2T$.
+
+(ii) $\tilde S$ and $\tilde\sigma$ are $\F^W_T$-measurable and $N$ is independent of
+$\F^W_T$; apply the independence lemma \citep[Lemma~2.3.4]{shreve2}. For the call, the
+integral is the Black--Scholes expectation with spot $\tilde S$ and volatility
+$\tilde\sigma$. (iii) is (ii) with $\tilde S=S$ and $\tilde\sigma=\sqrt{Q_T/T}$, after taking
+expectations. (iv) Given $\F^W_T$ the sum $\sum_k\sqrt{V_{t_k}}\Delta W^\perp_k$ is a
+combination, with $\F^W_T$-measurable coefficients, of the independent
+$\Delta W^\perp_k\sim\mathcal N(0,\Delta_k)$, hence conditionally $\mathcal N(0,\sum_kV_{t_k}\Delta_k)$; the
+rest is as before.
+\end{proof}
+
+The conditional estimator averages $C_{\mathrm{BS}}(\tilde S,K,T,r,y,\tilde\sigma)$ over
+simulated variance paths and needs no normal for $W^\perp$. By \cref{thm:st-conditional} it
+removes the part of the variance due to $W^\perp$, which is large when $|\rho|$ is small. At
+$\rho=\pm1$ there is nothing left to integrate. In the Heston model (\cref{def:sv-heston}),
+$\dd V_t=\kappa(\theta-V_t)\,\dd t+\xi\sqrt{V_t}\,\dd W_t$; this equation has a pathwise
+unique strong solution, adapted to the filtration of $W$ \citep[Sections~5.2 and 5.3]{karatzas-shreve},
+and integrating it gives
+\[
+  I_T=\frac1\xi\big(V_T-V_0-\kappa\theta T+\kappa Q_T\big),
+\]
+so the conditional estimator needs only $V_T$ and $Q_T$ \citep{willard,broadie-kaya}.
+
+\paragraph{A laboratory.} Take the test case with $V_0=\theta=0.04$, $\kappa=2$ and
+$\xi=0.3$, and the at-the-money put, whose payoff is bounded, so that every variance is
+finite whatever the moments of $S_T$. We sample $V$ exactly at $64$ equal steps, by
+noncentral chi-square transitions \citep[Section~3.4.1]{glasserman-mc}, take $Q_T$ by the
+trapezoidal rule and $I_T$ from the identity above. The plain estimator draws one more normal
+per path and builds $S_T$ from (i); the conditional estimator uses (ii) on the same variance
+paths. Both estimate the same discretised price, and the conditional one is the
+Rao--Blackwellisation of the other. The Fourier prices of \cref{prop:sv-fourier} are $8.1534$
+for $\rho=0$ and $7.9480$ for $\rho=-0.7$. Over $40$ independent runs of $5000$ paths
+(our implementation, numpy \texttt{default\_rng}, seeds $777$ to $816$), the errors of the
+conditional estimate divided by its standard error have mean $0.16$ and standard deviation
+$1.04$ for $\rho=0$, and $0.15$ and $1.01$ for $\rho=-0.7$: no discretisation bias is visible,
+and the standard errors are honest. The standard-error ratio of the conditional to the plain estimator is
+$0.163$ for $\rho=0$ and $0.728$ for $\rho=-0.7$ ($4\times10^5$ paths, \cref{tab:st-lab}); the
+cost per path is dominated by the $64$ variance steps and is the same for both, so the
+efficiencies are about $37$ and $1.9$. \Cref{fig:st-mixing} shows why: for $\rho=0$ the
+conditional value is a smooth function of the realised variance, while the plain payoff
+scatters around it.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ch10-mixing}
+  \caption{Conditional Monte Carlo for the at-the-money put in the Heston model ($V_0=\theta=0.04$,
+    $\kappa=2$, $64$ exact variance steps). (a) $\rho=0$, $\xi=0.3$: plain payoffs and conditional values
+    $P_{\mathrm{BS}}(S,K,T,r,y,\sqrt{Q_T/T})$ for $2000$ variance paths, against the realised volatility.
+    (b) Standard-error ratio of the conditional to the plain estimator against $-\rho$, from
+    $5\times10^4$ variance paths (the same for every $\rho$; seed $1031$), for $\xi=0.3$ and $\xi=0.6$.}
+  \label{fig:st-mixing}
+\end{figure}
+
+\demo{10-stratification.ipynb}{conditional Monte Carlo in the Heston model: move $\rho$ and
+$\xi$ and watch the plain payoffs collapse onto the conditional values.}
+
+\section{Laboratory}\label{sec:st-lab}
+
+\Cref{tab:st-lab} collects the methods of the chapter. One-dimensional rows use $n=2\times10^5$
+draws (the test-case call) and $n=10^5$ (the course's deep out-of-the-money call); the
+exact ratios come from \cref{thm:st-variance,prop:st-optimal,prop:st-post} with stratum
+moments by quadrature. The ratios are produced by \texttt{stratified.laboratory()} (numpy
+\texttt{default\_rng}, seed $10$). The costs are medians of wall-clock times of the whole
+estimator against its plain competitor, measured by \texttt{laboratory\_costs()} on our machine:
+they vary by tens of percent from run to run and more across machines, and the notebook
+measures them on yours.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \begin{tabular}{@{}llcccc@{}}
+    \toprule
+    target & method & exact & measured & cost & efficiency\\
+    \midrule
+    call & $10$ strata, proportional & $0.317$ & $0.318$ & $4.5$ & $2.2$\\
+     & $10$ strata, Neyman & $0.153$ & $0.152$ & $5$ & $8.6$\\
+     & $10$ strata, post-stratified & $0.317$ & $0.311$ & $3$ & $3.3$\\
+     & $100$ strata, proportional & $0.090$ & $0.085$ & $4.5$ & $27$\\
+    \midrule
+    deep OTM call & $10$ strata, proportional & $0.925$ & $0.939$ & $4.5$ & $0.26$\\
+     & $100$ strata, proportional & $0.398$ & $0.386$ & $4.5$ & $1.4$\\
+    \midrule
+    Asian call & $64$ strata of $W_T$ (bridge) & & $0.530$ & $1.6$ & $2.2$\\
+     & $64$ strata of the first increment & & $0.917$ & $1.2$ & $1.0$\\
+     & $64$ post-strata of $W_T$ & & $0.530$ & $1.5$ & $2.4$\\
+     & $64$ strata of $\sum_jW_{t_j}$ & & $0.108$ & $1.5$ & $57$\\
+     & Latin hypercube, increments & & $0.54\pm0.01$ & $4.2$ & $0.8$\\
+     & Latin hypercube, bridge & & $0.354\pm0.006$ & $4.8$ & $1.7$\\
+    \midrule
+    Heston put & conditional, $\rho=0$ & & $0.163$ & $1.0$ & $37$\\
+     & conditional, $\rho=-0.7$ & & $0.728$ & $1.0$ & $1.9$\\
+    \bottomrule
+  \end{tabular}
+  \caption{Standard-error ratios $\varrho$ to plain Monte Carlo at equal $n$, exact and measured;
+    cost per draw relative to the plain estimator (NumPy normals; increments construction for the
+    Asian call), on our machine; and the efficiency $1/(\varrho^2\times\text{cost})$, from the exact
+    ratio where there is one. Measured ratios divide the method's standard error by
+    $\sigma/\sqrt n$, with $\sigma$ exact for the calls, from $2^{20}$ plain paths for the Asian
+    call, and from the plain estimator on the same paths for the Heston put. The Asian rows use
+    $n=2^{16}$ paths, Latin hypercube $2000$ designs of $2^{10}$ points; the Heston rows use
+    $4\times10^5$ variance paths, whose simulation dominates the cost of both estimators.}
+  \label{tab:st-lab}
+\end{table}
+
+Costs change the picture. Stratification by inversion pays in one dimension only with enough
+strata, and loses for the deep out-of-the-money call with $10$ strata, whose equiprobable strata
+are wasted where the payoff vanishes; post-stratification keeps the fast generator. Latin
+hypercube sampling needs $12$ inversions per path and barely covers that cost here, while
+stratifying the right direction costs little and gains a factor $57$. Conditioning costs one
+Black--Scholes evaluation per path and helps as much as the integrated-out noise contributes.
+
+\paragraph{Course examples reproduced.} The stratified-sampling experiment of the course's
+notebook, with its exact variances; the call price $7.36429$; and the course's estimate
+$4.56058$ of its Asian call, confirmed within its standard error.
+
+\furtherreading
+\textcite{glasserman-mc} is the reference: Section~4.3.1 for stratified sampling and optimal
+allocation, Section~4.3.2 for stratified paths, Section~4.3.3 for post-stratification and
+Section~4.4 for Latin hypercube sampling; \textcite{asmussen-glynn}, Sections~V.4 and~V.7,
+treat conditional Monte Carlo and stratification. \textcite{neyman-1934} introduced the optimal
+allocation; \textcite{cochran}, Chapter~5, is the classical account of stratified sampling. Latin hypercube sampling is due to \textcite{mckay-beckman-conover}; its asymptotics
+are in \textcite{stein-lhs} and \textcite{owen-lhs-clt}, and \textcite{owen-mcbook},
+Chapter~10, gives a modern account. The mixing formula goes back to \textcite{hull-white-sv}
+for independent volatility; \textcite{romano-touzi} treat correlated volatility, and
+\textcite{willard} turned it into a conditional Monte Carlo method.
